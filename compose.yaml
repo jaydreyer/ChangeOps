@@ -41,6 +41,7 @@ services:
     build: .
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-changeops}:${POSTGRES_PASSWORD:-changeops}@db:5432/${POSTGRES_DB:-changeops}
+      TEST_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-changeops}:${POSTGRES_PASSWORD:-changeops}@db:5432/changeops_test
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:

@@ -469,23 +469,28 @@ def _add_commitment_impacts(
     trips_by_id: dict[str, TripInput],
     context: EnterpriseContextInput,
 ) -> None:
-    affected_by_worker = {item.worker_id: item for item in affected_results}
+    affected_by_worker: dict[str, list[WorkerAnalysis]] = defaultdict(list)
+    for result in affected_results:
+        affected_by_worker[result.worker_id].append(result)
     commitments_by_id = {item.id: item for item in context.commitments}
     qualifying: dict[str, list[tuple[CommitmentAssignmentInput, WorkerAnalysis]]] = defaultdict(
         list
     )
     for assignment in sorted(context.commitment_assignments, key=lambda item: item.id):
-        result = affected_by_worker.get(assignment.worker_id)
         commitment = commitments_by_id[assignment.commitment_id]
-        if result is None or not assignment.required or commitment.status != "active":
+        if not assignment.required or commitment.status != "active":
             continue
-        trip = trips_by_id[result.trip_id]
-        if commitment.start_date <= trip.departure_date <= commitment.end_date:
-            qualifying[commitment.id].append((assignment, result))
+        for result in affected_by_worker.get(assignment.worker_id, []):
+            trip = trips_by_id[result.trip_id]
+            if commitment.start_date <= trip.departure_date <= commitment.end_date:
+                qualifying[commitment.id].append((assignment, result))
 
     for commitment_id, matches in sorted(qualifying.items()):
         commitment = commitments_by_id[commitment_id]
-        assignment, result = sorted(matches, key=lambda item: item[0].id)[0]
+        assignment, result = sorted(
+            matches,
+            key=lambda item: (item[0].id, item[1].trip_id),
+        )[0]
         worker = workers_by_id[result.worker_id]
         trip = trips_by_id[result.trip_id]
         key = f"customer_commitments:customer_commitment:{commitment.id}"

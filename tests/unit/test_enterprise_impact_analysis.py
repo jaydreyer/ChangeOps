@@ -440,6 +440,42 @@ def test_customer_commitment_date_overlap_is_inclusive_and_required() -> None:
     assert "commitment-overlap" not in {item.source_key for item in impacts}
 
 
+def test_commitment_checks_every_affected_trip_and_reports_once() -> None:
+    workers, trips, training, context = make_inputs()
+    trips.append(
+        TripInput(
+            id="trip-sarah-later",
+            worker_id="worker-sarah",
+            origin_country="US",
+            destination_country="DE",
+            departure_date=date(2026, 10, 1),
+            booking_date=None,
+            booking_status="planned",
+        )
+    )
+    policy = make_policy()
+    worker_result = analyze_policy(policy, workers, trips, training)
+
+    result = analyze_enterprise_impacts(
+        policy,
+        workers,
+        trips,
+        training,
+        context,
+        worker_result,
+    )
+
+    commitment_impacts = [
+        item for item in result.impacts if item.source_key == "commitment-overlap"
+    ]
+    assert len(commitment_impacts) == 1
+    assert {
+        element.stable_key
+        for element in commitment_impacts[0].relationship_path
+        if element.object_type == "trip"
+    } == {"trip-sarah"}
+
+
 def test_input_order_does_not_change_enterprise_result() -> None:
     workers, trips, training, context = make_inputs()
     policy = make_policy()

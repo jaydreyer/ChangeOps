@@ -1,0 +1,720 @@
+# ChangeOps Demonstration Scenario
+
+## Purpose
+
+This document defines the initial demonstration scenario for ChangeOps.
+
+It serves as the reference case for Milestone 0: Deterministic Impact-Assessment Foundation. The seeded data, analysis rules, expected findings, and expected recommendations in this document should be treated as the golden test case for the first implementation.
+
+The purpose of the scenario is not to model every possible enterprise policy change. It is to prove that ChangeOps can:
+
+1. represent a policy change;
+2. evaluate the change against enterprise data;
+3. identify affected and unaffected people;
+4. explain why each person is or is not affected;
+5. cite the evidence supporting each conclusion;
+6. recommend appropriate follow-up actions;
+7. persist and retrieve the completed assessment.
+
+Milestone 0 uses deterministic rules. It does not use an LLM, LangGraph, MCP, external enterprise systems, or automated execution.
+
+---
+
+## Fictional Organization
+
+### Organization
+
+**Name:** Acme Global Manufacturing  
+**Industry:** Manufacturing  
+**Headquarters:** Minneapolis, Minnesota, United States
+
+Acme Global Manufacturing employs workers in several countries and regularly sends employees and contractors on international business trips.
+
+All names, records, policies, and systems in this scenario are fictional.
+
+---
+
+## Policy Change
+
+### Policy title
+
+International Business Travel Approval and Security Training
+
+### Policy owner
+
+Corporate Security and Global Travel
+
+### Effective date
+
+September 1, 2026
+
+### Policy text
+
+Effective September 1, 2026, U.S.-based employees and contractors traveling internationally for business must complete the International Travel Security course before departure.
+
+Manager approval is required before any nonrefundable international travel is booked.
+
+Travel booked before September 1, 2026 is exempt from the new manager-approval requirement. However, travelers departing on or after September 1, 2026 must still complete the International Travel Security course before departure.
+
+Travel between the United States and Canada is excluded from this policy.
+
+### Intended interpretation
+
+For Milestone 0, the following deterministic interpretations apply:
+
+- A worker is considered U.S.-based when the worker’s assigned work country is the United States.
+- Both employees and contractors may be affected.
+- International travel means business travel from the United States to a country other than the United States or Canada.
+- Travel to Canada is excluded.
+- The security-course requirement applies when the departure date is on or after September 1, 2026.
+- The manager-approval requirement applies when:
+  - the departure date is on or after September 1, 2026;
+  - the destination is covered by the policy; and
+  - the travel was not booked before September 1, 2026.
+- A trip booked before September 1, 2026 is exempt only from the new manager-approval requirement.
+- A preexisting booking does not exempt the traveler from the security-course requirement.
+
+These interpretations are implementation rules for the first deterministic slice. A later AI-enabled release may extract, classify, and flag uncertainty in these rules directly from policy text.
+
+---
+
+## Seeded Workers and Trips
+
+### 1. Sarah Johnson
+
+**Worker ID:** `worker-sarah-johnson`  
+**Worker type:** Employee  
+**Department:** Human Resources  
+**Manager:** Mike Wilson  
+**Assigned work country:** United States  
+**Destination:** France  
+**Departure date:** September 15, 2026  
+**Booking date:** Not yet booked  
+**Security course status:** Not completed
+
+#### Expected result
+
+Sarah is affected by both requirements.
+
+#### Expected reasoning
+
+- Sarah is a U.S.-based employee.
+- France is an international destination covered by the policy.
+- Her departure is after the September 1 effective date.
+- Her trip has not been booked, so it is not exempt from the manager-approval requirement.
+- She has not completed the required security course.
+
+#### Expected recommendations
+
+- Require manager approval before nonrefundable booking.
+- Assign the International Travel Security course.
+- Require course completion before departure.
+
+---
+
+### 2. Marcus Lee
+
+**Worker ID:** `worker-marcus-lee`  
+**Worker type:** Contractor  
+**Department:** Information Technology  
+**Manager:** Anita Patel  
+**Assigned work country:** United States  
+**Destination:** Japan  
+**Departure date:** October 2, 2026  
+**Booking date:** Not yet booked  
+**Security course status:** Completed
+
+#### Expected result
+
+Marcus is affected by the manager-approval requirement but does not require a new course assignment.
+
+#### Expected reasoning
+
+- Marcus is a U.S.-based contractor.
+- Contractors are included in the policy.
+- Japan is an international destination covered by the policy.
+- His departure is after the effective date.
+- His trip has not been booked, so manager approval is required before nonrefundable booking.
+- He has already completed the security course.
+
+#### Expected recommendations
+
+- Require manager approval before nonrefundable booking.
+- Do not assign a duplicate security course.
+- Confirm that the existing course completion remains valid through the departure date.
+
+For Milestone 0, the course completion should be treated as valid. Course expiration logic is outside the scope of this slice.
+
+---
+
+### 3. Elena García
+
+**Worker ID:** `worker-elena-garcia`  
+**Worker type:** Employee  
+**Department:** Finance  
+**Manager:** Carlos Martín  
+**Assigned work country:** Spain  
+**Destination:** United States  
+**Departure date:** September 20, 2026  
+**Booking date:** August 25, 2026  
+**Security course status:** Not completed
+
+#### Expected result
+
+Elena is not affected.
+
+#### Expected reasoning
+
+- Elena is assigned to Spain and is therefore not U.S.-based.
+- The policy applies only to U.S.-based employees and contractors.
+- Her travel should not be included in the affected population.
+
+#### Expected recommendations
+
+No action.
+
+---
+
+### 4. David Miller
+
+**Worker ID:** `worker-david-miller`  
+**Worker type:** Employee  
+**Department:** Sales  
+**Manager:** Jennifer Brooks  
+**Assigned work country:** United States  
+**Destination:** Germany  
+**Departure date:** September 10, 2026  
+**Booking date:** August 20, 2026  
+**Security course status:** Not completed
+
+#### Expected result
+
+David is affected by the security-course requirement but exempt from the new manager-approval requirement.
+
+#### Expected reasoning
+
+- David is a U.S.-based employee.
+- Germany is a covered international destination.
+- His departure is after the effective date.
+- His travel was booked before September 1, so the booking is exempt from the new manager-approval requirement.
+- The booking exemption does not apply to the security-course requirement.
+- He has not completed the required course.
+
+#### Expected recommendations
+
+- Assign the International Travel Security course.
+- Require course completion before departure.
+- Do not require retroactive manager approval for the existing booking.
+
+---
+
+### 5. Priya Shah
+
+**Worker ID:** `worker-priya-shah`  
+**Worker type:** Employee  
+**Department:** Product Management  
+**Manager:** Robert Chen  
+**Assigned work country:** United States  
+**Destination:** Canada  
+**Departure date:** September 18, 2026  
+**Booking date:** Not yet booked  
+**Security course status:** Not completed
+
+#### Expected result
+
+Priya is not affected.
+
+#### Expected reasoning
+
+- Priya is a U.S.-based employee.
+- Her departure occurs after the effective date.
+- However, travel between the United States and Canada is explicitly excluded from the policy.
+
+#### Expected recommendations
+
+No action.
+
+---
+
+### 6. Thomas Green
+
+**Worker ID:** `worker-thomas-green`  
+**Worker type:** Employee  
+**Department:** Operations  
+**Manager:** Linda Evans  
+**Assigned work country:** United States  
+**Destination:** Mexico  
+**Departure date:** August 20, 2026  
+**Booking date:** August 1, 2026  
+**Security course status:** Not completed
+
+#### Expected result
+
+Thomas is not affected.
+
+#### Expected reasoning
+
+- Thomas is a U.S.-based employee.
+- Mexico would otherwise be a covered international destination.
+- His departure occurs before the September 1 effective date.
+- Neither requirement applies to this trip.
+
+#### Expected recommendations
+
+No action.
+
+---
+
+## Seeded Supporting Evidence
+
+The analysis must not return conclusions without evidence. Each finding should reference one or more persisted evidence records.
+
+### Worker evidence
+
+Each worker record should provide:
+
+- worker ID;
+- worker type;
+- assigned work country;
+- department;
+- manager.
+
+### Trip evidence
+
+Each trip record should provide:
+
+- traveler ID;
+- origin country;
+- destination country;
+- departure date;
+- booking date;
+- booking status.
+
+### Training evidence
+
+Each training record should provide:
+
+- worker ID;
+- course identifier;
+- completion status;
+- completion date, when applicable.
+
+### Policy evidence
+
+The policy record should provide:
+
+- policy ID;
+- policy title;
+- policy version;
+- effective date;
+- policy text;
+- the relevant policy section or rule supporting each finding.
+
+---
+
+## Expected Assessment Summary
+
+The completed impact assessment should produce the following summary.
+
+### Affected workers
+
+- Sarah Johnson
+- Marcus Lee
+- David Miller
+
+### Unaffected workers
+
+- Elena García
+- Priya Shah
+- Thomas Green
+
+### Required manager approvals
+
+- Sarah Johnson
+- Marcus Lee
+
+### Required security-course assignments
+
+- Sarah Johnson
+- David Miller
+
+### Already compliant with security training
+
+- Marcus Lee
+
+### Exempt from new manager approval due to booking date
+
+- David Miller
+
+---
+
+## Expected Findings
+
+The assessment should contain findings equivalent to the following.
+
+### Finding 1: Sarah Johnson requires manager approval
+
+**Finding type:** Worker impact  
+**Severity:** Action required
+
+Sarah Johnson’s planned trip to France is covered by the policy. The trip has not been booked, so manager approval is required before any nonrefundable booking.
+
+**Evidence references:**
+
+- Sarah Johnson worker record
+- Sarah Johnson France trip record
+- Policy effective-date rule
+- Policy manager-approval rule
+- Policy destination-scope rule
+
+---
+
+### Finding 2: Sarah Johnson requires security training
+
+**Finding type:** Training impact  
+**Severity:** Action required
+
+Sarah Johnson is scheduled to depart after the policy effective date and has not completed the International Travel Security course.
+
+**Evidence references:**
+
+- Sarah Johnson worker record
+- Sarah Johnson France trip record
+- Sarah Johnson training record
+- Policy security-course rule
+
+---
+
+### Finding 3: Marcus Lee requires manager approval
+
+**Finding type:** Worker impact  
+**Severity:** Action required
+
+Marcus Lee is a U.S.-based contractor with planned business travel to Japan after the effective date. His trip has not been booked, so manager approval is required before nonrefundable booking.
+
+**Evidence references:**
+
+- Marcus Lee worker record
+- Marcus Lee Japan trip record
+- Policy worker-type rule
+- Policy manager-approval rule
+- Policy destination-scope rule
+
+---
+
+### Finding 4: Marcus Lee already satisfies the training requirement
+
+**Finding type:** Compliance confirmation  
+**Severity:** Informational
+
+Marcus Lee has already completed the International Travel Security course. No duplicate assignment is needed.
+
+**Evidence references:**
+
+- Marcus Lee training record
+- Policy security-course rule
+
+---
+
+### Finding 5: David Miller requires security training
+
+**Finding type:** Training impact  
+**Severity:** Action required
+
+David Miller is departing for Germany after the effective date and has not completed the required security course.
+
+**Evidence references:**
+
+- David Miller worker record
+- David Miller Germany trip record
+- David Miller training record
+- Policy security-course rule
+
+---
+
+### Finding 6: David Miller is exempt from the new approval requirement
+
+**Finding type:** Policy exception  
+**Severity:** Informational
+
+David Miller’s travel was booked before September 1, 2026. The trip is therefore exempt from the new manager-approval requirement.
+
+**Evidence references:**
+
+- David Miller Germany trip record
+- Policy booking-date exception
+
+---
+
+### Finding 7: Existing travel guidance is outdated
+
+**Finding type:** Documentation impact  
+**Severity:** Action required
+
+The existing international-travel guidance does not mention the new manager-approval requirement, the security-course requirement, the effective date, or the Canada exclusion.
+
+**Evidence references:**
+
+- Current international-travel knowledge article
+- New policy record
+
+This finding may be represented in the data model during Milestone 0 even if full documentation analysis is deferred to a later milestone.
+
+---
+
+## Expected Recommended Actions
+
+The system should recommend actions but must not execute them during Milestone 0.
+
+### Action 1: Obtain manager approval for Sarah Johnson
+
+**Action type:** Approval request recommendation  
+**Target:** Sarah Johnson’s manager  
+**Related worker:** Sarah Johnson  
+**Execution status:** Not executed
+
+Recommended outcome:
+
+Obtain documented manager approval before any nonrefundable travel is booked.
+
+---
+
+### Action 2: Assign security training to Sarah Johnson
+
+**Action type:** Training assignment recommendation  
+**Target:** Sarah Johnson  
+**Execution status:** Not executed
+
+Recommended outcome:
+
+Assign the International Travel Security course and require completion before September 15, 2026.
+
+---
+
+### Action 3: Obtain manager approval for Marcus Lee
+
+**Action type:** Approval request recommendation  
+**Target:** Marcus Lee’s manager  
+**Related worker:** Marcus Lee  
+**Execution status:** Not executed
+
+Recommended outcome:
+
+Obtain documented manager approval before any nonrefundable travel is booked.
+
+---
+
+### Action 4: Assign security training to David Miller
+
+**Action type:** Training assignment recommendation  
+**Target:** David Miller  
+**Execution status:** Not executed
+
+Recommended outcome:
+
+Assign the International Travel Security course and require completion before September 10, 2026.
+
+---
+
+### Action 5: Update international-travel guidance
+
+**Action type:** Documentation update recommendation  
+**Target:** International Travel Knowledge Article  
+**Execution status:** Not executed
+
+Recommended outcome:
+
+Update the travel guidance to include:
+
+- the September 1, 2026 effective date;
+- the U.S.-based worker scope;
+- inclusion of employees and contractors;
+- the security-course requirement;
+- the manager-approval requirement;
+- the pre-effective-date booking exception;
+- the Canada exclusion.
+
+---
+
+## Existing Knowledge Article
+
+### Article title
+
+Booking International Business Travel
+
+### Article ID
+
+`kb-international-travel-booking`
+
+### Current article text
+
+Employees planning international business travel should book through the approved corporate travel provider. Travelers should confirm passport and visa requirements before departure and submit expenses through the standard expense process.
+
+### Expected documentation impact
+
+This article conflicts with the new operating requirements because it does not instruct covered travelers to:
+
+- obtain manager approval before nonrefundable booking;
+- complete the International Travel Security course;
+- account for the September 1 effective date;
+- apply the preexisting-booking exception;
+- exclude travel to Canada.
+
+The article is not factually false, but it is incomplete and would create operational risk if left unchanged.
+
+---
+
+## Expected Unresolved Questions
+
+Milestone 0 may store unresolved questions even though deterministic answers are supplied for implementation.
+
+The expected unresolved questions are:
+
+1. How is “U.S.-based” officially determined in the source HR system?
+2. Does the policy apply to workers temporarily assigned to the United States?
+3. How long does the International Travel Security course remain valid?
+4. Who records and stores manager approval?
+5. Does approval apply per trip, per booking, or per traveler?
+6. Does a refundable reservation require approval before it becomes nonrefundable?
+7. Which team owns updates to the travel knowledge article?
+8. Are any countries subject to stricter security-review requirements outside this policy?
+
+For Milestone 0, these questions must not block the deterministic demonstration scenario.
+
+---
+
+## Deterministic Analysis Rules
+
+The first implementation should apply explicit rules similar to the following.
+
+### Rule 1: Worker scope
+
+A worker is in scope when:
+
+- assigned work country equals `US`; and
+- worker type is `employee` or `contractor`.
+
+### Rule 2: Destination scope
+
+A trip is in scope when:
+
+- origin country equals `US`;
+- destination country is not `US`; and
+- destination country is not `CA`.
+
+### Rule 3: Effective-date scope
+
+The policy applies when:
+
+- departure date is on or after `2026-09-01`.
+
+### Rule 4: Manager approval
+
+Manager approval is required when:
+
+- the worker is in scope;
+- the destination is in scope;
+- the effective-date rule applies; and
+- the booking date is absent or is on or after `2026-09-01`.
+
+### Rule 5: Security training
+
+Security training is required when:
+
+- the worker is in scope;
+- the destination is in scope;
+- the effective-date rule applies; and
+- no completed training record exists.
+
+### Rule 6: Booking exception
+
+A trip booked before `2026-09-01` is exempt from the new manager-approval requirement.
+
+The booking exception does not remove the security-training requirement.
+
+---
+
+## Expected API-Level Outcome
+
+The precise API design may be proposed during implementation, but the persisted assessment must support retrieval of:
+
+- assessment ID;
+- policy-change ID;
+- assessment status;
+- assessment creation timestamp;
+- affected workers;
+- unaffected workers or exclusion results;
+- findings;
+- evidence references;
+- recommended actions;
+- unresolved questions.
+
+A recommended action must be clearly marked as unexecuted.
+
+Milestone 0 should not represent a recommendation as approved, rejected, or pending approval because no approval workflow exists yet.
+
+---
+
+## Golden Scenario Assertions
+
+Automated tests should verify at least the following:
+
+1. Exactly three workers are classified as affected.
+2. Sarah Johnson requires manager approval.
+3. Sarah Johnson requires security training.
+4. Marcus Lee requires manager approval.
+5. Marcus Lee does not receive a duplicate training recommendation.
+6. David Miller is exempt from manager approval.
+7. David Miller still requires security training.
+8. Elena García is excluded because she is not U.S.-based.
+9. Priya Shah is excluded because travel to Canada is out of scope.
+10. Thomas Green is excluded because his departure occurs before the effective date.
+11. Every action-producing finding contains evidence references.
+12. Every recommended action remains unexecuted.
+13. The completed assessment can be retrieved after the application restarts.
+14. Running the seed process more than once does not create duplicate records.
+15. Running the deterministic assessment repeatedly produces equivalent results.
+
+---
+
+## Out of Scope for This Scenario
+
+The following capabilities are intentionally excluded from Milestone 0:
+
+- policy document upload;
+- PDF or document parsing;
+- LLM-based policy extraction;
+- LangGraph orchestration;
+- semantic search;
+- vector databases;
+- automatic ambiguity resolution;
+- user authentication;
+- role-based access control;
+- human approval workflows;
+- action execution;
+- Workday integration;
+- learning-system integration;
+- travel-system integration;
+- Jira integration;
+- Salesforce integration;
+- MCP servers;
+- notifications;
+- production deployment;
+- AWS infrastructure;
+- Terraform;
+- frontend user experience.
+
+These capabilities may be added in later vertical slices after the deterministic foundation is working and tested.
+
+---
+
+## Definition of Success
+
+The demonstration scenario is successful when a developer can run the application, create an impact assessment for the seeded policy, and retrieve a persisted result that correctly:
+
+- identifies Sarah Johnson, Marcus Lee, and David Miller as affected;
+- explains the different requirements that apply to each person;
+- excludes Elena García, Priya Shah, and Thomas Green for the correct reasons;
+- links every material conclusion to evidence;
+- recommends appropriate actions without executing them;
+- produces the same result consistently across repeated runs.

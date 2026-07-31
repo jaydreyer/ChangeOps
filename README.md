@@ -12,6 +12,7 @@ See:
 - `docs/milestone-0.md`
 - `docs/demo-scenario.md`
 - `docs/decisions.md`
+- [Contributing and engineering standards](CONTRIBUTING.md)
 
 ## Project direction
 

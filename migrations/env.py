@@ -4,6 +4,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from changeops.config import get_settings
+from changeops.db import models  # noqa: F401
 from changeops.db.base import Base
 
 config = context.config

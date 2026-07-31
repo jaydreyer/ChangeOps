@@ -28,6 +28,15 @@ services:
       db:
         condition: service_healthy
 
+  seed:
+    build: .
+    command: ["python", "-m", "changeops.seed"]
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-changeops}:${POSTGRES_PASSWORD:-changeops}@db:5432/${POSTGRES_DB:-changeops}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
   api:
     build: .
     environment:
@@ -35,7 +44,7 @@ services:
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:
-      migrate:
+      seed:
         condition: service_completed_successfully
 
 volumes:

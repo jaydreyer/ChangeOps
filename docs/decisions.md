@@ -90,3 +90,38 @@ ChangeOps is intended to demonstrate thoughtful engineering decisions rather tha
 Technologies should enter the architecture only when they solve a demonstrated product problem.
 
 Establishing deterministic enterprise context first produces a stronger foundation for later AI planning, approval workflows, execution, and auditing.
+
+# ADR-0008 — Use Typed Relational Dependencies and Immutable Impact Paths
+
+## Status
+
+Accepted
+
+## Context
+
+Milestone 1 must explain impacts across several enterprise domains without introducing a graph
+database or an opaque assessment payload.
+
+## Decision
+
+ChangeOps uses ordinary PostgreSQL relationships for the scoped enterprise context:
+
+- workers reference manager workers;
+- worker-team memberships connect workers and teams;
+- customer assignments connect workers and commitments;
+- separate policy-system, policy-document, and policy-training tables preserve target foreign keys.
+
+Completed assessments store enterprise impacts as relational rows. Evidence uses a join table, and
+each relationship path is stored as ordered path-element rows. Cross-domain proposed actions link
+to their impact and retain `execution_status = not_executed`.
+
+The existing pure worker analyzer remains intact. A second pure enterprise-impact analyzer consumes
+immutable typed input, and the application service coordinates both after loading all source data.
+
+## Consequences
+
+- Target integrity remains enforceable with foreign keys.
+- Impact records, evidence, paths, and actions remain directly queryable.
+- Historical paths do not change when source relationships later change.
+- Adding a new dependency target requires an explicit table and analyzer rule.
+- The design intentionally does not provide a generalized enterprise graph or rules engine.

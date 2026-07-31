@@ -718,3 +718,67 @@ The demonstration scenario is successful when a developer can run the applicatio
 - links every material conclusion to evidence;
 - recommends appropriate actions without executing them;
 - produces the same result consistently across repeated runs.
+
+---
+
+## Milestone 1 Enterprise Extension
+
+Milestone 1 preserves every worker result, finding, and recommendation above and adds the following
+fictional enterprise context.
+
+### Teams and managers
+
+- People Operations, managed by Mike Wilson, contains Sarah Johnson.
+- Technology Operations, managed by Anita Patel, contains Marcus Lee.
+- Customer Delivery, managed by Jennifer Brooks, contains David Miller.
+- Domestic Operations contains the unaffected workers and remains unaffected.
+
+Mike Wilson and Anita Patel require approval review. Jennifer Brooks requires booking-exception
+review for David Miller. The first three teams are operationally affected because each contains one
+directly affected worker.
+
+### Systems
+
+- Acme Travel Request is affected because it supports changed approval handling.
+- Acme Learning Hub is affected because completion verification or assignment is required.
+- Acme Expense remains unaffected because no explicit policy dependency or resulting rule connects
+  it to the change.
+
+### Documents
+
+- International Business Travel Policy requires update.
+- Booking International Business Travel requires update.
+- Manager Travel Approval Guide requires review.
+- Expense Submission Guide remains unaffected.
+
+Document impacts come only from explicit typed policy dependencies.
+
+### Training
+
+The International Travel Security course is an explicit course entity connected to the policy.
+Sarah Johnson and David Miller have worker-specific incomplete-training impacts. Marcus Lee's valid
+completion prevents an incomplete-training impact and duplicate assignment.
+
+### Customer commitments
+
+Sarah Johnson is required for the Northwind Renewable Energy on-site delivery from September 14
+through September 18. Her September 15 affected trip overlaps that period, so the commitment
+requires review.
+
+Marcus Lee's Contoso Retail assignment does not overlap his October 2 departure and remains
+unaffected.
+
+### Expected enterprise assessment
+
+The seeded assessment returns 18 affected enterprise impacts:
+
+- 6 people impacts: 3 workers and 3 managers;
+- 3 team impacts;
+- 2 system impacts;
+- 3 document impacts;
+- 3 training impacts: 1 course and 2 incomplete worker requirements;
+- 1 customer-commitment impact.
+
+Every impact contains a stable reason code, evidence references, a stable sort key, and an ordered
+relationship path. The complete response contains the four Milestone 0 worker actions plus nine
+cross-domain actions. All 13 actions remain `not_executed`.

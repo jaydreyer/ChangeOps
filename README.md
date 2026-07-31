@@ -4,7 +4,9 @@ ChangeOps analyzes operational and policy changes, identifies affected people an
 
 ## Current milestone
 
-Milestone 0: Deterministic Impact-Assessment Foundation.
+Milestone 1: Policy Ingestion and Structured Extraction.
+
+Milestone 0 is complete and preserved by the `v0.0.1-milestone-0` tag.
 
 See:
 

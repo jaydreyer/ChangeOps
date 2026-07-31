@@ -1,102 +1,363 @@
-# ChangeOps: Initial Product Brief
+ChangeOps: Initial Product Brief
 
-## Product vision
+Product vision
 
-ChangeOps helps organizations understand and safely act on changes that affect employees, policies, customers, documentation, and operational systems.
+ChangeOps helps organizations understand and safely act on policy and operational changes that affect people, teams, documentation, training, customer commitments, and enterprise systems.
 
-Instead of relying on employees to manually identify every downstream impact, ChangeOps gathers evidence from connected systems, produces an impact assessment, recommends actions, and routes consequential actions through human approval before execution.
+Instead of relying on employees to manually identify every downstream impact, ChangeOps builds an evidence-backed view of what is affected, proposes specific actions, routes consequential actions through human approval, executes approved actions through governed enterprise interfaces, and preserves a complete audit trail.
 
-## Initial use case
+ChangeOps uses deterministic software for known rules and enterprise relationships. AI is introduced where interpretation, ambiguity resolution, evidence synthesis, and planning require judgment.
+
+⸻
+
+Product problem
+
+Operational changes rarely remain contained within the document where they are announced.
+
+A revised policy may affect:
+
+* employees and contractors;
+* managers and teams;
+* approval processes;
+* training requirements;
+* knowledge articles and procedures;
+* enterprise systems;
+* customer delivery commitments.
+
+Organizations often identify these effects manually through meetings, spreadsheets, institutional knowledge, and follow-up work distributed across multiple teams.
+
+This creates predictable risks:
+
+* affected groups are missed;
+* conflicting guidance remains published;
+* system changes are discovered late;
+* customer commitments are overlooked;
+* recommended actions lack supporting evidence;
+* changes are executed without consistent approval or traceability.
+
+ChangeOps is intended to make this process structured, explainable, and governable.
+
+⸻
+
+Initial use case
 
 An HR or operations leader submits a new or revised employee policy.
 
-ChangeOps:
+ChangeOps progressively supports the following workflow:
 
-1. Extracts the policy’s effective date, scope, requirements, and exceptions.
-2. Identifies affected employee populations.
-3. Finds related and conflicting documentation.
-4. Identifies systems and workflows requiring changes.
-5. Produces an evidence-backed impact assessment.
-6. Recommends specific actions.
-7. Requires human approval before executing write actions.
-8. Records a complete audit trail.
+1. Accept the policy change.
+2. Extract or receive its effective date, scope, requirements, and exceptions.
+3. Validate the policy representation.
+4. Identify affected employees, contractors, managers, and teams.
+5. Trace impacts to related systems, documentation, training, and customer commitments.
+6. Produce an evidence-backed impact assessment.
+7. Surface ambiguity and unresolved questions.
+8. Recommend specific actions.
+9. Require human approval for consequential actions.
+10. Execute approved actions through governed enterprise tools.
+11. Record the complete decision and execution history.
 
-## Initial demonstration scenario
+Not every step requires AI.
 
-Effective September 1, employees traveling internationally for company business must complete the International Travel Security course and obtain manager approval before making any nonrefundable booking. The policy applies to U.S.-based employees and contractors. Travel booked before the effective date is exempt.
+Known rules, persisted enterprise relationships, validation, permissions, identifiers, and impact classifications should remain deterministic.
 
-## Target users
+⸻
 
-- HR operations leaders
-- Legal and compliance teams
-- Product operations teams
-- Enterprise knowledge managers
-- Internal-platform teams
-- Change-management leaders
+Initial demonstration scenario
 
-## Core product principles
+Effective September 1, employees traveling internationally for company business must complete the International Travel Security course and obtain manager approval before making any nonrefundable booking.
 
-- Evidence before action
-- Human control over consequential decisions
-- Deterministic rules where deterministic rules are sufficient
-- Clear separation between recommendations and execution
-- Full traceability
-- Least-privilege access
-- Recoverable workflows
-- Explicit uncertainty
-- No hidden autonomous writes
+The policy applies to U.S.-based employees and contractors.
 
-## Version 0.1 scope
+Travel booked before the effective date is exempt.
 
-Version 0.1 will:
+The demonstration scenario includes fictional enterprise data representing:
 
-- accept one policy-change request;
-- extract structured policy details;
-- identify affected employees and contractors;
-- retrieve related knowledge articles;
-- identify conflicting guidance;
-- generate an impact assessment;
-- recommend actions;
-- display evidence supporting each major finding.
+* employees and contractors;
+* managers and teams;
+* planned international travel;
+* training completion records;
+* travel-related systems;
+* policy and knowledge documents;
+* customer commitments connected to selected travelers.
 
-Version 0.1 will run locally and will not yet include production AWS infrastructure, generalized MCP integrations, or autonomous write actions.
+The scenario is intentionally narrow enough to understand quickly while still demonstrating how one policy change can propagate across an enterprise.
 
-## Success criteria
+⸻
 
-The first release is successful when a reviewer can submit the demonstration policy and receive an accurate, understandable assessment containing:
+Target users
 
-- affected populations;
-- applicable exceptions;
-- related documentation;
-- documentation conflicts;
-- affected systems;
-- unresolved questions;
-- recommended actions;
-- supporting evidence.
+* HR operations leaders
+* Legal and compliance teams
+* Product operations teams
+* Enterprise knowledge managers
+* Internal-platform teams
+* Change-management leaders
+* Training and enablement teams
+* Customer operations leaders
 
-## Future capabilities
+⸻
+
+Core product principles
+
+Evidence before action
+
+Every material conclusion and recommendation should be supported by source data, policy evidence, deterministic rules, or explicit human input.
+
+Human control over consequential decisions
+
+ChangeOps may recommend actions, but consequential actions require explicit human approval.
+
+Deterministic rules where sufficient
+
+Known business rules, enterprise relationships, validations, permissions, identifiers, sorting, and fingerprints should be implemented deterministically.
+
+AI for interpretation and synthesis
+
+AI should be used for tasks such as:
+
+* interpreting unstructured policy language;
+* identifying ambiguity;
+* synthesizing evidence;
+* drafting recommendations;
+* explaining proposed changes.
+
+AI should not become the authoritative source for facts already represented in enterprise data.
+
+Clear separation between recommendation and execution
+
+A proposed action is not an executed action.
+
+The system must preserve this distinction in its data model, workflow, interface, and audit history.
+
+Full traceability
+
+A reviewer should be able to determine:
+
+* what changed;
+* what was affected;
+* why it was classified as affected;
+* what evidence was used;
+* what action was proposed;
+* who approved or rejected it;
+* what was executed;
+* what result was returned.
+
+Least-privilege access
+
+Users and tools should receive only the permissions required for their assigned role and action.
+
+Recoverable workflows
+
+Long-running or interrupted workflows should preserve state and resume safely.
+
+Explicit uncertainty
+
+Ambiguous, unsupported, or incomplete conclusions should be surfaced rather than hidden behind confident language.
+
+No hidden autonomous writes
+
+ChangeOps must not silently modify enterprise systems.
+
+⸻
+
+Version 0.1 scope
+
+Version 0.1 establishes the trusted deterministic foundation for ChangeOps.
+
+It will:
+
+* load one structured policy-change scenario;
+* evaluate the policy against seeded enterprise data;
+* identify affected employees and contractors;
+* identify affected managers and teams;
+* identify related systems;
+* identify related documentation;
+* identify applicable training requirements;
+* identify affected customer commitments;
+* produce an immutable impact assessment;
+* include supporting evidence for each major finding;
+* include stable reason codes and relationship paths;
+* propose deterministic actions without executing them;
+* distinguish affected and unaffected enterprise objects;
+* expose the assessment through a stable API.
+
+Version 0.1 will run locally using Docker Compose.
+
+It will not yet include:
+
+* unstructured policy ingestion;
+* LLM-based extraction;
+* LangChain;
+* LangGraph;
+* human approval workflows;
+* MCP integrations;
+* action execution;
+* a production frontend;
+* production AWS infrastructure;
+* autonomous write actions.
+
+⸻
+
+Version 0.1 product outcome
+
+A reviewer should be able to run the demonstration scenario and answer:
+
+* Which workers are affected?
+* Which workers are exempt?
+* Which managers and teams are involved?
+* Which systems support the changed process?
+* Which documents require review or update?
+* Which training requirement applies?
+* Which customer commitments may require review?
+* Why was each object classified as affected?
+* What deterministic action is proposed?
+* What evidence supports the conclusion?
+
+The result should be reproducible from the same source data and remain unchanged after it is persisted.
+
+⸻
+
+Version 0.1 success criteria
+
+The first release is successful when a reviewer can create the demonstration assessment and receive an accurate, understandable result containing:
+
+* affected and unaffected workers;
+* applicable exceptions;
+* affected managers and teams;
+* related systems;
+* related documentation;
+* training impacts;
+* affected customer commitments;
+* unresolved questions;
+* proposed actions;
+* supporting evidence;
+* stable reason codes;
+* ordered relationship paths.
+
+The release must also demonstrate that:
+
+* equivalent inputs produce equivalent semantic results;
+* relevant source-data changes produce a new result;
+* earlier assessments remain immutable;
+* proposed actions remain unexecuted;
+* integration tests pass against PostgreSQL;
+* a reviewer can explain why every seeded object was included or excluded.
+
+⸻
+
+Planned capability progression
+
+Deterministic impact discovery
+
+ChangeOps first establishes a trusted enterprise context using normalized data, explicit relationships, and deterministic rules.
+
+This layer determines what is factually affected.
+
+AI-assisted interpretation and planning
+
+A later release will accept unstructured policy text and use AI to:
+
+* extract a typed policy representation;
+* identify ambiguity;
+* request clarification;
+* synthesize deterministic findings;
+* produce an evidence-backed change plan.
+
+The deterministic impact engine remains authoritative for known rules and enterprise relationships.
+
+Human review and approval
+
+Reviewers will be able to:
+
+* inspect evidence;
+* edit recommendations;
+* approve actions;
+* reject actions;
+* request clarification;
+* record decision rationale.
+
+Governed execution
+
+Approved actions will execute against simulated enterprise systems through controlled, idempotent interfaces.
+
+Portfolio-grade operation
+
+The final public application will add:
+
+* a usable end-to-end interface;
+* authentication and authorization;
+* cloud deployment;
+* infrastructure as code;
+* observability;
+* evaluation datasets;
+* CI/CD;
+* security and operational controls.
+
+⸻
+
+Future capabilities
 
 Later releases may add:
 
-- human approval and resumable workflows;
-- simulated HR, CRM, work-management, and knowledge-system MCP servers;
-- action execution;
-- role-based permissions;
-- evaluation datasets;
-- adversarial tests;
-- AWS deployment;
-- Terraform infrastructure;
-- CI/CD;
-- observability;
-- usage and cost controls;
-- multi-tenant public demonstration environments.
+* unstructured policy ingestion;
+* structured LLM extraction;
+* LangChain;
+* LangGraph workflows;
+* durable workflow state;
+* clarification and resume;
+* evidence-backed AI recommendations;
+* human approval;
+* simulated HR, CRM, learning, work-management, and knowledge-system MCP servers;
+* idempotent action execution;
+* role-based permissions;
+* evaluation datasets;
+* adversarial tests;
+* AWS deployment;
+* Terraform infrastructure;
+* CI/CD;
+* observability;
+* usage and cost controls;
+* multi-tenant public demonstration environments.
 
-## Non-goals
+These capabilities should be introduced only when the product milestone contains a problem that requires them.
+
+⸻
+
+Non-goals
 
 ChangeOps is not:
 
-- a general-purpose chatbot;
-- a fully autonomous decision-maker;
-- a replacement for legal or HR review;
-- a real Workday or Salesforce integration in its public demonstration form;
-- a system allowed to make high-impact employment decisions.
+* a general-purpose chatbot;
+* a generic agent platform;
+* a fully autonomous decision-maker;
+* a replacement for legal, HR, compliance, or operational review;
+* a system permitted to make high-impact employment decisions;
+* a real Workday or Salesforce integration in its public demonstration form;
+* a system that treats LLM output as authoritative enterprise data;
+* a generalized graph database or configuration-management platform;
+* a complete replica of an enterprise software suite;
+* a system allowed to execute consequential actions without approval.
+
+⸻
+
+Product boundary
+
+ChangeOps is responsible for:
+
+* organizing evidence;
+* applying known rules;
+* discovering enterprise impacts;
+* surfacing uncertainty;
+* proposing actions;
+* coordinating review;
+* governing execution;
+* preserving traceability.
+
+Human reviewers remain responsible for:
+
+* resolving material ambiguity;
+* assessing legal or policy implications;
+* approving consequential actions;
+* rejecting inappropriate recommendations;
+* accepting accountability for final decisions.

@@ -196,7 +196,6 @@ def _persist_assessment(
                 assessment_id=assessment.id,
                 finding_id=finding_by_key[result.finding_key].id,
                 worker_id=result.worker_id,
-                action_key=result.key,
                 action_type=result.action_type,
                 target_type=result.target_type,
                 target_identifier=result.target_identifier,

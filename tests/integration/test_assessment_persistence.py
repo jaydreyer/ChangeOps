@@ -37,7 +37,14 @@ def normalize_persisted_assessment(assessment: ImpactAssessment) -> dict[str, An
         ),
     )
     evidence = sorted(assessment.evidence, key=lambda item: item.evidence_key)
-    actions = sorted(assessment.proposed_actions, key=lambda item: item.action_key)
+    actions = sorted(
+        assessment.proposed_actions,
+        key=lambda item: (
+            item.worker_id,
+            item.action_type,
+            item.target_identifier,
+        ),
+    )
     questions = sorted(
         assessment.unresolved_questions,
         key=lambda item: item.sequence,
@@ -87,7 +94,6 @@ def normalize_persisted_assessment(assessment: ImpactAssessment) -> dict[str, An
         ],
         "proposed_actions": [
             {
-                "action_key": item.action_key,
                 "finding": {
                     "worker_id": item.finding.worker_result.worker_id,
                     "rule_code": item.finding.rule_code,

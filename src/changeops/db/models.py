@@ -153,9 +153,7 @@ class ImpactAssessment(Base):
     )
     findings: Mapped[list["Finding"]] = relationship(order_by="Finding.rule_code")
     evidence: Mapped[list["Evidence"]] = relationship(order_by="Evidence.evidence_key")
-    proposed_actions: Mapped[list["ProposedAction"]] = relationship(
-        order_by="ProposedAction.action_key",
-    )
+    proposed_actions: Mapped[list["ProposedAction"]] = relationship()
     unresolved_questions: Mapped[list["AssessmentUnresolvedQuestion"]] = relationship(
         order_by="AssessmentUnresolvedQuestion.sequence",
     )
@@ -244,11 +242,6 @@ class ProposedAction(Base):
             "execution_status = 'not_executed'",
             name="ck_proposed_actions_execution_status",
         ),
-        UniqueConstraint(
-            "assessment_id",
-            "action_key",
-            name="uq_proposed_actions_assessment_key",
-        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -258,7 +251,6 @@ class ProposedAction(Base):
     )
     finding_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("findings.id"), index=True)
     worker_id: Mapped[str] = mapped_column(ForeignKey("workers.id"), index=True)
-    action_key: Mapped[str] = mapped_column(String(200))
     action_type: Mapped[str] = mapped_column(String(100))
     target_type: Mapped[str] = mapped_column(String(50))
     target_identifier: Mapped[str] = mapped_column(String(200))

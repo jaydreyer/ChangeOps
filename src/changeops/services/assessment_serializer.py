@@ -33,7 +33,11 @@ def serialize_assessment(
     )
     proposed_actions = sorted(
         assessment.proposed_actions,
-        key=lambda item: item.action_key,
+        key=lambda item: (
+            item.worker_id,
+            item.action_type,
+            item.target_identifier,
+        ),
     )
     unresolved_questions = sorted(
         assessment.unresolved_questions,

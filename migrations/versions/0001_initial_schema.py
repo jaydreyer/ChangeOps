@@ -259,7 +259,6 @@ def upgrade() -> None:
         sa.Column("assessment_id", sa.Uuid(), nullable=False),
         sa.Column("finding_id", sa.Uuid(), nullable=False),
         sa.Column("worker_id", sa.String(length=100), nullable=False),
-        sa.Column("action_key", sa.String(length=200), nullable=False),
         sa.Column("action_type", sa.String(length=100), nullable=False),
         sa.Column("target_type", sa.String(length=50), nullable=False),
         sa.Column("target_identifier", sa.String(length=200), nullable=False),
@@ -274,11 +273,6 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["finding_id"], ["findings.id"]),
         sa.ForeignKeyConstraint(["worker_id"], ["workers.id"]),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint(
-            "assessment_id",
-            "action_key",
-            name="uq_proposed_actions_assessment_key",
-        ),
     )
     op.create_index(
         "ix_proposed_actions_assessment_id",

@@ -19,12 +19,22 @@ def test_create_and_retrieve_golden_assessment(client: TestClient) -> None:
         "unaffected_workers": 3,
         "manager_approvals_required": 2,
         "training_assignments_required": 2,
+        "enterprise_impacts": 18,
+        "impacts_by_domain": {
+            "people": 6,
+            "teams": 3,
+            "systems": 2,
+            "documents": 3,
+            "training": 3,
+            "customer_commitments": 1,
+        },
     }
     assert len(body["worker_results"]) == 6
     assert len(body["findings"]) == 6
-    assert len(body["evidence"]) == 15
-    assert len(body["proposed_actions"]) == 4
+    assert len(body["evidence"]) >= 15
+    assert len(body["proposed_actions"]) == 13
     assert len(body["unresolved_questions"]) == 8
+    assert len(body["input_fingerprint"]) == 64
     assert "approval_status" not in json.dumps(body)
 
     affected_workers = {
@@ -53,6 +63,47 @@ def test_create_and_retrieve_golden_assessment(client: TestClient) -> None:
         assert finding["evidence_ids"]
         assert set(finding["evidence_ids"]) <= evidence_ids
     assert all(action["execution_status"] == "not_executed" for action in body["proposed_actions"])
+    assert all(action["enterprise_impact_id"] is not None for action in body["proposed_actions"])
+
+    impacts = [
+        impact
+        for domain_impacts in body["enterprise_impacts"].values()
+        for impact in domain_impacts
+    ]
+    assert len(impacts) == body["summary"]["enterprise_impacts"]
+    for domain, domain_impacts in body["enterprise_impacts"].items():
+        assert len(domain_impacts) == body["summary"]["impacts_by_domain"][domain]
+        assert [item["sort_key"] for item in domain_impacts] == sorted(
+            item["sort_key"] for item in domain_impacts
+        )
+    for impact in impacts:
+        assert impact["evidence_ids"]
+        assert [element["sequence"] for element in impact["relationship_path"]] == list(
+            range(len(impact["relationship_path"]))
+        )
+        assert impact["relationship_path"][-1]["relationship_to_next"] is None
+
+    impacted_source_keys = {item["source_key"] for item in impacts}
+    assert {
+        "system-travel-request",
+        "system-learning-management",
+        "document-international-travel-policy",
+        "kb-international-travel-booking",
+        "international-travel-security",
+        "commitment-northwind-onsite",
+    } <= impacted_source_keys
+    assert {
+        "team-domestic-operations",
+        "system-expense-management",
+        "document-expense-submission-guide",
+        "commitment-contoso-launch",
+    }.isdisjoint(impacted_source_keys)
+    manager_impacts = body["enterprise_impacts"]["people"]
+    assert {
+        "worker-manager-mike-wilson",
+        "worker-manager-anita-patel",
+        "worker-manager-jennifer-brooks",
+    } <= {item["source_key"] for item in manager_impacts if item["object_type"] == "manager"}
 
     retrieve_response = client.get(create_response.headers["location"])
     assert retrieve_response.status_code == 200

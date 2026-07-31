@@ -3,12 +3,22 @@ from datetime import date
 from sqlalchemy.orm import Session
 
 from changeops.db.models import (
+    CommitmentAssignment,
+    CustomerCommitment,
+    EnterpriseDocument,
+    EnterpriseSystem,
     Organization,
     PolicyChange,
     PolicyChangeQuestion,
+    PolicyDocumentDependency,
+    PolicySystemDependency,
+    PolicyTrainingDependency,
+    Team,
+    TrainingCourse,
     TrainingRecord,
     Trip,
     Worker,
+    WorkerTeamMembership,
 )
 
 ORGANIZATION_ID = "org-acme-global-manufacturing"
@@ -53,6 +63,7 @@ WORKERS = [
         "worker_type": "employee",
         "department": "Human Resources",
         "manager_name": "Mike Wilson",
+        "manager_worker_id": "worker-manager-mike-wilson",
         "assigned_work_country": "US",
     },
     {
@@ -61,6 +72,7 @@ WORKERS = [
         "worker_type": "contractor",
         "department": "Information Technology",
         "manager_name": "Anita Patel",
+        "manager_worker_id": "worker-manager-anita-patel",
         "assigned_work_country": "US",
     },
     {
@@ -69,6 +81,7 @@ WORKERS = [
         "worker_type": "employee",
         "department": "Finance",
         "manager_name": "Carlos Martín",
+        "manager_worker_id": "worker-manager-carlos-martin",
         "assigned_work_country": "ES",
     },
     {
@@ -77,6 +90,7 @@ WORKERS = [
         "worker_type": "employee",
         "department": "Sales",
         "manager_name": "Jennifer Brooks",
+        "manager_worker_id": "worker-manager-jennifer-brooks",
         "assigned_work_country": "US",
     },
     {
@@ -85,6 +99,7 @@ WORKERS = [
         "worker_type": "employee",
         "department": "Product Management",
         "manager_name": "Robert Chen",
+        "manager_worker_id": "worker-manager-robert-chen",
         "assigned_work_country": "US",
     },
     {
@@ -93,7 +108,256 @@ WORKERS = [
         "worker_type": "employee",
         "department": "Operations",
         "manager_name": "Linda Evans",
+        "manager_worker_id": "worker-manager-linda-evans",
         "assigned_work_country": "US",
+    },
+]
+
+MANAGERS = [
+    {
+        "id": "worker-manager-mike-wilson",
+        "full_name": "Mike Wilson",
+        "worker_type": "employee",
+        "department": "People Operations",
+        "manager_name": "Executive Leadership",
+        "assigned_work_country": "US",
+    },
+    {
+        "id": "worker-manager-anita-patel",
+        "full_name": "Anita Patel",
+        "worker_type": "employee",
+        "department": "Technology Operations",
+        "manager_name": "Executive Leadership",
+        "assigned_work_country": "US",
+    },
+    {
+        "id": "worker-manager-carlos-martin",
+        "full_name": "Carlos Martín",
+        "worker_type": "employee",
+        "department": "Finance",
+        "manager_name": "Executive Leadership",
+        "assigned_work_country": "ES",
+    },
+    {
+        "id": "worker-manager-jennifer-brooks",
+        "full_name": "Jennifer Brooks",
+        "worker_type": "employee",
+        "department": "Customer Delivery",
+        "manager_name": "Executive Leadership",
+        "assigned_work_country": "US",
+    },
+    {
+        "id": "worker-manager-robert-chen",
+        "full_name": "Robert Chen",
+        "worker_type": "employee",
+        "department": "Product Management",
+        "manager_name": "Executive Leadership",
+        "assigned_work_country": "US",
+    },
+    {
+        "id": "worker-manager-linda-evans",
+        "full_name": "Linda Evans",
+        "worker_type": "employee",
+        "department": "Operations",
+        "manager_name": "Executive Leadership",
+        "assigned_work_country": "US",
+    },
+]
+
+TEAMS = [
+    {
+        "id": "team-people-operations",
+        "name": "People Operations",
+        "manager_worker_id": "worker-manager-mike-wilson",
+    },
+    {
+        "id": "team-technology-operations",
+        "name": "Technology Operations",
+        "manager_worker_id": "worker-manager-anita-patel",
+    },
+    {
+        "id": "team-customer-delivery",
+        "name": "Customer Delivery",
+        "manager_worker_id": "worker-manager-jennifer-brooks",
+    },
+    {
+        "id": "team-domestic-operations",
+        "name": "Domestic Operations",
+        "manager_worker_id": "worker-manager-linda-evans",
+    },
+]
+
+TEAM_MEMBERSHIPS = [
+    {
+        "id": "membership-sarah-people-operations",
+        "worker_id": "worker-sarah-johnson",
+        "team_id": "team-people-operations",
+    },
+    {
+        "id": "membership-marcus-technology-operations",
+        "worker_id": "worker-marcus-lee",
+        "team_id": "team-technology-operations",
+    },
+    {
+        "id": "membership-david-customer-delivery",
+        "worker_id": "worker-david-miller",
+        "team_id": "team-customer-delivery",
+    },
+    {
+        "id": "membership-elena-domestic-operations",
+        "worker_id": "worker-elena-garcia",
+        "team_id": "team-domestic-operations",
+    },
+    {
+        "id": "membership-priya-domestic-operations",
+        "worker_id": "worker-priya-shah",
+        "team_id": "team-domestic-operations",
+    },
+    {
+        "id": "membership-thomas-domestic-operations",
+        "worker_id": "worker-thomas-green",
+        "team_id": "team-domestic-operations",
+    },
+]
+
+SYSTEMS = [
+    {
+        "id": "system-travel-request",
+        "name": "Acme Travel Request",
+        "system_type": "travel_workflow",
+        "description": "Collects travel requests and manager approvals.",
+        "active": True,
+    },
+    {
+        "id": "system-learning-management",
+        "name": "Acme Learning Hub",
+        "system_type": "learning_management",
+        "description": "Tracks course assignments and completions.",
+        "active": True,
+    },
+    {
+        "id": "system-expense-management",
+        "name": "Acme Expense",
+        "system_type": "expense_management",
+        "description": "Processes employee expense reports.",
+        "active": True,
+    },
+]
+
+DOCUMENTS = [
+    {
+        "id": "document-international-travel-policy",
+        "title": "International Business Travel Policy",
+        "document_type": "policy",
+        "source_system": "Acme Knowledge",
+        "version": "1",
+        "status": "published",
+    },
+    {
+        "id": "kb-international-travel-booking",
+        "title": "Booking International Business Travel",
+        "document_type": "knowledge_article",
+        "source_system": "Acme Knowledge",
+        "version": "3",
+        "status": "published",
+    },
+    {
+        "id": "document-manager-travel-approval-guide",
+        "title": "Manager Travel Approval Guide",
+        "document_type": "guide",
+        "source_system": "Acme Knowledge",
+        "version": "2",
+        "status": "published",
+    },
+    {
+        "id": "document-expense-submission-guide",
+        "title": "Expense Submission Guide",
+        "document_type": "guide",
+        "source_system": "Acme Knowledge",
+        "version": "4",
+        "status": "published",
+    },
+]
+
+SYSTEM_DEPENDENCIES = [
+    {
+        "id": "dependency-policy-travel-request",
+        "rule_code": "MANAGER_APPROVAL_REQUIRED",
+        "system_id": "system-travel-request",
+        "relationship_type": "supports_approval_workflow",
+        "explanation": "The travel-request system implements manager approval handling.",
+    },
+    {
+        "id": "dependency-policy-learning-management",
+        "rule_code": "TRAINING_REQUIRED",
+        "system_id": "system-learning-management",
+        "relationship_type": "verifies_training_completion",
+        "explanation": "The learning system verifies and assigns required travel training.",
+    },
+]
+
+DOCUMENT_DEPENDENCIES = [
+    {
+        "id": "dependency-policy-primary-document",
+        "rule_code": "POLICY_CHANGE",
+        "document_id": "document-international-travel-policy",
+        "relationship_type": "contains_changed_policy",
+        "impact_classification": "update_required",
+        "explanation": "The source policy document must reflect the approved policy change.",
+    },
+    {
+        "id": "dependency-policy-booking-article",
+        "rule_code": "MANAGER_APPROVAL_REQUIRED",
+        "document_id": "kb-international-travel-booking",
+        "relationship_type": "explains_changed_process",
+        "impact_classification": "update_required",
+        "explanation": "The booking article explains the process changed by the approval rule.",
+    },
+    {
+        "id": "dependency-policy-manager-guide",
+        "rule_code": "MANAGER_APPROVAL_REQUIRED",
+        "document_id": "document-manager-travel-approval-guide",
+        "relationship_type": "instructs_manager",
+        "impact_classification": "review_required",
+        "explanation": "The manager guide documents approval responsibilities.",
+    },
+]
+
+COMMITMENTS = [
+    {
+        "id": "commitment-northwind-onsite",
+        "customer_name": "Northwind Renewable Energy",
+        "commitment_type": "onsite_delivery",
+        "description": "Provide an on-site policy workshop in Paris.",
+        "start_date": date(2026, 9, 14),
+        "end_date": date(2026, 9, 18),
+        "status": "active",
+    },
+    {
+        "id": "commitment-contoso-launch",
+        "customer_name": "Contoso Retail",
+        "commitment_type": "implementation_launch",
+        "description": "Support a remote implementation launch.",
+        "start_date": date(2026, 10, 10),
+        "end_date": date(2026, 10, 12),
+        "status": "active",
+    },
+]
+
+COMMITMENT_ASSIGNMENTS = [
+    {
+        "id": "assignment-northwind-sarah",
+        "commitment_id": "commitment-northwind-onsite",
+        "worker_id": "worker-sarah-johnson",
+        "assignment_role": "workshop_lead",
+        "required": True,
+    },
+    {
+        "id": "assignment-contoso-marcus",
+        "commitment_id": "commitment-contoso-launch",
+        "worker_id": "worker-marcus-lee",
+        "assignment_role": "technical_lead",
+        "required": True,
     },
 ]
 
@@ -162,7 +426,7 @@ TRAINING_RECORDS = [
         "completion_status": (
             "completed" if worker["id"] == "worker-marcus-lee" else "not_completed"
         ),
-        "completion_date": None,
+        "completion_date": (date(2026, 7, 1) if worker["id"] == "worker-marcus-lee" else None),
     }
     for worker in WORKERS
 ]
@@ -202,14 +466,67 @@ def seed_database(session: Session) -> None:
             structured_rules=STRUCTURED_RULES,
         )
     )
+    for manager in MANAGERS:
+        session.merge(Worker(organization_id=ORGANIZATION_ID, **manager))
+    session.flush()
+
+    for team in TEAMS:
+        session.merge(Team(organization_id=ORGANIZATION_ID, **team))
+    session.flush()
+
     for worker in WORKERS:
         session.merge(Worker(organization_id=ORGANIZATION_ID, **worker))
+    session.flush()
+    for membership in TEAM_MEMBERSHIPS:
+        session.merge(WorkerTeamMembership(**membership))
+
+    session.merge(
+        TrainingCourse(
+            id=COURSE_IDENTIFIER,
+            organization_id=ORGANIZATION_ID,
+            course_code="ITS-100",
+            name="International Travel Security",
+            active=True,
+        )
+    )
+    for system in SYSTEMS:
+        session.merge(EnterpriseSystem(organization_id=ORGANIZATION_ID, **system))
+    for document in DOCUMENTS:
+        session.merge(EnterpriseDocument(organization_id=ORGANIZATION_ID, **document))
+    for commitment in COMMITMENTS:
+        session.merge(CustomerCommitment(organization_id=ORGANIZATION_ID, **commitment))
     session.flush()
 
     for trip in TRIPS:
         session.merge(Trip(**trip))
     for training_record in TRAINING_RECORDS:
         session.merge(TrainingRecord(**training_record))
+    for dependency in SYSTEM_DEPENDENCIES:
+        session.merge(
+            PolicySystemDependency(
+                policy_change_id=POLICY_CHANGE_ID,
+                **dependency,
+            )
+        )
+    for dependency in DOCUMENT_DEPENDENCIES:
+        session.merge(
+            PolicyDocumentDependency(
+                policy_change_id=POLICY_CHANGE_ID,
+                **dependency,
+            )
+        )
+    session.merge(
+        PolicyTrainingDependency(
+            id="dependency-policy-security-course",
+            policy_change_id=POLICY_CHANGE_ID,
+            rule_code="TRAINING_REQUIRED",
+            course_id=COURSE_IDENTIFIER,
+            relationship_type="requires_course",
+            explanation="The policy requires the International Travel Security course.",
+        )
+    )
+    for assignment in COMMITMENT_ASSIGNMENTS:
+        session.merge(CommitmentAssignment(**assignment))
     for sequence, question in enumerate(QUESTIONS, start=1):
         session.merge(
             PolicyChangeQuestion(

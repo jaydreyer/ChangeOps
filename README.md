@@ -4,7 +4,7 @@ ChangeOps analyzes operational and policy changes, identifies affected people an
 
 ## Current milestone
 
-Milestone 1: Policy Ingestion and Structured Extraction.
+Milestone 1: Enterprise Impact Discovery.
 
 Milestone 0 is complete and preserved by the `v0.0.1-milestone-0` tag.
 
@@ -12,6 +12,7 @@ See:
 
 - `docs/product-brief.md`
 - `docs/milestone-0.md`
+- `docs/milestone-1.md`
 - `docs/demo-scenario.md`
 - `docs/decisions.md`
 - [Contributing and engineering standards](CONTRIBUTING.md)
@@ -20,17 +21,23 @@ See:
 
 See `docs/roadmap.md` for the milestone sequence and planned introduction of LangChain, LangGraph, MCP, the frontend, and AWS.
 
-## Milestone 0 behavior
+## Milestone 1 behavior
 
-The current backend:
+The current backend preserves the Milestone 0 worker-and-trip result and additionally:
 
 - seeds the six-worker international-travel scenario;
 - validates the policy's structured rules into a typed travel-policy model;
 - applies deterministic worker, destination, effective-date, booking, and training rules;
-- persists immutable assessment and evidence snapshots in PostgreSQL;
-- returns three affected workers, three unaffected workers, six findings, four unexecuted proposed actions, and eight scenario-defined unresolved questions.
+- traces affected workers to managers, teams, systems, documents, training, and customer
+  commitments through explicit PostgreSQL relationships;
+- returns 18 categorized enterprise impacts with stable reason codes, evidence, and ordered
+  relationship paths;
+- persists the complete immutable assessment aggregate in one transaction;
+- returns three affected workers, three unaffected workers, six original findings, 13 unexecuted
+  proposed actions, and eight scenario-defined unresolved questions.
 
-Milestone 0 has no frontend, LLM, approval lifecycle, or action execution.
+Milestone 1 has no frontend, LLM, workflow framework, approval lifecycle, external integration, or
+action execution.
 
 ## Requirements
 

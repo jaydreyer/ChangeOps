@@ -2,12 +2,22 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from changeops.db.models import (
+    CommitmentAssignment,
+    CustomerCommitment,
+    EnterpriseDocument,
+    EnterpriseSystem,
     Organization,
     PolicyChange,
     PolicyChangeQuestion,
+    PolicyDocumentDependency,
+    PolicySystemDependency,
+    PolicyTrainingDependency,
+    Team,
+    TrainingCourse,
     TrainingRecord,
     Trip,
     Worker,
+    WorkerTeamMembership,
 )
 from changeops.db.session import SessionLocal
 from changeops.services.seed_service import seed_database
@@ -21,8 +31,18 @@ def source_counts(session: Session) -> dict[str, int]:
             PolicyChange,
             PolicyChangeQuestion,
             Worker,
+            Team,
+            WorkerTeamMembership,
             Trip,
+            EnterpriseSystem,
+            EnterpriseDocument,
+            TrainingCourse,
             TrainingRecord,
+            PolicySystemDependency,
+            PolicyDocumentDependency,
+            PolicyTrainingDependency,
+            CustomerCommitment,
+            CommitmentAssignment,
         )
     }
 
@@ -43,8 +63,18 @@ def test_seed_is_repeatable_without_duplicates() -> None:
             "organizations": 1,
             "policy_changes": 1,
             "policy_change_questions": 8,
-            "workers": 6,
+            "workers": 12,
+            "teams": 4,
+            "worker_team_memberships": 6,
             "trips": 6,
+            "enterprise_systems": 3,
+            "enterprise_documents": 4,
+            "training_courses": 1,
             "training_records": 6,
+            "policy_system_dependencies": 2,
+            "policy_document_dependencies": 3,
+            "policy_training_dependencies": 1,
+            "customer_commitments": 2,
+            "commitment_assignments": 2,
         }
     )

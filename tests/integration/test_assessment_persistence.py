@@ -6,7 +6,10 @@ from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
 from changeops.db.models import (
+    AssessmentEnterpriseImpact,
+    AssessmentImpactPathElement,
     AssessmentWorkerResult,
+    EnterpriseSystem,
     ImpactAssessment,
     Trip,
 )
@@ -40,7 +43,7 @@ def normalize_persisted_assessment(assessment: ImpactAssessment) -> dict[str, An
     actions = sorted(
         assessment.proposed_actions,
         key=lambda item: (
-            item.worker_id,
+            item.worker_id or "",
             item.action_type,
             item.target_identifier,
         ),
@@ -49,6 +52,7 @@ def normalize_persisted_assessment(assessment: ImpactAssessment) -> dict[str, An
         assessment.unresolved_questions,
         key=lambda item: item.sequence,
     )
+    impacts = sorted(assessment.enterprise_impacts, key=lambda item: item.sort_key)
     return {
         "policy_change_id": assessment.policy_change_id,
         "status": assessment.status,
@@ -92,12 +96,57 @@ def normalize_persisted_assessment(assessment: ImpactAssessment) -> dict[str, An
             }
             for item in evidence
         ],
+        "enterprise_impacts": [
+            {
+                "domain": item.domain,
+                "object_type": item.object_type,
+                "source_key": item.source_key,
+                "display_name": item.display_name,
+                "classification": item.classification,
+                "explanation": item.explanation,
+                "reason_code": item.reason_code,
+                "sort_key": item.sort_key,
+                "evidence_keys": tuple(
+                    evidence_item.evidence_key
+                    for evidence_item in sorted(
+                        item.evidence,
+                        key=lambda evidence_item: evidence_item.evidence_key,
+                    )
+                ),
+                "relationship_path": tuple(
+                    (
+                        element.sequence,
+                        element.object_type,
+                        element.stable_key,
+                        element.display_label,
+                        element.relationship_to_next,
+                    )
+                    for element in sorted(
+                        item.path_elements,
+                        key=lambda element: element.sequence,
+                    )
+                ),
+            }
+            for item in impacts
+        ],
         "proposed_actions": [
             {
-                "finding": {
-                    "worker_id": item.finding.worker_result.worker_id,
-                    "rule_code": item.finding.rule_code,
-                },
+                "finding": (
+                    {
+                        "worker_id": item.finding.worker_result.worker_id,
+                        "rule_code": item.finding.rule_code,
+                    }
+                    if item.finding is not None
+                    else None
+                ),
+                "enterprise_impact": (
+                    {
+                        "source_key": item.enterprise_impact.source_key,
+                        "reason_code": item.enterprise_impact.reason_code,
+                    }
+                    if item.enterprise_impact is not None
+                    else None
+                ),
                 "worker_id": item.worker_id,
                 "action_type": item.action_type,
                 "target_type": item.target_type,
@@ -168,6 +217,28 @@ def test_assessment_survives_new_app_and_database_connections() -> None:
     assert response.json()["id"] == str(assessment_id)
 
 
+def test_relevant_enterprise_source_change_updates_only_later_assessment(
+    client: TestClient,
+) -> None:
+    first_id = create_assessment(client)
+    first_before = load_normalized(first_id)
+
+    with SessionLocal.begin() as session:
+        system = session.get(EnterpriseSystem, "system-travel-request")
+        assert system is not None
+        system.name = "Acme Travel Approval"
+
+    second_id = create_assessment(client)
+    first_after = load_normalized(first_id)
+    second = load_normalized(second_id)
+
+    assert first_after == first_before
+    assert second["input_fingerprint"] != first_before["input_fingerprint"]
+    assert any(
+        item["display_name"] == "Acme Travel Approval" for item in second["enterprise_impacts"]
+    )
+
+
 def test_failure_after_partial_flush_rolls_back_complete_assessment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -189,3 +260,5 @@ def test_failure_after_partial_flush_rolls_back_complete_assessment(
     with SessionLocal() as session:
         assert session.scalar(select(func.count()).select_from(ImpactAssessment)) == 0
         assert session.scalar(select(func.count()).select_from(AssessmentWorkerResult)) == 0
+        assert session.scalar(select(func.count()).select_from(AssessmentEnterpriseImpact)) == 0
+        assert session.scalar(select(func.count()).select_from(AssessmentImpactPathElement)) == 0

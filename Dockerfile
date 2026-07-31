@@ -11,6 +11,7 @@ RUN python -m pip install --no-cache-dir ".[dev]"
 
 COPY alembic.ini ./
 COPY migrations ./migrations
+COPY tests ./tests
 
 EXPOSE 8000
 

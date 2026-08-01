@@ -120,6 +120,36 @@ def test_invalid_exception_behavior_is_not_coerced() -> None:
     assert "unsupported_exception_behavior" in {issue.code for issue in result.issues}
 
 
+def test_explicit_non_material_ambiguity_does_not_block_accepted_rules() -> None:
+    payload = canonical_proposal_payload()
+    quote = "business"
+    start = POLICY_TEXT.index(quote)
+    payload["findings"] = [
+        {
+            "kind": "unresolved",
+            "code": "non_material_ambiguity",
+            "message": "Wording does not affect a schema field.",
+            "field_path": None,
+            "provenance": {
+                "field_path": "finding.non_material_ambiguity",
+                "start": start,
+                "end": start + len(quote),
+                "quote": quote,
+            },
+        }
+    ]
+
+    result = validate_policy_extraction(
+        PolicyExtractionProposal.model_validate(payload),
+        policy_text=POLICY_TEXT,
+        policy_effective_date=date(2026, 9, 1),
+        training_courses=COURSES,
+    )
+
+    assert result.outcome == "accepted"
+    assert result.accepted_rules is not None
+
+
 def test_malformed_structured_output_is_explicit_failure() -> None:
     response = {
         "raw": {"content": "{not-json"},

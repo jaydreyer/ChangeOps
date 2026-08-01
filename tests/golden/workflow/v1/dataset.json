@@ -1,0 +1,67 @@
+{
+  "dataset_version": "policy-analysis-workflow-v1",
+  "scope": "Deterministic routing contract fixtures; not a production accuracy benchmark.",
+  "cases": [
+    {
+      "id": "accepted_to_assessment",
+      "validation_outcome": "accepted",
+      "issues": [],
+      "retry_count": 0,
+      "expected_route": "accepted",
+      "expected_failure_code": null,
+      "clarification_expected": false,
+      "assessment_allowed": true
+    },
+    {
+      "id": "material_exception_ambiguity",
+      "validation_outcome": "validation_failed",
+      "issues": ["unsupported_exception_behavior"],
+      "retry_count": 0,
+      "expected_route": "clarify",
+      "expected_failure_code": null,
+      "clarification_expected": true,
+      "assessment_allowed": false
+    },
+    {
+      "id": "clarified_to_assessment",
+      "validation_outcome": "accepted",
+      "issues": [],
+      "retry_count": 0,
+      "expected_route": "accepted",
+      "expected_failure_code": null,
+      "clarification_expected": false,
+      "assessment_allowed": true,
+      "human_provenance_expected": true
+    },
+    {
+      "id": "unsupported_policy",
+      "validation_outcome": "unsupported",
+      "issues": ["unsupported_policy_family"],
+      "retry_count": 0,
+      "expected_route": "unsupported",
+      "expected_failure_code": null,
+      "clarification_expected": false,
+      "assessment_allowed": false
+    },
+    {
+      "id": "malformed_output_retry_exhausted",
+      "validation_outcome": "validation_failed",
+      "issues": ["structured_output_failure"],
+      "retry_count": 1,
+      "expected_route": "fail",
+      "expected_failure_code": "retry_limit_exhausted",
+      "clarification_expected": false,
+      "assessment_allowed": false
+    },
+    {
+      "id": "enterprise_reference_unresolved",
+      "validation_outcome": "validation_failed",
+      "issues": ["training_course_not_found"],
+      "retry_count": 0,
+      "expected_route": "fail",
+      "expected_failure_code": "enterprise_reference_unresolved",
+      "clarification_expected": false,
+      "assessment_allowed": false
+    }
+  ]
+}

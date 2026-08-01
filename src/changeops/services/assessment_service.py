@@ -82,46 +82,91 @@ def create_impact_assessment(session: Session, policy_change_id: str) -> ImpactA
             rules = InternationalTravelPolicyRules.model_validate(policy_record.structured_rules)
         except ValidationError as error:
             raise PolicyNotAnalyzableError(policy_change_id) from error
-
-        source = _load_source_records(session, policy_record)
-        policy = _policy_input(policy_record, rules)
-        membership_by_worker_id = {item.worker_id: item for item in source["team_memberships"]}
-        workers = [
-            _worker_input(record, membership_by_worker_id.get(record.id))
-            for record in source["workers"]
-        ]
-        trips = [_trip_input(record) for record in source["trips"]]
-        training = [_training_input(record) for record in source["training_records"]]
-        context = _enterprise_context(source)
-
-        worker_result = analyze_policy(policy, workers, trips, training)
-        enterprise_result = analyze_enterprise_impacts(
-            policy,
-            workers,
-            trips,
-            training,
-            context,
-            worker_result,
-        )
-        input_fingerprint = calculate_input_fingerprint(
-            analyzer_version=ANALYZER_VERSION,
-            policy=policy,
-            workers=workers,
-            trips=trips,
-            training_records=training,
-            context=context,
-        )
-
-        assessment_id = _persist_assessment(
-            session=session,
-            policy_record=policy_record,
-            source=source,
-            worker_analysis=worker_result,
-            enterprise_analysis=enterprise_result,
-            input_fingerprint=input_fingerprint,
+        assessment_id = _create_assessment_records(
+            session,
+            policy_record,
+            rules,
+            policy_analysis_run_id=None,
         )
 
     return get_impact_assessment(session, assessment_id)
+
+
+def create_impact_assessment_from_rules(
+    session: Session,
+    policy_change_id: str,
+    rules: InternationalTravelPolicyRules,
+    *,
+    policy_analysis_run_id: uuid.UUID,
+) -> ImpactAssessment:
+    with session.begin():
+        existing = session.scalar(
+            select(ImpactAssessment).where(
+                ImpactAssessment.policy_analysis_run_id == policy_analysis_run_id
+            )
+        )
+        if existing is not None:
+            assessment_id = existing.id
+        else:
+            policy_record = session.get(PolicyChange, policy_change_id)
+            if policy_record is None:
+                raise PolicyChangeNotFoundError(policy_change_id)
+            assessment_id = _create_assessment_records(
+                session,
+                policy_record,
+                rules,
+                policy_analysis_run_id=policy_analysis_run_id,
+            )
+
+    return get_impact_assessment(session, assessment_id)
+
+
+def _create_assessment_records(
+    session: Session,
+    policy_record: PolicyChange,
+    rules: InternationalTravelPolicyRules,
+    *,
+    policy_analysis_run_id: uuid.UUID | None,
+) -> uuid.UUID:
+    source = _load_source_records(session, policy_record)
+    policy = _policy_input(policy_record, rules)
+    membership_by_worker_id = {item.worker_id: item for item in source["team_memberships"]}
+    workers = [
+        _worker_input(record, membership_by_worker_id.get(record.id))
+        for record in source["workers"]
+    ]
+    trips = [_trip_input(record) for record in source["trips"]]
+    training = [_training_input(record) for record in source["training_records"]]
+    context = _enterprise_context(source)
+
+    worker_result = analyze_policy(policy, workers, trips, training)
+    enterprise_result = analyze_enterprise_impacts(
+        policy,
+        workers,
+        trips,
+        training,
+        context,
+        worker_result,
+    )
+    input_fingerprint = calculate_input_fingerprint(
+        analyzer_version=ANALYZER_VERSION,
+        policy=policy,
+        workers=workers,
+        trips=trips,
+        training_records=training,
+        context=context,
+    )
+
+    assessment_id = _persist_assessment(
+        session=session,
+        policy_record=policy_record,
+        source=source,
+        worker_analysis=worker_result,
+        enterprise_analysis=enterprise_result,
+        input_fingerprint=input_fingerprint,
+        policy_analysis_run_id=policy_analysis_run_id,
+    )
+    return assessment_id
 
 
 def get_impact_assessment(
@@ -270,9 +315,11 @@ def _persist_assessment(
     worker_analysis: AnalysisResult,
     enterprise_analysis: EnterpriseAnalysisResult,
     input_fingerprint: str,
+    policy_analysis_run_id: uuid.UUID | None = None,
 ) -> uuid.UUID:
     now = datetime.now(UTC)
     assessment = ImpactAssessment(
+        policy_analysis_run_id=policy_analysis_run_id,
         policy_change_id=policy_record.id,
         status="completed",
         analyzer_version=ANALYZER_VERSION,

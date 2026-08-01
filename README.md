@@ -4,7 +4,7 @@ ChangeOps analyzes operational and policy changes, identifies affected people an
 
 ## Current milestone
 
-Milestone 2, PR 1: Structured Policy Extraction.
+Milestone 2, PR 2: Durable Policy Analysis Workflow.
 
 Milestone 0 is complete and preserved by the `v0.0.1-milestone-0` tag.
 
@@ -50,8 +50,23 @@ Each invocation creates an append-only extraction attempt with raw output, candi
 rules, validation errors, and model/provider/prompt/schema metadata. Unsupported and invalid output
 fails closed and never reaches the impact engine.
 
-This slice intentionally has no LangGraph workflow, clarification, pause/resume, assessment
-creation, interpretation, agent, RAG, or UI.
+## Durable policy-analysis workflow
+
+The second Milestone 2 slice wraps extraction in a narrow LangGraph state machine backed by
+authoritative PostgreSQL application records. A run either completes with one deterministic
+assessment, pauses on one bounded typed clarification, terminates as unsupported, or fails with a
+stable code. Technical extraction failures receive at most one fresh append-only attempt.
+
+Clarification is deterministic and deliberately narrow. Because the existing schema-v1 assessment
+rule is `Literal[True]`, the workflow asks for an explicit `true` acknowledgement only when
+conflicting pre-effective-date booking behavior could change the rule and assessment.
+Malformed JSON is retried, not sent to a human; unsupported families and unresolved enterprise
+course references terminate without blind retries.
+
+Only a persisted extraction attempt with `validation_outcome = accepted`, resolved typed rules,
+and no pending clarification can cross the assessment adapter. Human answers retain their own
+clarification ID, responder, timestamp, and affected field; no source span is fabricated.
+`policy_changes.structured_rules` is never changed.
 
 ## Requirements
 
@@ -118,6 +133,13 @@ docker compose run --rm api python -m changeops.evaluation.extraction \
   tests/golden/extraction/v1/dataset.json
 ```
 
+Run the scoped deterministic workflow scenario evaluation:
+
+```bash
+docker compose run --rm api python -m changeops.evaluation.workflow \
+  tests/golden/workflow/v1/dataset.json
+```
+
 The integration suite creates and removes a dedicated `changeops_test` database. It does not use the development database for test assessments.
 
 ## Database operations
@@ -168,7 +190,35 @@ Retrieve an extraction attempt, including failures:
 GET /api/v1/policy-extraction-attempts/{attempt_id}
 ```
 
-The create operation returns `201 Created` and a `Location` header containing the retrieval path.
+Create and execute a policy-analysis run:
+
+```http
+POST /api/v1/policy-analysis-runs
+Content-Type: application/json
+
+{"policy_change_id":"policy-international-travel-2026-09"}
+```
+
+Retrieve durable state after completion or a process restart:
+
+```http
+GET /api/v1/policy-analysis-runs/{run_id}
+```
+
+Answer the pending typed clarification and resume:
+
+```http
+POST /api/v1/policy-analysis-runs/{run_id}/clarifications/{clarification_id}/answer
+Content-Type: application/json
+
+{"value":true,"responder_identity":"reviewer@example.com"}
+```
+
+The persisted answer contract is
+`{"type":"literal","allowed_values":[true]}`; `false` is rejected without answering or advancing
+the clarification.
+
+Create operations return `201 Created`; run and extraction creates include a `Location` header.
 
 ## Manual smoke test
 

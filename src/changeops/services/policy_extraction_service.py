@@ -32,6 +32,9 @@ def create_policy_extraction_attempt(
     session: Session,
     policy_change_id: str,
     configured_model: ConfiguredExtractionModel,
+    *,
+    policy_analysis_run_id: uuid.UUID | None = None,
+    retry_reason: str | None = None,
 ) -> PolicyExtractionAttempt:
     with session.begin():
         policy = session.get(PolicyChange, policy_change_id)
@@ -64,6 +67,8 @@ def create_policy_extraction_attempt(
         )
         proposal = invocation.proposal
         attempt = PolicyExtractionAttempt(
+            policy_analysis_run_id=policy_analysis_run_id,
+            retry_reason=retry_reason,
             policy_change_id=policy_change_id,
             policy_text_snapshot=policy_text,
             support_status=proposal.support_status if proposal is not None else None,

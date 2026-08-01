@@ -1,7 +1,7 @@
 # ChangeOps Architecture
 
-This document describes the current implementation: Milestone 1 plus the first Milestone 2
-vertical slice for structured policy extraction.
+This document describes the current implementation: Milestone 1 plus the first two Milestone 2
+vertical slices for structured extraction and durable policy-analysis orchestration.
 
 ## High-level architecture
 
@@ -21,6 +21,8 @@ flowchart LR
         Routes["API routes and<br/>Pydantic schemas"]
         Service["Assessment application service"]
         Extraction["Policy extraction service"]
+        Workflow["LangGraph policy-analysis workflow"]
+        RunService["Run, clarification, retry,<br/>and boundary services"]
         LC["LangChain structured output"]
         Validation["Deterministic extraction validation"]
         Rules["Typed policy-rule validation"]
@@ -35,6 +37,11 @@ flowchart LR
     API --> Routes
     Routes --> Service
     Routes --> Extraction
+    Routes --> Workflow
+    Workflow --> RunService
+    RunService --> Extraction
+    RunService --> Service
+    RunService --> ORM
     Extraction --> LC
     LC --> LLM
     Extraction --> Validation
@@ -65,6 +72,9 @@ The FastAPI application exposes:
 - `GET /api/v1/impact-assessments/{assessment_id}`
 - `POST /api/v1/policy-changes/{policy_change_id}/extraction-attempts`
 - `GET /api/v1/policy-extraction-attempts/{attempt_id}`
+- `POST /api/v1/policy-analysis-runs`
+- `GET /api/v1/policy-analysis-runs/{run_id}`
+- `POST /api/v1/policy-analysis-runs/{run_id}/clarifications/{clarification_id}/answer`
 
 The create response adds an input fingerprint, enterprise-impact summary, and categorized
 enterprise impacts. Existing worker results, findings, evidence, proposed actions, and unresolved
@@ -111,6 +121,53 @@ The assessment service coordinates one synchronous transaction:
 
 Any exception before commit rolls back the assessment, workers results, findings, evidence,
 enterprise impacts, paths, actions, and copied questions.
+
+The existing endpoint still validates `policy_changes.structured_rules`. A narrow second entry
+point accepts an already validated `InternationalTravelPolicyRules` value from the workflow
+boundary. It uses the same loaders, analyzers, fingerprinting, and persistence functions, so the
+Milestone 1 engine is unchanged.
+
+### Policy-analysis workflow
+
+LangGraph coordinates explicit nodes; application and domain services make all decisions. Graph
+state contains only the run, attempt, clarification, and assessment identifiers plus routing
+fields. It does not contain policy text, raw model output, or enterprise records.
+
+```mermaid
+stateDiagram-v2
+    [*] --> pending
+    pending --> running: initialize and extract
+    running --> running: retry one technical failure
+    running --> awaiting_clarification: material exception conflict
+    awaiting_clarification --> running: typed human answer
+    running --> completed: accepted rules and assessment
+    running --> unsupported: unsupported policy family
+    running --> failed: validation, resolution, retry, or assessment failure
+    completed --> [*]
+    unsupported --> [*]
+    failed --> [*]
+```
+
+PostgreSQL is authoritative. Starting or resuming reconstructs routing from the run, latest
+attempt, and clarification rows; no in-memory workflow object or opaque graph checkpoint is needed.
+Terminal runs do not execute again.
+
+The deterministic materiality gate asks only
+`booking_before_effective_date_exemption` in schema v1. Because the existing deterministic rule
+model requires `booking_before_effective_date_is_exempt: Literal[True]`, this is explicitly a
+`true` acknowledgement contract rather than an unrestricted boolean question. A `false` request
+is rejected and leaves the clarification pending. The gate does not ask humans to repair malformed
+output, identify unsupported policy families, or resolve arbitrary free-form questions.
+`non_material_ambiguity` findings do not pause when all required fields validate. Course-name
+resolution failures terminate with `enterprise_reference_unresolved`.
+
+Malformed output and provider invocation failures receive at most one new extraction attempt.
+Unsupported output, deterministic invariant failures, and enterprise-reference failures are not
+blindly retried. Exhaustion terminates with `retry_limit_exhausted`.
+
+The assessment adapter reloads the persisted attempt, requires `accepted`, validates its typed
+rules again, rejects pending clarification, and then calls the deterministic assessment service.
+A unique nullable `impact_assessments.policy_analysis_run_id` prevents duplicate assessments.
 
 ### Deterministic analyzers
 
@@ -258,7 +315,28 @@ foreign keys to systems, documents, and courses; there is no polymorphic graph t
 `policy_extraction_attempts` stores the policy-text snapshot, raw and parsed model output, candidate
 and accepted rules, provenance, findings, validation errors, and provider/model/prompt/schema
 versions. Every POST inserts a new UUID row. A PostgreSQL trigger rejects updates and deletes so
-failed and superseded attempts remain inspectable. There is no workflow-run table in this slice.
+failed and superseded attempts remain inspectable. Workflow attempts additionally reference their
+run and record a retry or human-clarification derivation reason.
+
+### Durable workflow records
+
+`policy_analysis_runs` stores the immutable policy snapshot, closed status and step, latest
+attempt, assessment, retry count, stable failure information, versions, accepted-rule provenance,
+and timestamps. `policy_analysis_clarifications` stores an immutable question/code/answer contract,
+affected fields, status, typed answer, responder, explicit human provenance, and timestamps.
+Question-defining columns are protected from update by a PostgreSQL trigger.
+
+Clarification answers are written once under row locks. Duplicate or concurrent answers conflict.
+The original question is never replaced, and human facts never receive fabricated policy-text
+spans.
+
+This synchronous slice assumes one active workflow executor per run. Row locks serialize
+clarification answers and run-state attachment, and the unique assessment association makes
+assessment recovery idempotent, but extraction invocation is not protected by a lease held across
+the provider call. Concurrent executors could therefore create multiple append-only attempts and
+race to set the latest attempt. A future asynchronous-worker slice should add a guarded execution
+token or compare-and-set transition before supporting multiple executors; this PR intentionally
+does not introduce distributed locks or a queue.
 
 ### Immutable assessment aggregate
 
@@ -316,12 +394,13 @@ The completed golden assessment returns:
 
 ## External dependencies and boundaries
 
-The assessment endpoints communicate only with PostgreSQL. The extraction endpoint additionally
-uses LangChain Core and the configured `langchain-openai` chat model integration.
+The assessment endpoints communicate only with PostgreSQL. Extraction and policy-analysis create
+or retry operations additionally use LangChain Core and the configured `langchain-openai` chat
+model integration. LangGraph 1.0.8 provides the narrow orchestration runtime.
 
 There are no:
 
-- LangGraph, agent, tool-calling loop, embedding, RAG, or vector-search components;
+- agents, tool-calling loops, embeddings, RAG, or vector-search components;
 - MCP or live enterprise integrations;
 - graph databases;
 - background workers or message queues;
@@ -338,6 +417,7 @@ There are no:
 - Pydantic Settings 2.14.2
 - LangChain Core 1.5.3
 - LangChain OpenAI 1.4.1
+- LangGraph 1.0.8
 - SQLAlchemy 2.0.51
 - Psycopg 3.3.4
 - Alembic 1.18.5

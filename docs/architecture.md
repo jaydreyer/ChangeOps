@@ -1,7 +1,8 @@
 # ChangeOps Architecture
 
-This document describes the current implementation: Milestone 1 plus the first two Milestone 2
-vertical slices for structured extraction and durable policy-analysis orchestration.
+This document describes the current implementation: Milestone 1 plus the first three Milestone 2
+vertical slices for structured extraction, durable policy-analysis orchestration, and grounded
+post-assessment interpretation.
 
 ## High-level architecture
 
@@ -75,6 +76,10 @@ The FastAPI application exposes:
 - `POST /api/v1/policy-analysis-runs`
 - `GET /api/v1/policy-analysis-runs/{run_id}`
 - `POST /api/v1/policy-analysis-runs/{run_id}/clarifications/{clarification_id}/answer`
+- `POST /api/v1/impact-assessments/{assessment_id}/change-plans`
+- `GET /api/v1/impact-assessments/{assessment_id}/change-plan`
+- `GET /api/v1/change-plans/{change_plan_id}`
+- `GET /api/v1/policy-interpretation-attempts/{attempt_id}`
 
 The create response adds an input fingerprint, enterprise-impact summary, and categorized
 enterprise impacts. Existing worker results, findings, evidence, proposed actions, and unresolved
@@ -168,6 +173,32 @@ blindly retried. Exhaustion terminates with `retry_limit_exhausted`.
 The assessment adapter reloads the persisted attempt, requires `accepted`, validates its typed
 rules again, rejects pending clarification, and then calls the deterministic assessment service.
 A unique nullable `impact_assessments.policy_analysis_run_id` prevents duplicate assessments.
+
+### Coverage-gap interpretation
+
+Interpretation is an explicit synchronous operation after a policy-analysis run has completed and
+its immutable assessment exists. Deterministic application code eagerly loads that assessment
+aggregate, the accepted extraction attempt, stored policy-text snapshot, accepted provenance,
+answered clarifications, actions, and unresolved questions. It builds a stable, bounded DTO before
+calling LangChain structured output. The interpreter receives no SQLAlchemy session, repository,
+tools, ORM records, or raw enterprise source tables.
+
+The candidate schema permits only review concerns with typed policy-span, impact, evidence, and
+relationship-path references. It structurally forbids impact mutations and asserted enterprise
+facts. A pure validator resolves all references against the input and accepts an empty gap list.
+Accepted output is stored as a separate immutable JSON aggregate; it does not own or duplicate
+impacts.
+
+Every invocation produces an append-only `policy_interpretation_attempts` row containing provider,
+model, prompt/schema versions, raw and candidate output, validation errors, and a stable failure
+code. `change_plans` has a unique assessment foreign key, enforcing one accepted plan per
+assessment. Repeated creation returns that plan. Invalid/provider-failed attempts do not block a
+later retry. PostgreSQL triggers reject attempt and plan updates or deletes.
+
+Interpretation errors are isolated after assessment completion. They never change the
+policy-analysis run from `completed`, roll back the assessment, or affect assessment retrieval.
+Product UI, approval, prioritization, action sequencing/execution, RAG, tools, and additional policy
+families remain deferred.
 
 ### Deterministic analyzers
 

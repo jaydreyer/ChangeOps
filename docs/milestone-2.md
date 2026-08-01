@@ -2,7 +2,8 @@
 
 ## Status
 
-Planned.
+In progress. PR 3 implements grounded coverage-gap interpretation; product UI and the remaining
+milestone exit criteria are not complete.
 
 Milestone 1 is complete and merged into `main`.
 

@@ -14,6 +14,7 @@ from changeops.schemas.action_review import (
     ActionReviewDecisionRequest,
     ActionReviewResponse,
 )
+from changeops.services.action_approval_service import find_action_approval_run_id_for_review
 from changeops.services.action_review_serializer import serialize_action_review
 from changeops.services.action_review_service import (
     ActionReviewLifecycleMismatchError,
@@ -24,6 +25,7 @@ from changeops.services.action_review_service import (
     get_action_review_for_proposed_action,
     submit_action_review_decision,
 )
+from changeops.workflows.action_approval import execute_action_approval
 
 router = APIRouter(prefix="/api/v1", tags=["action-reviews"])
 
@@ -133,6 +135,24 @@ def create_review_decision(
             status_code=http_status,
             detail={"code": error.code, "message": error.message},
         ) from error
+    decision_id = review.decisions[-1].id
+    session.rollback()
+    approval_run_id = find_action_approval_run_id_for_review(session, review.id)
+    if approval_run_id is not None:
+        session.rollback()
+        try:
+            execute_action_approval(
+                session,
+                approval_run_id,
+                trigger_type="decision_recorded",
+                trigger_reference=str(decision_id),
+                actor_identity=actor.identity.strip(),
+            )
+        except Exception:
+            # The committed human decision is authoritative. Explicit resume reconciles
+            # any unexpected orchestration failure.
+            session.rollback()
+    review = get_action_review(session, review.id)
     response.headers["Location"] = f"/api/v1/action-reviews/{review.id}"
     return serialize_action_review(review)
 

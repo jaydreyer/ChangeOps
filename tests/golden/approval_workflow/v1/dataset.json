@@ -1,0 +1,82 @@
+{
+  "dataset_version": "action-approval-workflow-v1",
+  "scope": "deterministic approval counts, routing, resume, and failure mapping",
+  "cases": [
+    {
+      "id": "fresh-assessment",
+      "kind": "progress",
+      "statuses": ["pending", "pending", "pending"],
+      "expected_summary": {"total": 3, "pending": 3, "approved": 0, "rejected": 0, "deferred": 0, "revision_requested": 0},
+      "expected_route": "await_decisions"
+    },
+    {
+      "id": "partially-reviewed",
+      "kind": "progress",
+      "statuses": ["approved", "pending", "rejected"],
+      "expected_summary": {"total": 3, "pending": 1, "approved": 1, "rejected": 1, "deferred": 0, "revision_requested": 0},
+      "expected_route": "await_decisions"
+    },
+    {
+      "id": "fully-reviewed",
+      "kind": "progress",
+      "statuses": ["approved", "rejected"],
+      "expected_summary": {"total": 2, "pending": 0, "approved": 1, "rejected": 1, "deferred": 0, "revision_requested": 0},
+      "expected_route": "complete"
+    },
+    {
+      "id": "final-pending-decision",
+      "kind": "progress",
+      "statuses": ["approved", "pending"],
+      "expected_summary": {"total": 2, "pending": 1, "approved": 1, "rejected": 0, "deferred": 0, "revision_requested": 0},
+      "expected_route": "await_decisions",
+      "resumed_statuses": ["approved", "rejected"],
+      "expected_resumed_summary": {"total": 2, "pending": 0, "approved": 1, "rejected": 1, "deferred": 0, "revision_requested": 0},
+      "expected_resumed_route": "complete"
+    },
+    {
+      "id": "mixed-terminal-decisions",
+      "kind": "progress",
+      "statuses": ["approved", "approved", "rejected", "deferred", "revision_requested"],
+      "expected_summary": {"total": 5, "pending": 0, "approved": 2, "rejected": 1, "deferred": 1, "revision_requested": 1},
+      "expected_route": "complete"
+    },
+    {
+      "id": "idempotent-awaiting-resume",
+      "kind": "progress",
+      "statuses": ["pending", "approved"],
+      "expected_summary": {"total": 2, "pending": 1, "approved": 1, "rejected": 0, "deferred": 0, "revision_requested": 0},
+      "expected_route": "await_decisions"
+    },
+    {
+      "id": "idempotent-completed-resume",
+      "kind": "progress",
+      "statuses": ["deferred"],
+      "expected_summary": {"total": 1, "pending": 0, "approved": 0, "rejected": 0, "deferred": 1, "revision_requested": 0},
+      "expected_route": "complete"
+    },
+    {
+      "id": "lifecycle-mismatch",
+      "kind": "failure",
+      "error": "membership",
+      "phase": "resume",
+      "expected_failure_code": "approval_review_membership_mismatch"
+    },
+    {
+      "id": "concurrent-decision-reconciliation",
+      "kind": "progress",
+      "statuses": ["pending", "pending", "approved"],
+      "expected_summary": {"total": 3, "pending": 2, "approved": 1, "rejected": 0, "deferred": 0, "revision_requested": 0},
+      "expected_route": "await_decisions",
+      "resumed_statuses": ["approved", "rejected", "approved"],
+      "expected_resumed_summary": {"total": 3, "pending": 0, "approved": 2, "rejected": 1, "deferred": 0, "revision_requested": 0},
+      "expected_resumed_route": "complete"
+    },
+    {
+      "id": "initialization-failure",
+      "kind": "failure",
+      "error": "technical",
+      "phase": "initialize",
+      "expected_failure_code": "approval_run_initialization_failed"
+    }
+  ]
+}

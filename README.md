@@ -4,12 +4,12 @@ ChangeOps analyzes operational and policy changes, identifies affected people an
 
 ## Current milestone
 
-Milestone 3, PR 1: Action Review and Decision Foundation.
+Milestone 3, PR 2: Durable Action-Approval Workflow.
 
 The complete Milestone 2 backend remains protected by automated merge-quality checks. Milestone 3
-now adds item-level review creation, immutable action snapshots, explicit terminal decisions,
-constrained approved edits, and a narrow role-aware authorization boundary. Durable approval
-interruption/resume and the reviewer UI remain later slices; Milestone 3 is not complete.
+now adds item-level review creation and decisions plus a separate durable assessment-level approval
+run that pauses and resumes around those human decisions. The reviewer UI remains a later slice;
+Milestone 3 is not complete.
 
 Milestone 0 is complete and preserved by the `v0.0.1-milestone-0` tag.
 
@@ -103,6 +103,25 @@ make decisions append-only and terminal reviews immutable; row locks and uniquen
 provide a single winner under concurrent creation or decision attempts. No reviewed action is
 executed, and every proposed action remains `not_executed`.
 
+## Durable action-approval workflow
+
+A completed policy-analysis assessment can now create one idempotent `ActionApprovalRun`. The run
+creates or reuses one review for each proposed action, stores explicit ordered membership, derives
+counts from persisted review states, and records append-only workflow transitions. It is separate
+from the already-completed `PolicyAnalysisRun`; approval never reopens analysis or mutates its
+immutable assessment.
+
+The narrow deterministic LangGraph invocation ends as soon as the run persists
+`awaiting_decisions / await_decisions`. Each authorized decision commits first, then synchronously
+resumes the same run. The graph recalculates all counts under a run row lock and either pauses again
+or completes when every item is terminal. Approval, rejection, deferral, and revision request all
+close an item; the decision mix is summarized without treating non-approval as a technical failure.
+
+Unexpected automatic-resume failure cannot roll back a committed human decision. Authorized
+reviewers and admins can use the idempotent explicit resume endpoint to reconcile persisted state.
+Completed runs and no-op waiting resumes remain unchanged. Nothing executes, including approved
+actions.
+
 ## Requirements
 
 - Docker Desktop or another Docker Engine with Docker Compose
@@ -186,9 +205,16 @@ docker compose run --rm api python -m changeops.evaluation.interpretation \
   tests/golden/interpretation/v1/dataset.json
 ```
 
+Run the deterministic approval-workflow evaluation:
+
+```bash
+docker compose run --rm api python -m changeops.evaluation.approval_workflow \
+  tests/golden/approval_workflow/v1/dataset.json
+```
+
 The integration suite creates and removes a dedicated `changeops_test` database. It does not use the development database for test assessments.
 
-Pull requests and pushes to `main` run the same Compose-based lint, format, pytest, and three
+Pull requests and pushes to `main` run the same Compose-based lint, format, pytest, and four
 offline evaluation commands in GitHub Actions. CI explicitly clears `OPENAI_API_KEY`, so ordinary
 quality checks use fixture models and cannot inherit repository or runner provider credentials.
 
@@ -336,6 +362,27 @@ Content-Type: application/json
 
 The headers are a replaceable demonstration boundary, not production authentication. Retrieval
 remains unauthenticated.
+
+Create or idempotently retrieve the approval run for a completed policy-analysis assessment:
+
+```http
+POST /api/v1/impact-assessments/{assessment_id}/approval-run
+GET  /api/v1/impact-assessments/{assessment_id}/approval-run
+GET  /api/v1/action-approval-runs/{run_id}
+```
+
+Explicitly reconcile or resume the same run:
+
+```http
+POST /api/v1/action-approval-runs/{run_id}/resume
+X-ChangeOps-Actor: reviewer@example.com
+X-ChangeOps-Role: reviewer
+```
+
+Creation returns `awaiting_decisions` while any item is pending and may return `completed`
+immediately when every reused review was already terminal. Resume returns `200` and is idempotent,
+including for waiting runs with no new decision and completed runs. The demonstration headers are
+not safe production authentication.
 
 Create operations return `201 Created`; run, extraction, and change-plan creates include a
 `Location` header.

@@ -219,6 +219,41 @@ class PolicyChange(Base):
     structured_rules: Mapped[dict[str, Any]] = mapped_column(JSONB)
 
 
+class PolicyExtractionAttempt(Base):
+    __tablename__ = "policy_extraction_attempts"
+    __table_args__ = (
+        CheckConstraint(
+            "support_status IS NULL OR support_status IN ('supported', 'unsupported')",
+            name="ck_policy_extraction_attempts_support_status",
+        ),
+        CheckConstraint(
+            "validation_outcome IN ('accepted', 'unsupported', 'validation_failed')",
+            name="ck_policy_extraction_attempts_validation_outcome",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    policy_change_id: Mapped[str] = mapped_column(
+        ForeignKey("policy_changes.id"),
+        index=True,
+    )
+    policy_text_snapshot: Mapped[str] = mapped_column(Text)
+    support_status: Mapped[str | None] = mapped_column(String(30))
+    validation_outcome: Mapped[str] = mapped_column(String(30))
+    model_provider: Mapped[str] = mapped_column(String(100))
+    model_identifier: Mapped[str] = mapped_column(String(200))
+    prompt_version: Mapped[str] = mapped_column(String(100))
+    schema_version: Mapped[str] = mapped_column(String(100))
+    raw_output: Mapped[Any | None] = mapped_column(JSONB)
+    parsed_output: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    candidate_rules: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    accepted_rules: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    provenance: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
+    findings: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
+    validation_errors: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class PolicyChangeQuestion(Base):
     __tablename__ = "policy_change_questions"
     __table_args__ = (

@@ -51,7 +51,9 @@ def migrated_test_database() -> Iterator[None]:
 @pytest.fixture(autouse=True)
 def reset_scenario_data(migrated_test_database: None) -> Iterator[None]:
     with engine.begin() as connection:
-        connection.execute(text("TRUNCATE TABLE impact_assessments CASCADE"))
+        connection.execute(
+            text("TRUNCATE TABLE impact_assessments, policy_extraction_attempts CASCADE")
+        )
     with SessionLocal.begin() as session:
         seed_database(session)
 

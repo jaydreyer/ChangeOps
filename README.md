@@ -4,7 +4,7 @@ ChangeOps analyzes operational and policy changes, identifies affected people an
 
 ## Current milestone
 
-Milestone 1: Enterprise Impact Discovery.
+Milestone 2, PR 1: Structured Policy Extraction.
 
 Milestone 0 is complete and preserved by the `v0.0.1-milestone-0` tag.
 
@@ -13,6 +13,7 @@ See:
 - `docs/product-brief.md`
 - `docs/milestone-0.md`
 - `docs/milestone-1.md`
+- `docs/milestone-2.md`
 - `docs/demo-scenario.md`
 - `docs/decisions.md`
 - [Contributing and engineering standards](CONTRIBUTING.md)
@@ -36,8 +37,21 @@ The current backend preserves the Milestone 0 worker-and-trip result and additio
 - returns three affected workers, three unaffected workers, six original findings, 13 unexecuted
   proposed actions, and eight scenario-defined unresolved questions.
 
-Milestone 1 has no frontend, LLM, workflow framework, approval lifecycle, external integration, or
-action execution.
+The Milestone 1 assessment behavior remains unchanged.
+
+## Structured policy extraction
+
+The first Milestone 2 slice converts stored policy text into proposed typed rules using LangChain
+structured output, then validates source spans, supported constructs, business rules, and
+enterprise course references deterministically. The model extracts the human course name;
+deterministic code resolves its enterprise identifier.
+
+Each invocation creates an append-only extraction attempt with raw output, candidate and accepted
+rules, validation errors, and model/provider/prompt/schema metadata. Unsupported and invalid output
+fails closed and never reaches the impact engine.
+
+This slice intentionally has no LangGraph workflow, clarification, pause/resume, assessment
+creation, interpretation, agent, RAG, or UI.
 
 ## Requirements
 
@@ -66,6 +80,10 @@ Expected response:
 {"status":"ok"}
 ```
 
+To exercise live extraction, copy `.env.example` to `.env` and set `OPENAI_API_KEY`. The default
+provider/model are `openai` and `gpt-5-mini`; override them with
+`EXTRACTION_MODEL_PROVIDER` and `EXTRACTION_MODEL`.
+
 Stop the stack while preserving database data:
 
 ```bash
@@ -91,6 +109,13 @@ Run the code-quality checks:
 ```bash
 docker compose run --rm api ruff check src migrations tests
 docker compose run --rm api ruff format --check src migrations tests
+```
+
+Run the versioned fixture-based extraction evaluation without a live provider:
+
+```bash
+docker compose run --rm api python -m changeops.evaluation.extraction \
+  tests/golden/extraction/v1/dataset.json
 ```
 
 The integration suite creates and removes a dedicated `changeops_test` database. It does not use the development database for test assessments.
@@ -129,6 +154,18 @@ Retrieve a persisted assessment:
 
 ```http
 GET /api/v1/impact-assessments/{assessment_id}
+```
+
+Create a new append-only extraction attempt:
+
+```http
+POST /api/v1/policy-changes/{policy_change_id}/extraction-attempts
+```
+
+Retrieve an extraction attempt, including failures:
+
+```http
+GET /api/v1/policy-extraction-attempts/{attempt_id}
 ```
 
 The create operation returns `201 Created` and a `Location` header containing the retrieval path.

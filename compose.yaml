@@ -42,6 +42,9 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-changeops}:${POSTGRES_PASSWORD:-changeops}@db:5432/${POSTGRES_DB:-changeops}
       TEST_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-changeops}:${POSTGRES_PASSWORD:-changeops}@db:5432/changeops_test
+      EXTRACTION_MODEL_PROVIDER: ${EXTRACTION_MODEL_PROVIDER:-openai}
+      EXTRACTION_MODEL: ${EXTRACTION_MODEL:-gpt-5-mini}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
     ports:
       - "${API_PORT:-8000}:8000"
     depends_on:

@@ -190,6 +190,12 @@ answered clarifications, actions, and unresolved questions. It builds a stable, 
 calling LangChain structured output. The interpreter receives no SQLAlchemy session, repository,
 tools, ORM records, or raw enterprise source tables.
 
+The interpreter uses LangChain's `function_calling` structured-output method over OpenAI's
+Responses API because its nested Pydantic schema is outside OpenAI's stricter native JSON-schema
+subset and reasoning-enabled function tools are unsupported by the Chat Completions API.
+Start/completion logs record the run, assessment, provider/model identifiers, elapsed time, parse
+success, and a sanitized error category without persisted input or raw provider output.
+
 The candidate schema permits only review concerns with typed policy-span, impact, evidence, and
 relationship-path references. It structurally forbids impact mutations and asserted enterprise
 facts. A pure validator resolves all references against the input and accepts an empty gap list.

@@ -1,6 +1,6 @@
 import uuid
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 import pytest
 from langchain_core.messages import AIMessage
@@ -9,7 +9,7 @@ from sqlalchemy import func, select, text
 from sqlalchemy.exc import DBAPIError, IntegrityError
 
 from changeops.ai.model_factory import InterpretationProviderConfigurationError
-from changeops.ai.policy_interpreter import ConfiguredInterpretationModel
+from changeops.ai.policy_interpreter import SYSTEM_PROMPT, ConfiguredInterpretationModel
 from changeops.api.policy_extractions import extraction_model_dependency
 from changeops.api.policy_interpretation import interpretation_model_dependency
 from changeops.db.models import (
@@ -26,8 +26,21 @@ class FixtureInterpretationModel:
     def __init__(self, candidate: dict[str, Any] | None = None, *, fail: bool = False) -> None:
         self.candidate = candidate
         self.fail = fail
+        self.schema: type[CandidateChangePlan] | None = None
+        self.method: str | None = None
+        self.include_raw: bool | None = None
 
-    def with_structured_output(self, schema, *, include_raw: bool) -> RunnableLambda:
+    def with_structured_output(
+        self,
+        schema: type[CandidateChangePlan],
+        *,
+        method: Literal["function_calling"],
+        include_raw: bool,
+    ) -> RunnableLambda:
+        self.schema = schema
+        self.method = method
+        self.include_raw = include_raw
+
         def respond(_: Any) -> dict[str, Any]:
             if self.fail:
                 raise TimeoutError("sensitive provider detail")
@@ -90,8 +103,9 @@ def completed_assessment(client) -> tuple[str, str]:
 def test_completed_assessment_produces_one_separate_idempotent_plan(client) -> None:
     run_id, assessment_id = completed_assessment(client)
     before = client.get(f"/api/v1/impact-assessments/{assessment_id}").json()
+    configured_model = configured_interpreter()
     client.app.dependency_overrides[interpretation_model_dependency] = lambda: (
-        configured_interpreter
+        lambda: configured_model
     )
 
     created = client.post(f"/api/v1/impact-assessments/{assessment_id}/change-plans")
@@ -103,6 +117,12 @@ def test_completed_assessment_produces_one_separate_idempotent_plan(client) -> N
     repeated = client.post(f"/api/v1/impact-assessments/{assessment_id}/change-plans")
 
     assert created.status_code == 201, created.text
+    assert isinstance(configured_model.model, FixtureInterpretationModel)
+    assert configured_model.model.schema is CandidateChangePlan
+    assert configured_model.model.method == "function_calling"
+    assert configured_model.model.include_raw is True
+    assert "top-level object has exactly summary and coverage_gaps" in SYSTEM_PROMPT
+    assert "set impact_id only when that evidence_key" in SYSTEM_PROMPT
     assert repeated.status_code == 200
     assert repeated.json() == created.json()
     assert created.json()["policy_analysis_run_id"] == run_id

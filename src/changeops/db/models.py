@@ -688,6 +688,11 @@ class ProposedAction(Base):
             "finding_id IS NOT NULL OR enterprise_impact_id IS NOT NULL",
             name="ck_proposed_actions_has_parent",
         ),
+        UniqueConstraint(
+            "id",
+            "assessment_id",
+            name="uq_proposed_actions_id_assessment",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -711,6 +716,73 @@ class ProposedAction(Base):
     worker: Mapped[Worker | None] = relationship()
     finding: Mapped[Finding | None] = relationship()
     enterprise_impact: Mapped[AssessmentEnterpriseImpact | None] = relationship()
+
+
+class ActionReview(Base):
+    __tablename__ = "action_reviews"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'approved', 'rejected', 'deferred', 'revision_requested')",
+            name="ck_action_reviews_status",
+        ),
+        CheckConstraint(
+            "(status = 'pending' AND completed_at IS NULL) OR "
+            "(status <> 'pending' AND completed_at IS NOT NULL)",
+            name="ck_action_reviews_completion",
+        ),
+        UniqueConstraint("proposed_action_id", name="uq_action_reviews_proposed_action"),
+        ForeignKeyConstraint(
+            ["proposed_action_id", "assessment_id"],
+            ["proposed_actions.id", "proposed_actions.assessment_id"],
+            name="fk_action_reviews_action_assessment",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    assessment_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("impact_assessments.id"),
+        index=True,
+    )
+    proposed_action_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("proposed_actions.id"),
+        index=True,
+    )
+    status: Mapped[str] = mapped_column(String(30))
+    original_action_snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    review_context_snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    decisions: Mapped[list["ActionReviewDecision"]] = relationship(
+        order_by="ActionReviewDecision.created_at",
+    )
+
+
+class ActionReviewDecision(Base):
+    __tablename__ = "action_review_decisions"
+    __table_args__ = (
+        CheckConstraint(
+            "decision IN ('approved', 'rejected', 'deferred', 'revision_requested')",
+            name="ck_action_review_decisions_decision",
+        ),
+        CheckConstraint(
+            "(decision = 'approved') OR edited_action_snapshot IS NULL",
+            name="ck_action_review_decisions_approved_edit",
+        ),
+        UniqueConstraint("action_review_id", name="uq_action_review_decisions_review"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    action_review_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("action_reviews.id"),
+        index=True,
+    )
+    decision: Mapped[str] = mapped_column(String(30))
+    reviewer_identity: Mapped[str] = mapped_column(String(200))
+    reviewer_role: Mapped[str] = mapped_column(String(30))
+    rationale: Mapped[str] = mapped_column(Text)
+    edited_action_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class AssessmentUnresolvedQuestion(Base):

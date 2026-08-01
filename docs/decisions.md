@@ -319,3 +319,43 @@ Rejected for Milestone 2 because the required clarification interrupt must persi
 - LangChain usage;
 - prompt and model versioning;
 - evaluation datasets, rubrics, and thresholds.
+
+# ADR-0010 — Separate Immutable Action Review from Proposed Actions
+
+## Status
+
+Accepted
+
+## Context
+
+Milestone 3 must record consequential human decisions without rewriting the immutable assessment
+that explains what the system originally proposed. Approval fields on `proposed_actions` would
+combine historical analysis with a later human workflow and would lose the distinction between
+original and edited values.
+
+## Decision
+
+ChangeOps uses a separate item-level action-review aggregate:
+
+- one review per proposed action;
+- a versioned immutable original-action snapshot;
+- a small evidence-context snapshot;
+- zero or one append-only decision event in the first slice;
+- a persisted review status that must match its decision;
+- optional typed description and due-date edits only for approval;
+- a derived effective approved action rather than an executable record.
+
+PostgreSQL composite foreign keys, uniqueness constraints, row locks, mutation triggers, and
+deferred lifecycle constraint triggers enforce the aggregate. Reviewer identity is copied from a
+narrow request-header authorization context. The proposed action is never updated.
+
+## Consequences
+
+- Original recommendations and reviewer edits remain independently auditable.
+- Concurrent decisions have exactly one database winner.
+- Later execution can consume an effective approved snapshot without treating the assessment as
+  mutable.
+- The first slice deliberately permits only one terminal decision and has no reopening or
+  supersession semantics.
+- Request headers demonstrate an authorization boundary but must be replaced by production
+  authentication before external deployment.

@@ -1,9 +1,8 @@
 # ChangeOps Architecture
 
-This document describes the current implementation: the completed Milestone 2 backend for
-structured extraction, durable policy-analysis orchestration, deterministic assessment, grounded
-post-assessment interpretation, and automated quality verification. The integrated reviewer UI
-remains deferred.
+This document describes the current implementation: the completed Milestone 2 backend plus the
+first Milestone 3 slice for item-level action review and terminal human decisions. Durable approval
+workflow interruption/resume and the integrated reviewer UI remain deferred.
 
 ## High-level architecture
 
@@ -32,6 +31,7 @@ flowchart LR
         EnterpriseAnalyzer["Pure enterprise-impact analyzer"]
         Fingerprint["Canonical input fingerprint"]
         Serializer["Stable response serializer"]
+        Review["Action review service<br/>and pure validation"]
         ORM["SQLAlchemy models and sessions"]
     end
 
@@ -54,14 +54,17 @@ flowchart LR
     Service --> Fingerprint
     Service --> ORM
     Service --> Serializer
+    Routes --> Review
+    Review --> ORM
     ORM --> DB
     Migrate --> DB
     Seed --> DB
 ```
 
 ChangeOps remains a synchronous modular monolith. The HTTP, application, domain, serialization, and
-persistence code run in one Python process. PostgreSQL stores source, extraction, and assessment
-data; a configured OpenAI chat model is the only external service used by the extraction endpoint.
+persistence code run in one Python process. PostgreSQL stores source, extraction, workflow,
+assessment, interpretation, and review data; a configured chat-model provider is the only external
+service used by the extraction and interpretation endpoints.
 
 ## Major runtime components
 
@@ -81,6 +84,10 @@ The FastAPI application exposes:
 - `GET /api/v1/impact-assessments/{assessment_id}/change-plan`
 - `GET /api/v1/change-plans/{change_plan_id}`
 - `GET /api/v1/policy-interpretation-attempts/{attempt_id}`
+- `POST /api/v1/proposed-actions/{proposed_action_id}/review`
+- `GET /api/v1/proposed-actions/{proposed_action_id}/review`
+- `GET /api/v1/action-reviews/{review_id}`
+- `POST /api/v1/action-reviews/{review_id}/decisions`
 
 The create response adds an input fingerprint, enterprise-impact summary, and categorized
 enterprise impacts. Existing worker results, findings, evidence, proposed actions, and unresolved
@@ -88,6 +95,28 @@ questions remain available.
 
 Pydantic constrains impact domains, object types, classifications, and action types. It also
 validates allowed domain-classification combinations.
+
+### Action review and decision service
+
+Review creation locks one immutable proposed action, verifies its completed assessment, and either
+returns the existing review or snapshots the action plus its reason code and evidence keys. A
+unique proposed-action constraint makes item-level creation idempotent under concurrent requests.
+
+Decision submission accepts a trusted actor identity and role from `X-ChangeOps-Actor` and
+`X-ChangeOps-Role`. Pure deterministic validation requires a pending review, authorized role,
+nonempty rationale, supported decision, and—only for approval—actual changes limited to description
+and due date. The body cannot assert reviewer identity.
+
+The service locks the review, inserts one immutable decision event, and moves the review to the
+matching terminal status in the same transaction. A second request receives a stable conflict.
+Serialization returns original and context snapshots, decision history, the current decision, and
+a derived effective approved action when applicable.
+
+PostgreSQL composite foreign keys bind the review to the proposed action's assessment. Deferred
+constraint triggers require pending reviews to have no decision and terminal reviews to have one
+matching decision. Other triggers reject decision update/delete, snapshot or review-identity
+changes, and all terminal review mutation. `proposed_actions` is never updated, and its database
+constraint continues to require `execution_status = not_executed`.
 
 ### Policy extraction service
 

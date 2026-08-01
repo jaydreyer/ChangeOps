@@ -4,11 +4,12 @@ ChangeOps analyzes operational and policy changes, identifies affected people an
 
 ## Current milestone
 
-Milestone 2 backend complete; preparing Milestone 3.
+Milestone 3, PR 1: Action Review and Decision Foundation.
 
-The complete API workflow for Enterprise AI Policy Intelligence is implemented and protected by
-automated merge-quality checks. The integrated reviewer UI remains intentionally deferred until
-the roadmap introduces Next.js; Milestone 3 has not started.
+The complete Milestone 2 backend remains protected by automated merge-quality checks. Milestone 3
+now adds item-level review creation, immutable action snapshots, explicit terminal decisions,
+constrained approved edits, and a narrow role-aware authorization boundary. Durable approval
+interruption/resume and the reviewer UI remain later slices; Milestone 3 is not complete.
 
 Milestone 0 is complete and preserved by the `v0.0.1-milestone-0` tag.
 
@@ -18,6 +19,7 @@ See:
 - `docs/milestone-0.md`
 - `docs/milestone-1.md`
 - `docs/milestone-2.md`
+- `docs/milestone-3.md`
 - `docs/demo-scenario.md`
 - `docs/decisions.md`
 - [Contributing and engineering standards](CONTRIBUTING.md)
@@ -87,6 +89,19 @@ append-only failed attempts and never change the completed run or assessment. Cr
 idempotent; PostgreSQL permits at most one accepted change plan per assessment while failed
 attempts remain available for audit and retry. Returning an existing plan does not construct or
 require a configured interpretation provider.
+
+## Action review and decision foundation
+
+Each persisted proposed action can have one idempotently created review. The review snapshots the
+original unexecuted action and relevant evidence keys without updating the assessment or proposed
+action. An authorized `reviewer` or `admin` can submit exactly one approval, rejection, deferral, or
+revision request with rationale.
+
+Approval may store a separate edited description and/or due date. The API deterministically
+derives the effective approved action while preserving the original snapshot. PostgreSQL triggers
+make decisions append-only and terminal reviews immutable; row locks and uniqueness constraints
+provide a single winner under concurrent creation or decision attempts. No reviewed action is
+executed, and every proposed action remains `not_executed`.
 
 ## Requirements
 
@@ -292,6 +307,35 @@ GET /api/v1/policy-interpretation-attempts/{attempt_id}
 
 Interpretation is explicitly requested after the policy-analysis run completes. A successful new
 plan returns `201`; an existing plan returns `200`. Failed attempts do not block a later retry.
+
+Create or idempotently retrieve a review, then retrieve it by either stable identifier:
+
+```http
+POST /api/v1/proposed-actions/{proposed_action_id}/review
+GET /api/v1/proposed-actions/{proposed_action_id}/review
+GET /api/v1/action-reviews/{review_id}
+```
+
+Submit the one terminal decision using the demonstration authorization headers:
+
+```http
+POST /api/v1/action-reviews/{review_id}/decisions
+X-ChangeOps-Actor: reviewer@example.com
+X-ChangeOps-Role: reviewer
+Content-Type: application/json
+
+{
+  "decision": "approved",
+  "rationale": "Approved with a clearer assignment description.",
+  "edited_action": {
+    "description": "Assign the updated international travel course.",
+    "due_date": "2026-08-20"
+  }
+}
+```
+
+The headers are a replaceable demonstration boundary, not production authentication. Retrieval
+remains unauthenticated.
 
 Create operations return `201 Created`; run, extraction, and change-plan creates include a
 `Location` header.

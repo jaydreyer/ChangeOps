@@ -199,9 +199,12 @@ success, and a sanitized error category without persisted input or raw provider 
 The candidate schema permits only review concerns with typed policy-span, impact, evidence, and
 relationship-path references. It structurally forbids impact mutations and asserted enterprise
 facts. Exact policy quotes are deterministically resolved to the nearest matching zero-based span
-before a pure validator resolves all references against the input; quotes absent from the stored
-policy remain invalid. The validator also accepts an empty gap list. Accepted output is stored as a
-separate immutable JSON aggregate; it does not own or duplicate impacts.
+before validation. Evidence references with both owner types are reduced to one valid canonical
+owner, and a wrong owner identifier is repaired only when its owner type has exactly one valid
+match. A pure validator then resolves all references against the input; absent quotes, invented
+evidence, and ambiguous ownership remain invalid. The validator also accepts an empty gap list.
+Accepted output is stored as a separate immutable JSON aggregate; it does not own or duplicate
+impacts.
 
 Every invocation produces an append-only `policy_interpretation_attempts` row containing provider,
 model, prompt/schema versions, raw and candidate output, validation errors, and a stable failure

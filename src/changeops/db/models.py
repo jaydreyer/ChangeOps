@@ -233,6 +233,11 @@ class PolicyExtractionAttempt(Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    policy_analysis_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("policy_analysis_runs.id"),
+        index=True,
+    )
+    retry_reason: Mapped[str | None] = mapped_column(String(100))
     policy_change_id: Mapped[str] = mapped_column(
         ForeignKey("policy_changes.id"),
         index=True,
@@ -252,6 +257,92 @@ class PolicyExtractionAttempt(Base):
     findings: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
     validation_errors: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class PolicyAnalysisRun(Base):
+    __tablename__ = "policy_analysis_runs"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN "
+            "('pending', 'running', 'awaiting_clarification', 'completed', "
+            "'unsupported', 'failed')",
+            name="ck_policy_analysis_runs_status",
+        ),
+        CheckConstraint(
+            "current_step IN "
+            "('initialize', 'extract', 'evaluate_extraction', "
+            "'evaluate_clarification', 'await_clarification', "
+            "'create_assessment', 'finalize', 'terminal')",
+            name="ck_policy_analysis_runs_current_step",
+        ),
+        CheckConstraint("retry_count >= 0", name="ck_policy_analysis_runs_retry_count"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id"),
+        index=True,
+    )
+    policy_change_id: Mapped[str] = mapped_column(
+        ForeignKey("policy_changes.id"),
+        index=True,
+    )
+    policy_text_snapshot: Mapped[str] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(30))
+    current_step: Mapped[str] = mapped_column(String(40))
+    latest_extraction_attempt_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("policy_extraction_attempts.id"),
+    )
+    assessment_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("impact_assessments.id"),
+    )
+    retry_count: Mapped[int] = mapped_column(Integer)
+    failure_code: Mapped[str | None] = mapped_column(String(100))
+    failure_detail: Mapped[str | None] = mapped_column(Text)
+    workflow_version: Mapped[str] = mapped_column(String(100))
+    model_provider: Mapped[str] = mapped_column(String(100))
+    model_identifier: Mapped[str] = mapped_column(String(200))
+    prompt_version: Mapped[str] = mapped_column(String(100))
+    schema_version: Mapped[str] = mapped_column(String(100))
+    accepted_rule_provenance: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    clarifications: Mapped[list["PolicyAnalysisClarification"]] = relationship(
+        order_by="PolicyAnalysisClarification.created_at",
+    )
+
+
+class PolicyAnalysisClarification(Base):
+    __tablename__ = "policy_analysis_clarifications"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('pending', 'answered', 'superseded')",
+            name="ck_policy_analysis_clarifications_status",
+        ),
+        UniqueConstraint(
+            "policy_analysis_run_id",
+            "question_code",
+            name="uq_policy_analysis_clarifications_run_question",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    policy_analysis_run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("policy_analysis_runs.id"),
+        index=True,
+    )
+    question_code: Mapped[str] = mapped_column(String(100))
+    question_text: Mapped[str] = mapped_column(Text)
+    expected_answer_contract: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    affected_fields: Mapped[list[str]] = mapped_column(JSONB)
+    status: Mapped[str] = mapped_column(String(30))
+    answer: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    responder_identity: Mapped[str | None] = mapped_column(String(200))
+    answer_provenance: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class PolicyChangeQuestion(Base):
@@ -393,9 +484,19 @@ class CommitmentAssignment(Base):
 
 class ImpactAssessment(Base):
     __tablename__ = "impact_assessments"
-    __table_args__ = (CheckConstraint("status = 'completed'", name="ck_impact_assessments_status"),)
+    __table_args__ = (
+        CheckConstraint("status = 'completed'", name="ck_impact_assessments_status"),
+        UniqueConstraint(
+            "policy_analysis_run_id",
+            name="uq_impact_assessments_policy_analysis_run",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    policy_analysis_run_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("policy_analysis_runs.id"),
+        index=True,
+    )
     policy_change_id: Mapped[str] = mapped_column(
         ForeignKey("policy_changes.id"),
         index=True,

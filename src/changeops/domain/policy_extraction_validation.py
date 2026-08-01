@@ -25,6 +25,7 @@ MATERIAL_FIELD_PATHS = frozenset(
 )
 
 SUPPORTED_WORKER_TYPES = frozenset({"employee", "contractor"})
+NON_MATERIAL_FINDING_CODES = frozenset({"non_material_ambiguity"})
 
 
 def validate_policy_extraction(
@@ -85,7 +86,11 @@ def validate_policy_extraction(
             )
         )
 
-    unresolved = tuple(finding for finding in proposal.findings if finding.kind == "unresolved")
+    unresolved = tuple(
+        finding
+        for finding in proposal.findings
+        if finding.kind == "unresolved" and finding.code not in NON_MATERIAL_FINDING_CODES
+    )
     unsupported = tuple(finding for finding in proposal.findings if finding.kind == "unsupported")
     if unresolved or unsupported:
         return _failed(

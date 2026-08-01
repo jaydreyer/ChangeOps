@@ -9,6 +9,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Integer,
     String,
     Table,
@@ -490,6 +491,11 @@ class ImpactAssessment(Base):
             "policy_analysis_run_id",
             name="uq_impact_assessments_policy_analysis_run",
         ),
+        UniqueConstraint(
+            "id",
+            "policy_analysis_run_id",
+            name="uq_impact_assessments_id_policy_analysis_run",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -727,3 +733,80 @@ class AssessmentUnresolvedQuestion(Base):
     )
     sequence: Mapped[int] = mapped_column(Integer)
     question: Mapped[str] = mapped_column(Text)
+
+
+class PolicyInterpretationAttempt(Base):
+    __tablename__ = "policy_interpretation_attempts"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('accepted', 'invalid', 'provider_failed')",
+            name="ck_policy_interpretation_attempts_status",
+        ),
+        UniqueConstraint(
+            "id",
+            "policy_analysis_run_id",
+            "impact_assessment_id",
+            name="uq_policy_interpretation_attempts_lifecycle",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    policy_analysis_run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("policy_analysis_runs.id"), index=True
+    )
+    impact_assessment_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("impact_assessments.id"), index=True
+    )
+    status: Mapped[str] = mapped_column(String(30))
+    raw_output: Mapped[Any | None] = mapped_column(JSONB)
+    candidate_change_plan: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    validated_change_plan: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    validation_errors: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
+    model_provider: Mapped[str] = mapped_column(String(100))
+    model_identifier: Mapped[str] = mapped_column(String(200))
+    prompt_version: Mapped[str] = mapped_column(String(100))
+    schema_version: Mapped[str] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    failure_code: Mapped[str | None] = mapped_column(String(100))
+    failure_message: Mapped[str | None] = mapped_column(Text)
+
+
+class ChangePlan(Base):
+    __tablename__ = "change_plans"
+    __table_args__ = (
+        UniqueConstraint("impact_assessment_id", name="uq_change_plans_impact_assessment"),
+        UniqueConstraint("interpretation_attempt_id", name="uq_change_plans_attempt"),
+        ForeignKeyConstraint(
+            ["impact_assessment_id", "policy_analysis_run_id"],
+            ["impact_assessments.id", "impact_assessments.policy_analysis_run_id"],
+            name="fk_change_plans_assessment_lifecycle",
+        ),
+        ForeignKeyConstraint(
+            [
+                "interpretation_attempt_id",
+                "policy_analysis_run_id",
+                "impact_assessment_id",
+            ],
+            [
+                "policy_interpretation_attempts.id",
+                "policy_interpretation_attempts.policy_analysis_run_id",
+                "policy_interpretation_attempts.impact_assessment_id",
+            ],
+            name="fk_change_plans_attempt_lifecycle",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    policy_analysis_run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("policy_analysis_runs.id"), index=True
+    )
+    impact_assessment_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("impact_assessments.id"), index=True
+    )
+    interpretation_attempt_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("policy_interpretation_attempts.id")
+    )
+    schema_version: Mapped[str] = mapped_column(String(100))
+    validated_plan: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

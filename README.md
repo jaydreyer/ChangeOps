@@ -4,7 +4,7 @@ ChangeOps analyzes operational and policy changes, identifies affected people an
 
 ## Current milestone
 
-Milestone 2, PR 2: Durable Policy Analysis Workflow.
+Milestone 2, PR 3: Grounded Coverage-Gap Interpretation.
 
 Milestone 0 is complete and preserved by the `v0.0.1-milestone-0` tag.
 
@@ -68,6 +68,21 @@ and no pending clarification can cross the assessment adapter. Human answers ret
 clarification ID, responder, timestamp, and affected field; no source span is fabricated.
 `policy_changes.structured_rules` is never changed.
 
+## Grounded coverage-gap interpretation
+
+The third Milestone 2 slice interprets only the persisted artifacts of a completed policy-analysis
+assessment. A structured model may propose review concerns about unsupported concepts, missing
+evidence, or incomplete mapping coverage. Pure deterministic validation resolves every policy
+span, assessment impact, evidence key, and relationship-path reference before a separate immutable
+change plan is accepted.
+
+Interpretation is non-authoritative: it cannot add, remove, reclassify, or edit deterministic
+impacts, evidence, reason codes, paths, actions, or counts. Provider and grounding failures create
+append-only failed attempts and never change the completed run or assessment. Creation is
+idempotent; PostgreSQL permits at most one accepted change plan per assessment while failed
+attempts remain available for audit and retry. Returning an existing plan does not construct or
+require a configured interpretation provider.
+
 ## Requirements
 
 - Docker Desktop or another Docker Engine with Docker Compose
@@ -97,7 +112,9 @@ Expected response:
 
 To exercise live extraction, copy `.env.example` to `.env` and set `OPENAI_API_KEY`. The default
 provider/model are `openai` and `gpt-5-mini`; override them with
-`EXTRACTION_MODEL_PROVIDER` and `EXTRACTION_MODEL`.
+`EXTRACTION_MODEL_PROVIDER` and `EXTRACTION_MODEL`. Interpretation defaults to the same provider
+and model family and can be configured independently with `INTERPRETATION_MODEL_PROVIDER` and
+`INTERPRETATION_MODEL`.
 
 Stop the stack while preserving database data:
 
@@ -138,6 +155,13 @@ Run the scoped deterministic workflow scenario evaluation:
 ```bash
 docker compose run --rm api python -m changeops.evaluation.workflow \
   tests/golden/workflow/v1/dataset.json
+```
+
+Run the fixture-based interpretation grounding evaluation without a live provider:
+
+```bash
+docker compose run --rm api python -m changeops.evaluation.interpretation \
+  tests/golden/interpretation/v1/dataset.json
 ```
 
 The integration suite creates and removes a dedicated `changeops_test` database. It does not use the development database for test assessments.
@@ -218,7 +242,25 @@ The persisted answer contract is
 `{"type":"literal","allowed_values":[true]}`; `false` is rejected without answering or advancing
 the clarification.
 
-Create operations return `201 Created`; run and extraction creates include a `Location` header.
+Create or idempotently retrieve the accepted plan for a completed workflow assessment:
+
+```http
+POST /api/v1/impact-assessments/{assessment_id}/change-plans
+GET /api/v1/impact-assessments/{assessment_id}/change-plan
+GET /api/v1/change-plans/{change_plan_id}
+```
+
+Retrieve any interpretation attempt, including invalid and provider-failed attempts:
+
+```http
+GET /api/v1/policy-interpretation-attempts/{attempt_id}
+```
+
+Interpretation is explicitly requested after the policy-analysis run completes. A successful new
+plan returns `201`; an existing plan returns `200`. Failed attempts do not block a later retry.
+
+Create operations return `201 Created`; run, extraction, and change-plan creates include a
+`Location` header.
 
 ## Manual smoke test
 

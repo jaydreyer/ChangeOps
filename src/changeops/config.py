@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://changeops:changeops@localhost:5432/changeops"
     extraction_model_provider: str = "openai"
     extraction_model: str = "gpt-5-mini"
+    interpretation_model_provider: str = "openai"
+    interpretation_model: str = "gpt-5-mini"
     openai_api_key: SecretStr | None = None
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")

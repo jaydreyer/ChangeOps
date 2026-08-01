@@ -1,0 +1,209 @@
+{
+  "dataset_version": "policy-interpretation-evaluation-v1",
+  "input": {
+    "policy_change_id": "policy-1",
+    "policy_text": "Employees must complete security training.",
+    "policy_analysis_run_id": "00000000-0000-0000-0000-000000000003",
+    "accepted_extraction_attempt_id": "00000000-0000-0000-0000-000000000004",
+    "accepted_rules": {"kind": "international_travel"},
+    "accepted_source_provenance": [],
+    "answered_clarifications": [],
+    "impact_assessment_id": "00000000-0000-0000-0000-000000000001",
+    "assessment_summary": {"enterprise_impacts": 1},
+    "impacts": [{
+      "id": "00000000-0000-0000-0000-000000000002",
+      "assessment_id": "00000000-0000-0000-0000-000000000001",
+      "domain": "training",
+      "object_type": "training_course",
+      "source_key": "course-1",
+      "display_name": "Security",
+      "classification": "operationally_affected",
+      "explanation": "Mapped course.",
+      "reason_code": "required_course",
+      "evidence_keys": ["policy:text"],
+      "relationship_path": [{"sequence": 0}]
+    }],
+    "findings": [],
+    "evidence": [{
+      "id": "00000000-0000-0000-0000-000000000005",
+      "evidence_key": "policy:text",
+      "evidence_type": "policy",
+      "source_type": "policy_change",
+      "source_id": "policy-1",
+      "label": "Policy",
+      "snapshot": {}
+    }],
+    "proposed_actions": [],
+    "unresolved_questions": [],
+    "prompt_version": "coverage-gap-interpretation-v1",
+    "schema_version": "policy-interpretation-v1"
+  },
+  "cases": [
+    {
+      "id": "valid-grounded-gap",
+      "expected_valid": true,
+      "candidate": {
+        "summary": "Review mapping coverage.",
+        "coverage_gaps": [{
+          "finding_key": "review-training-mapping",
+          "title": "Review mapping",
+          "observed_limitation": "Only supplied mappings were evaluated.",
+          "why_it_matters": "Other mappings may require review.",
+          "recommended_review_action": "Review mapping completeness.",
+          "policy_spans": [{"policy_change_id": "policy-1", "start": 24, "end": 41, "quote": "security training"}],
+          "impact_references": [{"assessment_id": "00000000-0000-0000-0000-000000000001", "impact_id": "00000000-0000-0000-0000-000000000002"}],
+          "evidence_references": [{"assessment_id": "00000000-0000-0000-0000-000000000001", "evidence_key": "policy:text", "impact_id": "00000000-0000-0000-0000-000000000002"}]
+        }]
+      }
+    },
+    {
+      "id": "valid-absence-gap",
+      "expected_valid": true,
+      "candidate": {
+        "summary": "Review absence.",
+        "coverage_gaps": [{
+          "finding_key": "review-policy-absence",
+          "title": "Review absence",
+          "observed_limitation": "No supplied artifact evaluates the employee wording.",
+          "why_it_matters": "Scope may require review.",
+          "recommended_review_action": "Review supported scope.",
+          "policy_spans": [{"policy_change_id": "policy-1", "start": 0, "end": 9, "quote": "Employees"}]
+        }]
+      }
+    },
+    {"id": "no-gaps", "expected_valid": true, "candidate": {"summary": "No gaps.", "coverage_gaps": []}},
+    {
+      "id": "invented-impact",
+      "expected_valid": false,
+      "expected_code": "invalid_impact_reference",
+      "candidate": {
+        "summary": "",
+        "coverage_gaps": [{
+          "finding_key": "invented-impact",
+          "title": "Review",
+          "observed_limitation": "Review.",
+          "why_it_matters": "Review.",
+          "recommended_review_action": "Review.",
+          "policy_spans": [{"policy_change_id": "policy-1", "start": 0, "end": 9, "quote": "Employees"}],
+          "impact_references": [{"assessment_id": "00000000-0000-0000-0000-000000000001", "impact_id": "10000000-0000-0000-0000-000000000002"}]
+        }]
+      }
+    },
+    {
+      "id": "invented-evidence",
+      "expected_valid": false,
+      "expected_code": "invalid_evidence_reference",
+      "candidate": {
+        "summary": "",
+        "coverage_gaps": [{
+          "finding_key": "invented-evidence",
+          "title": "Review",
+          "observed_limitation": "Review.",
+          "why_it_matters": "Review.",
+          "recommended_review_action": "Review.",
+          "policy_spans": [{"policy_change_id": "policy-1", "start": 0, "end": 9, "quote": "Employees"}],
+          "evidence_references": [{"assessment_id": "00000000-0000-0000-0000-000000000001", "evidence_key": "invented"}]
+        }]
+      }
+    },
+    {
+      "id": "invalid-policy-span",
+      "expected_valid": false,
+      "expected_code": "invalid_policy_span",
+      "candidate": {
+        "summary": "",
+        "coverage_gaps": [{
+          "finding_key": "invalid-span",
+          "title": "Review",
+          "observed_limitation": "Review.",
+          "why_it_matters": "Review.",
+          "recommended_review_action": "Review.",
+          "policy_spans": [{"policy_change_id": "policy-1", "start": 0, "end": 900, "quote": "Employees"}]
+        }]
+      }
+    },
+    {
+      "id": "wrong-assessment",
+      "expected_valid": false,
+      "expected_code": "wrong_assessment_reference",
+      "candidate": {
+        "summary": "",
+        "coverage_gaps": [{
+          "finding_key": "wrong-assessment",
+          "title": "Review",
+          "observed_limitation": "Review.",
+          "why_it_matters": "Review.",
+          "recommended_review_action": "Review.",
+          "policy_spans": [{"policy_change_id": "policy-1", "start": 0, "end": 9, "quote": "Employees"}],
+          "impact_references": [{"assessment_id": "90000000-0000-0000-0000-000000000001", "impact_id": "00000000-0000-0000-0000-000000000002"}]
+        }]
+      }
+    },
+    {
+      "id": "impact-mutation",
+      "expected_valid": false,
+      "expected_code": "malformed_output",
+      "candidate": {
+        "summary": "",
+        "coverage_gaps": [{
+          "finding_key": "impact-mutation",
+          "title": "Remove impact",
+          "observed_limitation": "Review.",
+          "why_it_matters": "Review.",
+          "recommended_review_action": "Review.",
+          "policy_spans": [{"policy_change_id": "policy-1", "start": 0, "end": 9, "quote": "Employees"}],
+          "impact_mutations": [{"operation": "remove"}]
+        }]
+      }
+    },
+    {
+      "id": "invented-enterprise-fact",
+      "expected_valid": false,
+      "expected_code": "malformed_output",
+      "candidate": {
+        "summary": "",
+        "coverage_gaps": [{
+          "finding_key": "invented-fact",
+          "title": "Invented fact",
+          "observed_limitation": "Review.",
+          "why_it_matters": "Review.",
+          "recommended_review_action": "Review.",
+          "policy_spans": [{"policy_change_id": "policy-1", "start": 0, "end": 9, "quote": "Employees"}],
+          "asserted_enterprise_facts": ["An unmapped course exists."]
+        }]
+      }
+    },
+    {
+      "id": "duplicate-finding-key",
+      "expected_valid": false,
+      "expected_code": "duplicate_finding_key",
+      "candidate": {
+        "summary": "",
+        "coverage_gaps": [
+          {
+            "finding_key": "duplicate-key",
+            "title": "One",
+            "observed_limitation": "Review.",
+            "why_it_matters": "Review.",
+            "recommended_review_action": "Review.",
+            "policy_spans": [{"policy_change_id": "policy-1", "start": 0, "end": 9, "quote": "Employees"}]
+          },
+          {
+            "finding_key": "duplicate-key",
+            "title": "Two",
+            "observed_limitation": "Review.",
+            "why_it_matters": "Review.",
+            "recommended_review_action": "Review.",
+            "policy_spans": [{"policy_change_id": "policy-1", "start": 0, "end": 9, "quote": "Employees"}]
+          }
+        ]
+      }
+    },
+    {
+      "id": "malformed-provider-output",
+      "expected_valid": false,
+      "expected_code": "malformed_output",
+      "candidate": {"coverage_gaps": "not-a-list"}
+    }
+  ]
+}

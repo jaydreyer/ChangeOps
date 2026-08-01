@@ -1,0 +1,106 @@
+name: Quality
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  COMPOSE_PROJECT_NAME: changeops
+  OPENAI_API_KEY: ""
+
+jobs:
+  quality:
+    name: quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Restore cached API image
+        id: api-image-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/changeops-api-image.tar
+          key: changeops-api-${{ runner.os }}-${{ hashFiles('Dockerfile', 'pyproject.toml') }}
+
+      - name: Load cached API image
+        if: steps.api-image-cache.outputs.cache-hit == 'true'
+        run: docker image load --input /tmp/changeops-api-image.tar
+
+      - name: Build Compose services
+        run: docker compose build
+
+      - name: Save API image cache
+        if: steps.api-image-cache.outputs.cache-hit != 'true'
+        run: docker image save changeops-api:latest --output /tmp/changeops-api-image.tar
+
+      - name: Lint
+        run: docker compose run --rm api ruff check src migrations tests
+
+      - name: Check formatting
+        run: docker compose run --rm api ruff format --check src migrations tests
+
+      - name: Run test suite
+        run: docker compose run --rm api pytest
+
+      - name: Run extraction evaluation
+        run: >-
+          docker compose run --rm api python -m changeops.evaluation.extraction
+          tests/golden/extraction/v1/dataset.json
+
+      - name: Run workflow evaluation
+        run: >-
+          docker compose run --rm api python -m changeops.evaluation.workflow
+          tests/golden/workflow/v1/dataset.json
+
+      - name: Run interpretation evaluation
+        run: >-
+          docker compose run --rm api python -m changeops.evaluation.interpretation
+          tests/golden/interpretation/v1/dataset.json
+
+      - name: Stop Compose services
+        if: always()
+        run: docker compose down -v
+
+  migration:
+    name: migration
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Build migration image
+        run: docker compose build migrate
+
+      - name: Start an empty PostgreSQL database
+        run: |
+          docker compose down -v
+          docker compose up --wait db
+
+      - name: Discover current Alembic head
+        run: docker compose run --rm --no-deps migrate alembic heads
+
+      - name: Upgrade empty database to head
+        run: docker compose run --rm --no-deps migrate alembic upgrade head
+
+      - name: Downgrade head by one revision
+        run: docker compose run --rm --no-deps migrate alembic downgrade -1
+
+      - name: Upgrade immediate predecessor back to head
+        run: docker compose run --rm --no-deps migrate alembic upgrade head
+
+      - name: Verify database is at head
+        run: docker compose run --rm --no-deps migrate alembic current --check-heads
+
+      - name: Stop Compose services
+        if: always()
+        run: docker compose down -v

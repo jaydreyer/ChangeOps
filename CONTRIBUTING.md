@@ -298,6 +298,16 @@ Documentation should never lag behind implementation.
 
 Every pull request should include:
 
+## Required merge checks
+
+Repository owners should require the stable GitHub Actions checks named `quality` and `migration`
+before merging to `main`. Together they cover Compose build reproducibility, Ruff lint and format,
+the complete deterministic and PostgreSQL integration suite, all offline AI evaluations, and the
+current-head migration round trip.
+
+The manually dispatched `live-ai-smoke` check uses a real provider secret and is diagnostic; it is
+not a required pull-request check. Ordinary CI must keep model-provider secrets empty.
+
 ## Summary
 
 What changed.

@@ -2,8 +2,12 @@
 
 ## Status
 
-In progress. PR 3 implements grounded coverage-gap interpretation; product UI and the remaining
-milestone exit criteria are not complete.
+Milestone 2 backend complete; preparing Milestone 3.
+
+The API workflow, deterministic validation and analysis, durable clarification, grounded
+interpretation, offline evaluations, automated merge gates, and manual live-provider smoke path
+are complete. The integrated reviewer UI is a deferred product-experience criterion because the
+roadmap intentionally introduces Next.js later. Milestone 3 approval work has not started.
 
 Milestone 1 is complete and merged into `main`.
 
@@ -486,65 +490,70 @@ Usefulness may initially be measured without blocking merge.
 
 ### Policy understanding
 
-- [ ] Unstructured international-travel policy text produces typed candidate rules.
-- [ ] Material fields include resolvable source provenance.
-- [ ] Unsupported or unrepresentable policies fail closed.
-- [ ] The extractor does not invent enterprise identifiers.
-- [ ] Model, prompt, and schema versions are persisted.
-- [ ] Invalid AI output never reaches the deterministic engine.
+- [x] Unstructured international-travel policy text produces typed candidate rules.
+- [x] Material fields include resolvable source provenance.
+- [x] Unsupported or unrepresentable policies fail closed.
+- [x] The extractor does not invent enterprise identifiers.
+- [x] Model, prompt, and schema versions are persisted.
+- [x] Invalid AI output never reaches the deterministic engine.
 
 ### Clarification and workflow
 
-- [ ] Material ambiguity pauses the workflow before assessment creation.
-- [ ] Non-material observations do not block processing.
-- [ ] A reviewer can submit explicit clarification.
-- [ ] Clarification is persisted with actor and provenance.
-- [ ] The same workflow run resumes after clarification.
-- [ ] Invalid or stale clarification is rejected.
-- [ ] Workflow state is persisted and inspectable.
-- [ ] Workflow routing is deterministic and encoded in code.
-- [ ] Retries are bounded.
+- [x] Material ambiguity pauses the workflow before assessment creation.
+- [x] Non-material observations do not block processing.
+- [x] A reviewer can submit explicit clarification.
+- [x] Clarification is persisted with actor and provenance.
+- [x] The same workflow run resumes after clarification.
+- [x] Invalid or stale clarification is rejected.
+- [x] Workflow state is persisted and inspectable.
+- [x] Workflow routing is deterministic and encoded in code.
+- [x] Retries are bounded.
 
 ### Deterministic analysis
 
-- [ ] The Milestone 1 engine receives only validated rules.
-- [ ] The same validated rules and enterprise data produce the same assessment as Milestone 1.
-- [ ] AI cannot add, remove, or reclassify impacts.
-- [ ] Assessments remain immutable.
+- [x] The Milestone 1 engine receives only validated rules.
+- [x] The same validated rules and enterprise data produce the same assessment as Milestone 1.
+- [x] AI cannot add, remove, or reclassify impacts.
+- [x] Assessments remain immutable.
 
 ### Interpretation
 
-- [ ] Interpretation runs only after assessment persistence.
-- [ ] Interpretation reads the assessment aggregate rather than raw source tables.
-- [ ] Every cited impact, evidence key, and policy span resolves.
-- [ ] Invalid references prevent change-plan persistence.
-- [ ] Change plans are stored separately from assessments.
-- [ ] Interpretation failure does not invalidate the assessment.
-- [ ] Coverage gaps are presented as review concerns, not authoritative impacts.
+- [x] Interpretation runs only after assessment persistence.
+- [x] Interpretation reads the assessment aggregate rather than raw source tables.
+- [x] Every cited impact, evidence key, and policy span resolves.
+- [x] Invalid references prevent change-plan persistence.
+- [x] Change plans are stored separately from assessments.
+- [x] Interpretation failure does not invalidate the assessment.
+- [x] Coverage gaps are presented as review concerns, not authoritative impacts.
 
 ### Evaluation
 
-- [ ] A versioned extraction golden dataset exists.
-- [ ] Unsupported and fail-closed cases are covered.
-- [ ] Grounding and boundary checks run as deterministic tests.
-- [ ] Interpretation fixtures and a documented rubric exist.
-- [ ] The repository provides one documented command for running AI evaluations.
-- [ ] Evaluation output records model, prompt, schema, and dataset versions.
+- [x] Versioned extraction, workflow, and interpretation golden datasets exist.
+- [x] Unsupported and fail-closed cases are covered.
+- [x] Grounding and boundary checks run as deterministic tests.
+- [x] Interpretation fixtures and a documented rubric exist.
+- [x] The repository documents commands for all three offline AI evaluations.
+- [x] Evaluation output records model, prompt, schema, and dataset versions.
 
 ### Product experience
 
-- [ ] A reviewer can complete the flagship workflow through the product.
-- [ ] AI proposals, deterministic conclusions, and human input are visibly distinguished.
-- [ ] Provenance is inspectable.
-- [ ] Pause and resume are visible.
-- [ ] Unsupported and failed outcomes are understandable.
-- [ ] The change plan is clearly separate from the deterministic assessment.
+These criteria describe the integrated reviewer UI and are intentionally deferred until the
+portfolio milestone introduces Next.js. The Milestone 2 API exposes each artifact and state
+transition needed by that future experience without introducing frontend technology early.
+
+- [ ] A reviewer can complete the flagship workflow through the integrated reviewer UI (deferred).
+- [ ] AI proposals, deterministic conclusions, and human input are visibly distinguished in the
+  UI (deferred).
+- [ ] Provenance is inspectable in the UI (deferred).
+- [ ] Pause and resume are visible in the UI (deferred).
+- [ ] Unsupported and failed outcomes are understandable in the UI (deferred).
+- [ ] The change plan is clearly separate from the deterministic assessment in the UI (deferred).
 
 ---
 
 ## Exit criteria
 
-Milestone 2 is complete when:
+The Milestone 2 backend exit criteria are complete:
 
 1. A reviewer can submit an unstructured international-travel policy.
 
@@ -573,6 +582,9 @@ Milestone 2 is complete when:
    - AI explains what the deterministic analysis may not cover;
    - humans resolve ambiguity before consequential analysis proceeds.
 
+The API and repository documentation communicate this boundary today. The full visual product
+experience for these artifacts remains deferred as described above.
+
 ---
 
 ## Explicit deferrals
@@ -590,3 +602,4 @@ The following are intentionally deferred:
 - arbitrary policy-family support;
 - RAG and vector search;
 - multi-agent workflows.
+- integrated Next.js reviewer UI.

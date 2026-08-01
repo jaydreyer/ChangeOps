@@ -155,6 +155,10 @@ Exit criteria
 
 Milestone 2 — AI-Assisted Change Planning
 
+Status: backend complete. The API workflow and quality gates satisfy this milestone's backend exit
+criteria. The integrated reviewer UI remains deferred to Milestone 5, where Next.js is
+intentionally introduced.
+
 Product capability
 
 Accept unstructured policy text, convert it into a validated structured change, run deterministic enterprise impact discovery, and produce an evidence-backed change plan.
@@ -232,6 +236,10 @@ Exit criteria
 * each recommendation cites policy evidence and deterministic impact evidence;
 * graph state, retries, failures, and transitions are visible;
 * no consequential action executes automatically.
+* pull requests protect deterministic tests, PostgreSQL integration tests, migrations, lint,
+  formatting, and offline AI evaluations;
+* a manually triggered live-provider smoke verifies provider contracts without adding live calls
+  to ordinary CI.
 
 ⸻
 
@@ -374,7 +382,7 @@ Technologies added
 * TypeScript
 * AWS
 * Terraform
-* CI/CD
+* deployment CI/CD
 * authentication
 * authorization
 * observability
@@ -417,7 +425,7 @@ Production-readiness scope
 * metrics and traces;
 * workflow and tool-call observability;
 * database backup and migration strategy;
-* CI/CD;
+* deployment CI/CD beyond the repository's existing merge-quality gates;
 * security checks;
 * evaluation datasets;
 * deterministic regression tests;

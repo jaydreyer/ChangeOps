@@ -1,0 +1,43 @@
+name: Live AI Smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  COMPOSE_PROJECT_NAME: changeops-live-smoke
+  OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+jobs:
+  live-ai-smoke:
+    name: live-ai-smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Require live-provider configuration
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "Live AI smoke failed: provider_configuration_absent"
+            exit 1
+          fi
+
+      - name: Start isolated application stack
+        run: docker compose up --build --detach
+
+      - name: Run sanitized live-provider smoke
+        run: >-
+          docker compose exec -T api python -m changeops.evaluation.live_smoke
+          --base-url http://127.0.0.1:8000
+
+      - name: Stop isolated application stack
+        if: always()
+        run: docker compose down -v

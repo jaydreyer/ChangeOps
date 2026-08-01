@@ -4,7 +4,11 @@ ChangeOps analyzes operational and policy changes, identifies affected people an
 
 ## Current milestone
 
-Milestone 2, PR 3: Grounded Coverage-Gap Interpretation.
+Milestone 2 backend complete; preparing Milestone 3.
+
+The complete API workflow for Enterprise AI Policy Intelligence is implemented and protected by
+automated merge-quality checks. The integrated reviewer UI remains intentionally deferred until
+the roadmap introduces Next.js; Milestone 3 has not started.
 
 Milestone 0 is complete and preserved by the `v0.0.1-milestone-0` tag.
 
@@ -168,6 +172,28 @@ docker compose run --rm api python -m changeops.evaluation.interpretation \
 ```
 
 The integration suite creates and removes a dedicated `changeops_test` database. It does not use the development database for test assessments.
+
+Pull requests and pushes to `main` run the same Compose-based lint, format, pytest, and three
+offline evaluation commands in GitHub Actions. CI explicitly clears `OPENAI_API_KEY`, so ordinary
+quality checks use fixture models and cannot inherit repository or runner provider credentials.
+
+The separate `migration` check creates an empty PostgreSQL database, upgrades to the discovered
+Alembic head, downgrades that head by one revision, and upgrades back to head. Repository owners
+should configure branch protection to require the stable `quality` and `migration` checks before
+merge.
+
+## Live AI smoke verification
+
+The `Live AI Smoke` GitHub Actions workflow is available only through manual `workflow_dispatch`.
+It requires the `OPENAI_API_KEY` repository secret and starts a fresh isolated Compose stack. The
+smoke runs real extraction and interpretation for the canonical policy, verifies the deterministic
+3/3 worker split, 6 findings, 18 enterprise impacts, 13 unexecuted actions, and 8 unresolved
+questions, then checks accepted grounding, plan retrieval, idempotency, and assessment immutability.
+
+Workflow output contains only provider/model names, elapsed time, lifecycle identifiers, terminal
+outcome, and a stable failure code. It does not emit provider envelopes, raw model output,
+authorization data, or unrestricted exception text. A successful live call is deliberately not
+required for ordinary offline development or pull-request CI.
 
 ## Database operations
 

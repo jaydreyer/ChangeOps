@@ -1,8 +1,9 @@
 # ChangeOps Architecture
 
-This document describes the current implementation: Milestone 1 plus the first three Milestone 2
-vertical slices for structured extraction, durable policy-analysis orchestration, and grounded
-post-assessment interpretation.
+This document describes the current implementation: the completed Milestone 2 backend for
+structured extraction, durable policy-analysis orchestration, deterministic assessment, grounded
+post-assessment interpretation, and automated quality verification. The integrated reviewer UI
+remains deferred.
 
 ## High-level architecture
 
@@ -463,6 +464,21 @@ There are no:
 - background workers or message queues;
 - approval workflows or action execution;
 - frontend, authentication, or authorization components.
+
+## Quality and provider verification boundaries
+
+GitHub Actions runs two read-only merge checks on pull requests and pushes to `main`. The `quality`
+job builds and executes the development Compose services for Ruff, the complete pytest suite, and
+all three versioned offline evaluations. `OPENAI_API_KEY` is explicitly empty in this workflow, so
+fixture-backed tests cannot inherit a live provider secret. The `migration` job uses an empty
+PostgreSQL database and verifies the current Alembic head can upgrade, downgrade one revision, and
+upgrade again.
+
+A separate dispatch-only workflow starts an isolated Compose stack with a repository provider
+secret and runs the canonical extraction, workflow, assessment, and interpretation path. Its
+Python runner asserts typed acceptance, deterministic assessment counts, grounded plan
+acceptance, retrieval, idempotency, and assessment immutability. It emits only configuration
+names, elapsed time, lifecycle identifiers, terminal outcome, and a stable failure code.
 
 ## Technology stack
 

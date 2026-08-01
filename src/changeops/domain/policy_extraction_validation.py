@@ -1,6 +1,7 @@
 from datetime import date
 
 from changeops.domain.policy_extraction import (
+    MATERIAL_FIELD_PATHS,
     CandidateInternationalTravelPolicyRules,
     ExtractionValidationResult,
     PolicyExtractionProposal,
@@ -8,21 +9,6 @@ from changeops.domain.policy_extraction import (
     ValidationIssue,
 )
 from changeops.domain.types import InternationalTravelPolicyRules
-
-MATERIAL_FIELD_PATHS = frozenset(
-    {
-        "policy_family",
-        "candidate_rules.kind",
-        "candidate_rules.schema_version",
-        "candidate_rules.effective_date",
-        "candidate_rules.worker_scope.assigned_work_country",
-        "candidate_rules.worker_scope.worker_types",
-        "candidate_rules.trip_scope.origin_country",
-        "candidate_rules.trip_scope.excluded_destination_countries",
-        "candidate_rules.manager_approval.booking_before_effective_date_is_exempt",
-        "candidate_rules.security_training.course_name",
-    }
-)
 
 SUPPORTED_WORKER_TYPES = frozenset({"employee", "contractor"})
 NON_MATERIAL_FINDING_CODES = frozenset({"non_material_ambiguity"})

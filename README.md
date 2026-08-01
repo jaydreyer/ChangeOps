@@ -111,10 +111,12 @@ Expected response:
 ```
 
 To exercise live extraction, copy `.env.example` to `.env` and set `OPENAI_API_KEY`. The default
-provider/model are `openai` and `gpt-5-mini`; override them with
+provider/model are `openai` and `gpt-5.6-luna`; override them with
 `EXTRACTION_MODEL_PROVIDER` and `EXTRACTION_MODEL`. Interpretation defaults to the same provider
 and model family and can be configured independently with `INTERPRETATION_MODEL_PROVIDER` and
-`INTERPRETATION_MODEL`.
+`INTERPRETATION_MODEL`. Provider calls default to a 120-second timeout with provider-library
+retries disabled; configure these bounds with `*_MODEL_TIMEOUT_SECONDS` and
+`*_MODEL_MAX_RETRIES`. The policy-analysis workflow still owns its one bounded fresh-attempt retry.
 
 Stop the stack while preserving database data:
 
@@ -222,6 +224,11 @@ Content-Type: application/json
 
 {"policy_change_id":"policy-international-travel-2026-09"}
 ```
+
+Policy analysis is synchronous while the configured model is running. During that call, retrieving
+the run reports `status = running` and `current_step = extract`, and API logs record model-call
+start, completion, elapsed time, and a sanitized error category. Use `curl --show-error --verbose`
+when exercising a live provider so the open request is visible.
 
 Retrieve durable state after completion or a process restart:
 

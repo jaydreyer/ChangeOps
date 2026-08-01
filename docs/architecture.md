@@ -99,7 +99,8 @@ existing impacts, or enterprise identifiers.
 Model output is proposed data. A pure deterministic validator:
 
 1. validates the structured schema and closed literals;
-2. resolves every material field's exact zero-based text span against the stored policy snapshot;
+2. resolves each exact quoted passage to the nearest matching zero-based span in the stored policy
+   snapshot, then rejects quotes that do not resolve;
 3. checks supported family and version-1 business invariants;
 4. verifies the extracted effective date against the policy record;
 5. resolves the human-readable training-course name to exactly one active organization course;
@@ -169,6 +170,12 @@ resolution failures terminate with `enterprise_reference_unresolved`.
 Malformed output and provider invocation failures receive at most one new extraction attempt.
 Unsupported output, deterministic invariant failures, and enterprise-reference failures are not
 blindly retried. Exhaustion terminates with `retry_limit_exhausted`.
+
+Before provider invocation, the durable run moves to `running / extract`; it therefore remains
+observable while the synchronous HTTP request is open. Provider construction applies explicit
+timeouts and disables provider-library retries so the workflow remains the single owner of its
+bounded retry policy. Start/completion logs include provider/model identifiers, elapsed time, parse
+success, and a sanitized error category without policy text or raw provider output.
 
 The assessment adapter reloads the persisted attempt, requires `accepted`, validates its typed
 rules again, rejects pending clarification, and then calls the deterministic assessment service.

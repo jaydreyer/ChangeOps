@@ -1,5 +1,7 @@
+import logging
 import uuid
 from datetime import UTC, date, datetime
+from time import monotonic
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -18,6 +20,8 @@ from changeops.domain.policy_extraction import (
     ValidationIssue,
 )
 from changeops.domain.policy_extraction_validation import validate_policy_extraction
+
+logger = logging.getLogger(__name__)
 
 
 class PolicyChangeNotFoundError(Exception):
@@ -44,7 +48,27 @@ def create_policy_extraction_attempt(
         policy_effective_date = policy.effective_date
         organization_id = policy.organization_id
 
+    started_at = monotonic()
+    logger.info(
+        "Policy extraction model call started: policy_change_id=%s run_id=%s provider=%s model=%s",
+        policy_change_id,
+        policy_analysis_run_id,
+        configured_model.provider,
+        configured_model.identifier,
+    )
     invocation = invoke_policy_extractor(configured_model.model, policy_text)
+    error_code = invocation.parsing_error.split(":", 1)[0] if invocation.parsing_error else None
+    logger.info(
+        "Policy extraction model call completed: policy_change_id=%s run_id=%s "
+        "provider=%s model=%s elapsed_seconds=%.3f parsed=%s error=%s",
+        policy_change_id,
+        policy_analysis_run_id,
+        configured_model.provider,
+        configured_model.identifier,
+        monotonic() - started_at,
+        invocation.proposal is not None,
+        error_code,
+    )
 
     with session.begin():
         courses = tuple(

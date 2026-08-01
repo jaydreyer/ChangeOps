@@ -134,6 +134,14 @@ def extract_for_run(
     policy_change_id = run.policy_change_id
     persisted_run_id = run.id
     session.rollback()
+    with session.begin():
+        locked = session.get(PolicyAnalysisRun, run_id, with_for_update=True)
+        if locked is None:
+            raise PolicyAnalysisRunNotFoundError(str(run_id))
+        locked.status = "running"
+        locked.current_step = "extract"
+        locked.failure_code = None
+        locked.updated_at = datetime.now(UTC)
     attempt = create_policy_extraction_attempt(
         session,
         policy_change_id,

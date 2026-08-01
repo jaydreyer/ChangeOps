@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StrictBool
+from pydantic import BaseModel, ConfigDict, Field
 
 from changeops.domain.policy_analysis import FailureCode, RunStatus, RunStep
 
@@ -14,7 +14,7 @@ class CreatePolicyAnalysisRunRequest(BaseModel):
 
 
 class ClarificationAnswerRequest(BaseModel):
-    value: StrictBool
+    value: Literal[True]
     responder_identity: str = Field(min_length=1, max_length=200)
 
     model_config = ConfigDict(extra="forbid")

@@ -16,6 +16,7 @@ from changeops.db.models import (
 )
 from changeops.db.session import SessionLocal
 from changeops.services.seed_service import POLICY_CHANGE_ID, STRUCTURED_RULES
+from changeops.workflows.policy_analysis import execute_policy_analysis
 from tests.integration.test_policy_extraction_api import configured_fixture_model
 from tests.policy_extraction_fixtures import accepted_model_response, canonical_proposal_payload
 
@@ -89,12 +90,24 @@ def test_material_clarification_pauses_and_human_answer_resumes_once(client) -> 
     assert len(paused["clarifications"]) == 1
     clarification = paused["clarifications"][0]
     assert clarification["status"] == "pending"
-    assert clarification["expected_answer_contract"] == {"type": "boolean"}
+    assert clarification["expected_answer_contract"] == {
+        "type": "literal",
+        "allowed_values": [True],
+    }
     assert client.get(create.headers["Location"]).json() == paused
 
     answer_url = (
         f"/api/v1/policy-analysis-runs/{paused['id']}/clarifications/{clarification['id']}/answer"
     )
+    rejected = client.post(
+        answer_url,
+        json={"value": False, "responder_identity": "human-reviewer@example.test"},
+    )
+    assert rejected.status_code == 422
+    still_paused = client.get(create.headers["Location"]).json()
+    assert still_paused["status"] == "awaiting_clarification"
+    assert still_paused["clarifications"][0]["status"] == "pending"
+
     answered = client.post(
         answer_url,
         json={"value": True, "responder_identity": "human-reviewer@example.test"},
@@ -254,3 +267,41 @@ def test_unresolved_enterprise_course_fails_without_retry_or_assessment(client) 
     assert body["failure_code"] == "enterprise_reference_unresolved"
     assert body["retry_count"] == 0
     assert body["assessment_id"] is None
+
+
+def test_assessment_commit_is_recovered_after_run_association_crash(client) -> None:
+    client.app.dependency_overrides[extraction_model_dependency] = lambda: (
+        configured_fixture_model()
+    )
+    created = client.post(
+        "/api/v1/policy-analysis-runs",
+        json={"policy_change_id": POLICY_CHANGE_ID},
+    ).json()
+    run_id = uuid.UUID(created["id"])
+    assessment_id = uuid.UUID(created["assessment_id"])
+
+    with SessionLocal.begin() as session:
+        run = session.get(PolicyAnalysisRun, run_id)
+        assessment = session.get(ImpactAssessment, assessment_id)
+        assert run is not None and assessment is not None
+        assert assessment.policy_analysis_run_id == run.id
+        run.status = "running"
+        run.current_step = "create_assessment"
+        run.assessment_id = None
+        run.completed_at = None
+
+    with SessionLocal() as fresh_session:
+        execute_policy_analysis(fresh_session, run_id, configured_fixture_model())
+
+    with SessionLocal() as verification_session:
+        recovered = verification_session.get(PolicyAnalysisRun, run_id)
+        assessment_count = verification_session.scalar(
+            select(func.count())
+            .select_from(ImpactAssessment)
+            .where(ImpactAssessment.policy_analysis_run_id == run_id)
+        )
+        assert recovered is not None
+        assert recovered.status == "completed"
+        assert recovered.current_step == "terminal"
+        assert recovered.assessment_id == assessment_id
+        assert assessment_count == 1

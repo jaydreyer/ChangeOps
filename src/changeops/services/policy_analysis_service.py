@@ -51,6 +51,10 @@ class ClarificationStateConflictError(Exception):
     pass
 
 
+class ClarificationAnswerInvalidError(Exception):
+    pass
+
+
 class WorkflowStateError(Exception):
     pass
 
@@ -214,10 +218,10 @@ def persist_material_clarification(
                 policy_analysis_run_id=run.id,
                 question_code=BOOKING_EXCEPTION_QUESTION_CODE,
                 question_text=(
-                    "Are trips booked before the policy effective date exempt "
-                    "from the new manager-approval requirement?"
+                    "Confirm that trips booked before the policy effective date are exempt "
+                    "from the new manager-approval requirement."
                 ),
-                expected_answer_contract={"type": "boolean"},
+                expected_answer_contract={"type": "literal", "allowed_values": [True]},
                 affected_fields=[BOOKING_EXCEPTION_FIELD],
                 status="pending",
                 answer=None,
@@ -260,6 +264,8 @@ def answer_clarification(
             raise ClarificationNotFoundError(str(clarification_id))
         if run.status != "awaiting_clarification" or clarification.status != "pending":
             raise ClarificationStateConflictError(str(clarification_id))
+        if value is not True:
+            raise ClarificationAnswerInvalidError(str(clarification_id))
         clarification.status = "answered"
         clarification.answer = {"value": value}
         clarification.responder_identity = responder_identity
@@ -277,7 +283,7 @@ def answer_clarification(
 def apply_answered_clarification(
     session: Session,
     run_id: uuid.UUID,
-) -> PolicyExtractionAttempt | None:
+) -> PolicyExtractionAttempt:
     run = get_policy_analysis_run(session, run_id)
     clarification = next(
         (
@@ -289,22 +295,9 @@ def apply_answered_clarification(
     )
     if clarification is None or clarification.answer is None:
         raise ClarificationStateConflictError("no answered material clarification")
-    if clarification.answer.get("value") is not True:
-        session.rollback()
-        with session.begin():
-            locked = session.get(PolicyAnalysisRun, run_id, with_for_update=True)
-            if locked is None:
-                raise PolicyAnalysisRunNotFoundError(str(run_id))
-            _terminalize(
-                locked,
-                status="failed",
-                now=datetime.now(UTC),
-                failure_code="extraction_validation_failed",
-                failure_detail=(
-                    "The clarified exception behavior cannot be represented by schema version 1."
-                ),
-            )
-        return None
+    clarified_value = clarification.answer.get("value")
+    if clarified_value is not True:
+        raise ClarificationAnswerInvalidError(str(clarification.id))
 
     original = session.get(PolicyExtractionAttempt, run.latest_extraction_attempt_id)
     policy = session.get(PolicyChange, run.policy_change_id)
@@ -316,7 +309,7 @@ def apply_answered_clarification(
     clarified_candidate = proposal.candidate_rules.model_copy(
         update={
             "manager_approval": proposal.candidate_rules.manager_approval.model_copy(
-                update={"booking_before_effective_date_is_exempt": True}
+                update={"booking_before_effective_date_is_exempt": clarified_value}
             )
         }
     )

@@ -91,8 +91,6 @@ def _build_graph(
 
     def apply_clarification(state: PolicyAnalysisGraphState) -> PolicyAnalysisGraphState:
         attempt = apply_answered_clarification(session, uuid.UUID(state["run_id"]))
-        if attempt is None:
-            return {"route": "terminal"}
         return {
             "latest_extraction_attempt_id": str(attempt.id),
             "route": "assessment",
@@ -141,7 +139,7 @@ def _build_graph(
     workflow.add_conditional_edges(
         "apply_clarification",
         lambda state: state["route"],
-        {"assessment": "create_assessment", "terminal": END},
+        {"assessment": "create_assessment"},
     )
     workflow.add_edge("create_assessment", "finalize")
     workflow.add_edge("finalize", END)

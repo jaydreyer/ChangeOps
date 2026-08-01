@@ -153,7 +153,10 @@ attempt, and clarification rows; no in-memory workflow object or opaque graph ch
 Terminal runs do not execute again.
 
 The deterministic materiality gate asks only
-`booking_before_effective_date_exemption` in schema v1. It does not ask humans to repair malformed
+`booking_before_effective_date_exemption` in schema v1. Because the existing deterministic rule
+model requires `booking_before_effective_date_is_exempt: Literal[True]`, this is explicitly a
+`true` acknowledgement contract rather than an unrestricted boolean question. A `false` request
+is rejected and leaves the clarification pending. The gate does not ask humans to repair malformed
 output, identify unsupported policy families, or resolve arbitrary free-form questions.
 `non_material_ambiguity` findings do not pause when all required fields validate. Course-name
 resolution failures terminate with `enterprise_reference_unresolved`.
@@ -326,6 +329,14 @@ Question-defining columns are protected from update by a PostgreSQL trigger.
 Clarification answers are written once under row locks. Duplicate or concurrent answers conflict.
 The original question is never replaced, and human facts never receive fabricated policy-text
 spans.
+
+This synchronous slice assumes one active workflow executor per run. Row locks serialize
+clarification answers and run-state attachment, and the unique assessment association makes
+assessment recovery idempotent, but extraction invocation is not protected by a lease held across
+the provider call. Concurrent executors could therefore create multiple append-only attempts and
+race to set the latest attempt. A future asynchronous-worker slice should add a guarded execution
+token or compare-and-set transition before supporting multiple executors; this PR intentionally
+does not introduce distributed locks or a queue.
 
 ### Immutable assessment aggregate
 

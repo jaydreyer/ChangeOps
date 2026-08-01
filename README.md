@@ -57,8 +57,9 @@ authoritative PostgreSQL application records. A run either completes with one de
 assessment, pauses on one bounded typed clarification, terminates as unsupported, or fails with a
 stable code. Technical extraction failures receive at most one fresh append-only attempt.
 
-Clarification is deterministic and deliberately narrow. Schema v1 asks a boolean question only
-when conflicting pre-effective-date booking behavior could change the rule and assessment.
+Clarification is deterministic and deliberately narrow. Because the existing schema-v1 assessment
+rule is `Literal[True]`, the workflow asks for an explicit `true` acknowledgement only when
+conflicting pre-effective-date booking behavior could change the rule and assessment.
 Malformed JSON is retried, not sent to a human; unsupported families and unresolved enterprise
 course references terminate without blind retries.
 
@@ -212,6 +213,10 @@ Content-Type: application/json
 
 {"value":true,"responder_identity":"reviewer@example.com"}
 ```
+
+The persisted answer contract is
+`{"type":"literal","allowed_values":[true]}`; `false` is rejected without answering or advancing
+the clarification.
 
 Create operations return `201 Created`; run and extraction creates include a `Location` header.
 

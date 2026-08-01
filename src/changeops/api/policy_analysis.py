@@ -12,6 +12,7 @@ from changeops.schemas.policy_analysis import (
 )
 from changeops.services.policy_analysis_serializer import serialize_policy_analysis_run
 from changeops.services.policy_analysis_service import (
+    ClarificationAnswerInvalidError,
     ClarificationNotFoundError,
     ClarificationStateConflictError,
     PolicyAnalysisPolicyNotFoundError,
@@ -104,6 +105,14 @@ def answer_policy_analysis_clarification(
             detail={
                 "code": "clarification_state_conflict",
                 "message": "Clarification is already answered or the run is terminal.",
+            },
+        ) from error
+    except ClarificationAnswerInvalidError as error:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail={
+                "code": "clarification_answer_invalid",
+                "message": "The answer does not satisfy the clarification contract.",
             },
         ) from error
     execute_policy_analysis(session, run_id, configured_model)

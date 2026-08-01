@@ -369,6 +369,7 @@ Create or idempotently retrieve the approval run for a completed policy-analysis
 POST /api/v1/impact-assessments/{assessment_id}/approval-run
 GET  /api/v1/impact-assessments/{assessment_id}/approval-run
 GET  /api/v1/action-approval-runs/{run_id}
+GET  /api/v1/action-approval-runs/{run_id}/workbench
 ```
 
 Explicitly reconcile or resume the same run:
@@ -383,6 +384,42 @@ Creation returns `awaiting_decisions` while any item is pending and may return `
 immediately when every reused review was already terminal. Resume returns `200` and is idempotent,
 including for waiting runs with no new decision and completed runs. The demonstration headers are
 not safe production authentication.
+
+The workbench endpoint is a read-only, screen-oriented projection. It resolves immutable run
+membership, complete review snapshots, findings, enterprise impacts, persisted evidence, and
+ordered relationship paths without creating a durable workbench record. A missing reference
+returns the stable `approval_workbench_inconsistent` error instead of silently dropping context.
+
+## Local approval workbench
+
+Start PostgreSQL, migrations, provider-free demonstration seed data, the API, and Next.js:
+
+```bash
+docker compose up --build
+```
+
+Open:
+
+- API and OpenAPI docs: <http://localhost:8000/docs>
+- approval workbench entry: <http://localhost:3000>
+
+The Compose seed creates completed demonstration assessment
+`8f4f647d-7f2d-4da8-8e02-77d5301f2002`. Enter that ID on the workbench home page. The page
+idempotently creates or retrieves its approval run and displays every action in immutable
+membership order.
+
+The reviewer email field populates `X-ChangeOps-Actor`; decision and retry requests send
+`X-ChangeOps-Role: reviewer`. These are trusted local demonstration headers, not login or
+production authentication.
+
+The interface labels AI proposals, deterministic conclusions, human decisions, workflow state,
+and execution state in text. Approval may edit only description and due date. Every write is
+followed by an authoritative server refresh. All terminal outcomes remain durable, and every
+action remains `not_executed`.
+
+Policy submission, extraction monitoring, clarification, and interpretation screens are
+intentionally deferred. This slice begins at a completed assessment and does not call an LLM or an
+enterprise system.
 
 Create operations return `201 Created`; run, extraction, and change-plan creates include a
 `Location` header.

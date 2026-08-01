@@ -245,10 +245,10 @@ Exit criteria
 
 Milestone 3 — Human Review and Approval
 
-Status: in progress. PR 1 implements item-level review persistence and deterministic terminal
+Status: complete. PR 1 implements item-level review persistence and deterministic terminal
 decisions. PR 2 implements the separate durable assessment-level approval run, stable membership,
-deterministic interruption/resume, count reconciliation, and transition audit history. The
-reviewer interface remains a separate later slice.
+deterministic interruption/resume, count reconciliation, and transition audit history. PR 3 adds
+the minimal local focused approval workbench.
 
 Product capability
 
@@ -267,12 +267,13 @@ Technologies added
 * approval data model
 * item-level review API workflow
 * role-aware authorization sufficient for the demonstration
+* minimal Next.js and TypeScript reviewer workbench
 
 Planned slices
 
 * PR 1 — action review and decision foundation;
 * PR 2 — durable approval interruption and resume (implemented);
-* PR 3 — focused reviewer interface.
+* PR 3 — focused reviewer interface (implemented).
 
 Approval behavior
 
@@ -387,8 +388,6 @@ Proves
 
 Technologies added
 
-* Next.js
-* TypeScript
 * AWS
 * Terraform
 * deployment CI/CD
@@ -396,6 +395,11 @@ Technologies added
 * authorization
 * observability
 * production-oriented evaluation tooling
+
+Milestone 3 introduces Next.js and TypeScript only for the smallest usable local approval
+workbench. Milestone 5 expands that narrow screen into the complete deployed portfolio
+application with production authentication, infrastructure, observability, and the earlier
+policy-analysis screens.
 
 User experience
 

@@ -98,6 +98,7 @@ def create_impact_assessment_from_rules(
     rules: InternationalTravelPolicyRules,
     *,
     policy_analysis_run_id: uuid.UUID,
+    assessment_id: uuid.UUID | None = None,
 ) -> ImpactAssessment:
     with session.begin():
         existing = session.scalar(
@@ -116,6 +117,7 @@ def create_impact_assessment_from_rules(
                 policy_record,
                 rules,
                 policy_analysis_run_id=policy_analysis_run_id,
+                assessment_id=assessment_id,
             )
 
     return get_impact_assessment(session, assessment_id)
@@ -127,6 +129,7 @@ def _create_assessment_records(
     rules: InternationalTravelPolicyRules,
     *,
     policy_analysis_run_id: uuid.UUID | None,
+    assessment_id: uuid.UUID | None = None,
 ) -> uuid.UUID:
     source = _load_source_records(session, policy_record)
     policy = _policy_input(policy_record, rules)
@@ -165,6 +168,7 @@ def _create_assessment_records(
         enterprise_analysis=enterprise_result,
         input_fingerprint=input_fingerprint,
         policy_analysis_run_id=policy_analysis_run_id,
+        assessment_id=assessment_id,
     )
     return assessment_id
 
@@ -316,9 +320,11 @@ def _persist_assessment(
     enterprise_analysis: EnterpriseAnalysisResult,
     input_fingerprint: str,
     policy_analysis_run_id: uuid.UUID | None = None,
+    assessment_id: uuid.UUID | None = None,
 ) -> uuid.UUID:
     now = datetime.now(UTC)
     assessment = ImpactAssessment(
+        id=assessment_id or uuid.uuid4(),
         policy_analysis_run_id=policy_analysis_run_id,
         policy_change_id=policy_record.id,
         status="completed",

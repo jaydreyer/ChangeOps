@@ -6,6 +6,7 @@ from changeops.db.models import (
     CustomerCommitment,
     EnterpriseDocument,
     EnterpriseSystem,
+    ImpactAssessment,
     Organization,
     PolicyChange,
     PolicyChangeQuestion,
@@ -21,6 +22,10 @@ from changeops.db.models import (
     WorkerTeamMembership,
 )
 from changeops.db.session import SessionLocal
+from changeops.services.demo_assessment_seed_service import (
+    DEMO_ASSESSMENT_ID,
+    seed_demo_assessment,
+)
 from changeops.services.seed_service import seed_database
 
 
@@ -81,3 +86,19 @@ def test_seed_is_repeatable_without_duplicates() -> None:
             "commitment_assignments": 2,
         }
     )
+
+
+def test_provider_free_demo_assessment_seed_is_stable_and_idempotent() -> None:
+    with SessionLocal() as session:
+        first = seed_demo_assessment(session)
+        second = seed_demo_assessment(session)
+
+    assert first == second == DEMO_ASSESSMENT_ID
+    with SessionLocal() as session:
+        assessment = session.get(ImpactAssessment, DEMO_ASSESSMENT_ID)
+        assert assessment is not None
+        assert assessment.status == "completed"
+        assert len(assessment.proposed_actions) == 13
+        assert all(
+            action.execution_status == "not_executed" for action in assessment.proposed_actions
+        )

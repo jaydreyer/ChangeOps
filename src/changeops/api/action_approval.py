@@ -3,9 +3,11 @@ from typing import Annotated
 
 from fastapi import APIRouter, Header, Response, status
 from fastapi.exceptions import HTTPException
+from pydantic import ValidationError
 
 from changeops.api.dependencies import SessionDependency
 from changeops.schemas.action_approval import ActionApprovalRunResponse
+from changeops.schemas.action_approval_workbench import ActionApprovalWorkbenchResponse
 from changeops.services.action_approval_serializer import serialize_action_approval_run
 from changeops.services.action_approval_service import (
     ActionApprovalRunNotFoundError,
@@ -14,6 +16,13 @@ from changeops.services.action_approval_service import (
     create_action_approval_run_record,
     get_action_approval_run,
     get_action_approval_run_for_assessment,
+)
+from changeops.services.action_approval_workbench_serializer import (
+    serialize_action_approval_workbench,
+)
+from changeops.services.action_approval_workbench_service import (
+    ActionApprovalWorkbenchInconsistencyError,
+    get_action_approval_workbench,
 )
 from changeops.workflows.action_approval import execute_action_approval
 
@@ -75,6 +84,32 @@ def retrieve_action_approval_run(
         return serialize_action_approval_run(get_action_approval_run(session, run_id))
     except ActionApprovalRunNotFoundError as error:
         raise _run_not_found(error) from error
+
+
+@router.get(
+    "/action-approval-runs/{run_id}/workbench",
+    response_model=ActionApprovalWorkbenchResponse,
+)
+def retrieve_action_approval_workbench(
+    run_id: uuid.UUID,
+    session: SessionDependency,
+) -> ActionApprovalWorkbenchResponse:
+    try:
+        return serialize_action_approval_workbench(get_action_approval_workbench(session, run_id))
+    except ActionApprovalRunNotFoundError as error:
+        raise _run_not_found(error) from error
+    except (ActionApprovalWorkbenchInconsistencyError, ValidationError) as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "approval_workbench_inconsistent",
+                "message": (
+                    str(error)
+                    if isinstance(error, ActionApprovalWorkbenchInconsistencyError)
+                    else "A persisted approval review snapshot is inconsistent."
+                ),
+            },
+        ) from error
 
 
 @router.get(

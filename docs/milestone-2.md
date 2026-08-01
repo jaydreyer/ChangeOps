@@ -411,6 +411,8 @@ Each finding must include:
 
 Before persistence:
 
+- the model cites exact policy quotes and existing impact IDs or evidence keys;
+- deterministic code constructs span offsets, lifecycle IDs, and evidence ownership;
 - every cited impact must exist;
 - every evidence key must resolve;
 - every policy span must resolve;

@@ -3,7 +3,7 @@ from datetime import date
 
 import pytest
 
-from changeops.ai.policy_interpreter import _resolve_candidate_references
+from changeops.ai.policy_interpreter import _ground_proposed_change_plan
 from changeops.domain.policy_interpretation import (
     CandidateChangePlan,
     CandidateCoverageGapFinding,
@@ -15,6 +15,8 @@ from changeops.domain.policy_interpretation import (
     InterpretationImpact,
     PolicyInterpretationInput,
     PolicySpanReference,
+    ProposedChangePlan,
+    ProposedCoverageGapFinding,
 )
 from changeops.domain.policy_interpretation_validation import validate_candidate_change_plan
 
@@ -111,9 +113,33 @@ def test_grounded_plan_and_empty_plan_are_accepted() -> None:
     assert empty.coverage_gaps == ()
 
 
-def test_interpreter_resolves_mechanical_evidence_owner_errors() -> None:
+def proposed_finding(**changes) -> ProposedCoverageGapFinding:
+    values = {
+        "finding_key": "review-training-mapping",
+        "title": "Review mapping coverage",
+        "observed_limitation": "Only the supplied mapping was evaluated.",
+        "why_it_matters": "Other governed material may require review.",
+        "recommended_review_action": "Review policy-to-course mapping completeness.",
+        "policy_quotes": ("security training",),
+    }
+    values.update(changes)
+    return ProposedCoverageGapFinding(**values)
+
+
+def test_model_facing_schema_excludes_deterministic_reference_bookkeeping() -> None:
+    properties = ProposedCoverageGapFinding.model_json_schema()["properties"]
+
+    assert {"policy_quotes", "impact_ids", "evidence_keys"} <= properties.keys()
+    assert {
+        "policy_spans",
+        "impact_references",
+        "evidence_references",
+        "relationship_path_references",
+    }.isdisjoint(properties)
+
+
+def test_interpreter_constructs_typed_references_from_semantic_citations() -> None:
     finding_id = uuid.UUID("00000000-0000-0000-0000-000000000005")
-    wrong_finding_id = uuid.UUID("00000000-0000-0000-0000-000000000006")
     input_with_finding = interpretation_input().model_copy(
         update={
             "findings": (
@@ -140,58 +166,59 @@ def test_interpreter_resolves_mechanical_evidence_owner_errors() -> None:
             ),
         }
     )
-    candidate = CandidateChangePlan(
+    proposal = ProposedChangePlan(
         summary="Grounded concern.",
         coverage_gaps=(
-            finding(
-                evidence_references=(
-                    EvidenceReference(
-                        assessment_id=ASSESSMENT_ID,
-                        evidence_key="policy:text",
-                        impact_id=IMPACT_ID,
-                        finding_id=finding_id,
-                    ),
-                    EvidenceReference(
-                        assessment_id=ASSESSMENT_ID,
-                        evidence_key="trip:trip-1",
-                        finding_id=wrong_finding_id,
-                    ),
-                )
+            proposed_finding(
+                impact_ids=(IMPACT_ID, IMPACT_ID),
+                evidence_keys=("policy:text", "trip:trip-1", "trip:trip-1"),
             ),
         ),
     )
 
-    resolved = _resolve_candidate_references(candidate, input_with_finding)
-    references = resolved.coverage_gaps[0].evidence_references
+    grounded = _ground_proposed_change_plan(proposal, input_with_finding)
+    grounded_finding = grounded.coverage_gaps[0]
+    references = grounded_finding.evidence_references
+    span = grounded_finding.policy_spans[0]
 
+    assert span.policy_change_id == "policy-1"
+    assert span.start == input_with_finding.policy_text.index(span.quote)
+    assert span.end == span.start + len(span.quote)
+    assert grounded_finding.impact_references == (
+        ImpactReference(assessment_id=ASSESSMENT_ID, impact_id=IMPACT_ID),
+    )
     assert references[0].impact_id == IMPACT_ID
     assert references[0].finding_id is None
     assert references[1].impact_id is None
     assert references[1].finding_id == finding_id
-    validate_candidate_change_plan(resolved, input_with_finding)
+    assert len(references) == 2
+    validate_candidate_change_plan(grounded, input_with_finding)
 
 
-def test_interpreter_leaves_invented_evidence_owners_invalid() -> None:
-    unresolved = CandidateChangePlan(
+def test_interpreter_leaves_invented_evidence_keys_invalid() -> None:
+    proposal = ProposedChangePlan(
         summary="Unsupported concern.",
-        coverage_gaps=(
-            finding(
-                evidence_references=(
-                    EvidenceReference(
-                        assessment_id=ASSESSMENT_ID,
-                        evidence_key="invented",
-                        finding_id=uuid.uuid4(),
-                    ),
-                )
-            ),
-        ),
+        coverage_gaps=(proposed_finding(evidence_keys=("invented",)),),
     )
 
-    resolved = _resolve_candidate_references(unresolved, interpretation_input())
+    grounded = _ground_proposed_change_plan(proposal, interpretation_input())
 
     with pytest.raises(ChangePlanValidationError) as captured:
-        validate_candidate_change_plan(resolved, interpretation_input())
+        validate_candidate_change_plan(grounded, interpretation_input())
     assert "invalid_evidence_reference" in {item.code for item in captured.value.issues}
+
+
+def test_interpreter_leaves_invented_policy_quotes_invalid() -> None:
+    proposal = ProposedChangePlan(
+        summary="Unsupported concern.",
+        coverage_gaps=(proposed_finding(policy_quotes=("invented policy language",)),),
+    )
+
+    grounded = _ground_proposed_change_plan(proposal, interpretation_input())
+
+    with pytest.raises(ChangePlanValidationError) as captured:
+        validate_candidate_change_plan(grounded, interpretation_input())
+    assert "policy_quote_mismatch" in {item.code for item in captured.value.issues}
 
 
 @pytest.mark.parametrize(

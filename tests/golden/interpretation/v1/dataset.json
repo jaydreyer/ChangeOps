@@ -36,7 +36,7 @@
     }],
     "proposed_actions": [],
     "unresolved_questions": [],
-    "prompt_version": "coverage-gap-interpretation-v3",
+    "prompt_version": "coverage-gap-interpretation-v4",
     "schema_version": "policy-interpretation-v1"
   },
   "cases": [
@@ -205,6 +205,56 @@
       "expected_valid": false,
       "expected_code": "malformed_output",
       "candidate": {"coverage_gaps": "not-a-list"}
+    },
+    {
+      "id": "valid-semantic-proposal",
+      "expected_valid": true,
+      "proposal": {
+        "summary": "Review mapping coverage.",
+        "coverage_gaps": [{
+          "finding_key": "review-training-mapping-proposal",
+          "title": "Review mapping",
+          "observed_limitation": "Only supplied mappings were evaluated.",
+          "why_it_matters": "Other mappings may require review.",
+          "recommended_review_action": "Review mapping completeness.",
+          "policy_quotes": ["security training"],
+          "impact_ids": ["00000000-0000-0000-0000-000000000002"],
+          "evidence_keys": ["policy:text"]
+        }]
+      }
+    },
+    {
+      "id": "proposal-invented-policy-quote",
+      "expected_valid": false,
+      "expected_code": "policy_quote_mismatch",
+      "proposal": {
+        "summary": "Unsupported quote.",
+        "coverage_gaps": [{
+          "finding_key": "proposal-invented-quote",
+          "title": "Review quote",
+          "observed_limitation": "The claimed language is unsupported.",
+          "why_it_matters": "The concern cannot be grounded.",
+          "recommended_review_action": "Review the supplied policy text.",
+          "policy_quotes": ["invented policy language"]
+        }]
+      }
+    },
+    {
+      "id": "proposal-invented-evidence-key",
+      "expected_valid": false,
+      "expected_code": "invalid_evidence_reference",
+      "proposal": {
+        "summary": "Unsupported evidence.",
+        "coverage_gaps": [{
+          "finding_key": "proposal-invented-evidence",
+          "title": "Review evidence",
+          "observed_limitation": "The claimed evidence is unsupported.",
+          "why_it_matters": "The concern cannot be grounded.",
+          "recommended_review_action": "Review the supplied evidence.",
+          "policy_quotes": ["Employees"],
+          "evidence_keys": ["invented:evidence"]
+        }]
+      }
     }
   ]
 }

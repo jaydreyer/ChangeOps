@@ -17,7 +17,7 @@ from changeops.db.models import (
     PolicyAnalysisRun,
 )
 from changeops.db.session import SessionLocal
-from changeops.domain.policy_interpretation import CandidateChangePlan
+from changeops.domain.policy_interpretation import ProposedChangePlan
 from changeops.services.seed_service import POLICY_CHANGE_ID, POLICY_TEXT
 from tests.integration.test_policy_extraction_api import configured_fixture_model
 
@@ -26,14 +26,14 @@ class FixtureInterpretationModel:
     def __init__(self, candidate: dict[str, Any] | None = None, *, fail: bool = False) -> None:
         self.candidate = candidate
         self.fail = fail
-        self.schema: type[CandidateChangePlan] | None = None
+        self.schema: type[ProposedChangePlan] | None = None
         self.method: str | None = None
         self.include_raw: bool | None = None
         self.inputs: list[Any] = []
 
     def with_structured_output(
         self,
-        schema: type[CandidateChangePlan],
+        schema: type[ProposedChangePlan],
         *,
         method: Literal["function_calling"],
         include_raw: bool,
@@ -48,7 +48,7 @@ class FixtureInterpretationModel:
                 raise TimeoutError("sensitive provider detail")
             return {
                 "raw": AIMessage(content="fixture interpretation"),
-                "parsed": CandidateChangePlan.model_validate(self.candidate),
+                "parsed": ProposedChangePlan.model_validate(self.candidate),
                 "parsing_error": None,
             }
 
@@ -60,7 +60,6 @@ def configured_interpreter(
 ) -> ConfiguredInterpretationModel:
     if candidate is None:
         quote = "U.S.-based"
-        start = POLICY_TEXT.index(quote)
         candidate = {
             "summary": "One grounded review concern.",
             "coverage_gaps": [
@@ -72,14 +71,7 @@ def configured_interpreter(
                     "recommended_review_action": (
                         "Review the scope definition with the policy owner."
                     ),
-                    "policy_spans": [
-                        {
-                            "policy_change_id": POLICY_CHANGE_ID,
-                            "start": start,
-                            "end": start + len(quote),
-                            "quote": quote,
-                        }
-                    ],
+                    "policy_quotes": [quote],
                 }
             ],
         }
@@ -120,13 +112,13 @@ def test_completed_assessment_produces_one_separate_idempotent_plan(client) -> N
 
     assert created.status_code == 201, created.text
     assert isinstance(configured_model.model, FixtureInterpretationModel)
-    assert configured_model.model.schema is CandidateChangePlan
+    assert configured_model.model.schema is ProposedChangePlan
     assert configured_model.model.method == "function_calling"
     assert configured_model.model.include_raw is True
     assert "top-level object has exactly summary and coverage_gaps" in SYSTEM_PROMPT
     assert "absence of effective_date\ninside accepted_rules is not a coverage gap" in SYSTEM_PROMPT
-    assert "exactly one owner" in SYSTEM_PROMPT
-    assert "either\nimpact_id or finding_id, never both" in SYSTEM_PROMPT
+    assert "Do not calculate character offsets" in SYSTEM_PROMPT
+    assert "evidence-owner IDs" in SYSTEM_PROMPT
     rendered_prompt = "\n".join(
         str(message.content) for message in configured_model.model.inputs[0].to_messages()
     )
@@ -135,6 +127,9 @@ def test_completed_assessment_produces_one_separate_idempotent_plan(client) -> N
     assert repeated.json() == created.json()
     assert created.json()["policy_analysis_run_id"] == run_id
     assert created.json()["change_plan"]["coverage_gaps"][0]["conclusion_type"] == "review_concern"
+    persisted_gap = created.json()["change_plan"]["coverage_gaps"][0]
+    assert persisted_gap["policy_spans"][0]["policy_change_id"] == POLICY_CHANGE_ID
+    assert "policy_quotes" not in persisted_gap
     assert client.get(created.headers["Location"]).json() == created.json()
     lookup = client.get(f"/api/v1/impact-assessments/{assessment_id}/change-plan")
     assert lookup.json() == created.json()
@@ -145,15 +140,13 @@ def test_completed_assessment_produces_one_separate_idempotent_plan(client) -> N
         assert run is not None and run.status == "completed"
 
 
-def test_interpretation_resolves_exact_quote_with_incorrect_offsets(client) -> None:
+def test_interpretation_constructs_precise_policy_span_from_exact_quote(client) -> None:
     _, assessment_id = completed_assessment(client)
-    candidate = configured_interpreter().model.candidate
-    span = candidate["coverage_gaps"][0]["policy_spans"][0]
-    expected_start = POLICY_TEXT.index(span["quote"])
-    span["start"] = expected_start + 9
-    span["end"] = span["start"] + len(span["quote"])
+    proposal = configured_interpreter().model.candidate
+    quote = proposal["coverage_gaps"][0]["policy_quotes"][0]
+    expected_start = POLICY_TEXT.index(quote)
     client.app.dependency_overrides[interpretation_model_dependency] = lambda: (
-        lambda: configured_interpreter(candidate)
+        lambda: configured_interpreter(proposal)
     )
 
     response = client.post(f"/api/v1/impact-assessments/{assessment_id}/change-plans")
@@ -167,12 +160,10 @@ def test_interpretation_resolves_exact_quote_with_incorrect_offsets(client) -> N
 
 def test_interpretation_rejects_quote_absent_from_policy(client) -> None:
     _, assessment_id = completed_assessment(client)
-    candidate = configured_interpreter().model.candidate
-    span = candidate["coverage_gaps"][0]["policy_spans"][0]
-    span["quote"] = "invented policy language"
-    span["end"] = span["start"] + len(span["quote"])
+    proposal = configured_interpreter().model.candidate
+    proposal["coverage_gaps"][0]["policy_quotes"][0] = "invented policy language"
     client.app.dependency_overrides[interpretation_model_dependency] = lambda: (
-        lambda: configured_interpreter(candidate)
+        lambda: configured_interpreter(proposal)
     )
 
     response = client.post(f"/api/v1/impact-assessments/{assessment_id}/change-plans")
@@ -205,12 +196,10 @@ def test_provider_failure_is_auditable_and_does_not_change_completed_run(client)
 
 def test_invalid_reference_persists_attempt_without_plan(client) -> None:
     _, assessment_id = completed_assessment(client)
-    candidate = configured_interpreter().model.candidate
-    candidate["coverage_gaps"][0]["impact_references"] = [
-        {"assessment_id": assessment_id, "impact_id": str(uuid.uuid4())}
-    ]
+    proposal = configured_interpreter().model.candidate
+    proposal["coverage_gaps"][0]["impact_ids"] = [str(uuid.uuid4())]
     client.app.dependency_overrides[interpretation_model_dependency] = lambda: (
-        lambda: configured_interpreter(candidate)
+        lambda: configured_interpreter(proposal)
     )
     response = client.post(f"/api/v1/impact-assessments/{assessment_id}/change-plans")
     assert response.status_code == 422

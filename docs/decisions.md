@@ -223,7 +223,10 @@ AI-generated policy rules are candidate data until they pass:
 
 An unsupported or unrepresentable policy must fail closed rather than be coerced into the current schema.
 
-AI interpretation is stored separately from the immutable impact assessment. Every referenced impact and evidence key must resolve against the persisted assessment before the interpretation artifact is accepted.
+AI interpretation is stored separately from the immutable impact assessment. The model cites exact
+policy quotes and existing impact IDs or evidence keys; deterministic code constructs span offsets,
+lifecycle IDs, and evidence ownership. Every resulting reference must resolve against the persisted
+assessment before the interpretation artifact is accepted.
 
 The model may reference existing evidence but may not create authoritative evidence.
 

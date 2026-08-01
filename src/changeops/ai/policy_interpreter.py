@@ -89,4 +89,41 @@ def invoke_policy_interpreter(
         if any(boundary_fields.intersection(map(str, item["loc"])) for item in error.errors()):
             return InterpretationInvocation(None, raw, "structured_output_boundary_violation")
         return InterpretationInvocation(None, raw, "structured_output_validation_failed")
-    return InterpretationInvocation(candidate, raw, None)
+    return InterpretationInvocation(
+        _resolve_policy_spans(candidate, interpretation_input.policy_text),
+        raw,
+        None,
+    )
+
+
+def _resolve_policy_spans(
+    candidate: CandidateChangePlan,
+    policy_text: str,
+) -> CandidateChangePlan:
+    def resolve(span):
+        if policy_text[span.start : span.end] == span.quote:
+            return span
+
+        starts: list[int] = []
+        offset = 0
+        while (start := policy_text.find(span.quote, offset)) >= 0:
+            starts.append(start)
+            offset = start + 1
+        if not starts:
+            return span
+
+        start = min(starts, key=lambda match: abs(match - span.start))
+        return span.model_copy(update={"start": start, "end": start + len(span.quote)})
+
+    return candidate.model_copy(
+        update={
+            "coverage_gaps": tuple(
+                finding.model_copy(
+                    update={
+                        "policy_spans": tuple(resolve(span) for span in finding.policy_spans)
+                    }
+                )
+                for finding in candidate.coverage_gaps
+            )
+        }
+    )

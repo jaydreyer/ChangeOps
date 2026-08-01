@@ -80,7 +80,8 @@ Interpretation is non-authoritative: it cannot add, remove, reclassify, or edit 
 impacts, evidence, reason codes, paths, actions, or counts. Provider and grounding failures create
 append-only failed attempts and never change the completed run or assessment. Creation is
 idempotent; PostgreSQL permits at most one accepted change plan per assessment while failed
-attempts remain available for audit and retry.
+attempts remain available for audit and retry. Returning an existing plan does not construct or
+require a configured interpretation provider.
 
 ## Requirements
 

@@ -193,7 +193,9 @@ Every invocation produces an append-only `policy_interpretation_attempts` row co
 model, prompt/schema versions, raw and candidate output, validation errors, and a stable failure
 code. `change_plans` has a unique assessment foreign key, enforcing one accepted plan per
 assessment. Repeated creation returns that plan. Invalid/provider-failed attempts do not block a
-later retry. PostgreSQL triggers reject attempt and plan updates or deletes.
+later retry. Provider construction is lazy, so returning an existing plan does not require provider
+configuration. Composite foreign keys require every plan's run, assessment, and accepted attempt
+to belong to the same lifecycle. PostgreSQL triggers reject attempt and plan updates or deletes.
 
 Interpretation errors are isolated after assessment completion. They never change the
 policy-analysis run from `completed`, roll back the assessment, or affect assessment retrieval.

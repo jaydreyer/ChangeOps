@@ -1,12 +1,14 @@
 import uuid
+from datetime import UTC, datetime
 from typing import Any
 
 import pytest
 from langchain_core.messages import AIMessage
 from langchain_core.runnables import RunnableLambda
 from sqlalchemy import func, select, text
-from sqlalchemy.exc import DBAPIError
+from sqlalchemy.exc import DBAPIError, IntegrityError
 
+from changeops.ai.model_factory import InterpretationProviderConfigurationError
 from changeops.ai.policy_interpreter import ConfiguredInterpretationModel
 from changeops.api.policy_extractions import extraction_model_dependency
 from changeops.api.policy_interpretation import interpretation_model_dependency
@@ -89,10 +91,15 @@ def test_completed_assessment_produces_one_separate_idempotent_plan(client) -> N
     run_id, assessment_id = completed_assessment(client)
     before = client.get(f"/api/v1/impact-assessments/{assessment_id}").json()
     client.app.dependency_overrides[interpretation_model_dependency] = lambda: (
-        configured_interpreter()
+        configured_interpreter
     )
 
     created = client.post(f"/api/v1/impact-assessments/{assessment_id}/change-plans")
+
+    def unavailable_provider() -> ConfiguredInterpretationModel:
+        raise InterpretationProviderConfigurationError("provider disabled after creation")
+
+    client.app.dependency_overrides[interpretation_model_dependency] = lambda: unavailable_provider
     repeated = client.post(f"/api/v1/impact-assessments/{assessment_id}/change-plans")
 
     assert created.status_code == 201, created.text
@@ -113,7 +120,7 @@ def test_completed_assessment_produces_one_separate_idempotent_plan(client) -> N
 def test_provider_failure_is_auditable_and_does_not_change_completed_run(client) -> None:
     run_id, assessment_id = completed_assessment(client)
     client.app.dependency_overrides[interpretation_model_dependency] = lambda: (
-        configured_interpreter(fail=True)
+        lambda: configured_interpreter(fail=True)
     )
     response = client.post(f"/api/v1/impact-assessments/{assessment_id}/change-plans")
     assert response.status_code == 502, response.text
@@ -135,7 +142,7 @@ def test_invalid_reference_persists_attempt_without_plan(client) -> None:
         {"assessment_id": assessment_id, "impact_id": str(uuid.uuid4())}
     ]
     client.app.dependency_overrides[interpretation_model_dependency] = lambda: (
-        configured_interpreter(candidate)
+        lambda: configured_interpreter(candidate)
     )
     response = client.post(f"/api/v1/impact-assessments/{assessment_id}/change-plans")
     assert response.status_code == 422
@@ -149,7 +156,7 @@ def test_invalid_reference_persists_attempt_without_plan(client) -> None:
 def test_interpretation_attempts_reject_update_and_delete(client) -> None:
     _, assessment_id = completed_assessment(client)
     client.app.dependency_overrides[interpretation_model_dependency] = lambda: (
-        configured_interpreter(fail=True)
+        lambda: configured_interpreter(fail=True)
     )
     response = client.post(f"/api/v1/impact-assessments/{assessment_id}/change-plans")
     attempt_id = response.json()["detail"]["attempt_id"]
@@ -166,7 +173,40 @@ def test_interpretation_attempts_reject_update_and_delete(client) -> None:
 def test_direct_assessment_without_completed_run_cannot_be_interpreted(client) -> None:
     assessment = client.post(f"/api/v1/policy-changes/{POLICY_CHANGE_ID}/impact-assessments").json()
     client.app.dependency_overrides[interpretation_model_dependency] = lambda: (
-        configured_interpreter()
+        configured_interpreter
     )
     response = client.post(f"/api/v1/impact-assessments/{assessment['id']}/change-plans")
     assert response.status_code == 422
+
+
+def test_database_rejects_change_plan_lifecycle_mismatches(client) -> None:
+    run_1, assessment_1 = completed_assessment(client)
+    run_2, assessment_2 = completed_assessment(client)
+    client.app.dependency_overrides[interpretation_model_dependency] = lambda: (
+        configured_interpreter
+    )
+    accepted = client.post(f"/api/v1/impact-assessments/{assessment_1}/change-plans")
+    assert accepted.status_code == 201
+    attempt_id = accepted.json()["interpretation_attempt_id"]
+
+    mismatches = (
+        (run_1, assessment_2),
+        (run_2, assessment_2),
+    )
+    for run_id, assessment_id in mismatches:
+        with pytest.raises(IntegrityError), SessionLocal.begin() as session:
+            session.add(
+                ChangePlan(
+                    id=uuid.uuid4(),
+                    policy_analysis_run_id=uuid.UUID(run_id),
+                    impact_assessment_id=uuid.UUID(assessment_id),
+                    interpretation_attempt_id=uuid.UUID(attempt_id),
+                    schema_version="policy-interpretation-v1",
+                    validated_plan={
+                        "summary": "Invalid lifecycle fixture.",
+                        "coverage_gaps": [],
+                        "schema_version": "policy-interpretation-v1",
+                    },
+                    created_at=datetime.now(UTC),
+                )
+            )

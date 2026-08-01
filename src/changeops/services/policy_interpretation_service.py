@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Callable
 from datetime import UTC, datetime
 
 from sqlalchemy import select
@@ -52,7 +53,7 @@ class InterpretationFailedError(Exception):
 def create_or_get_change_plan(
     session: Session,
     assessment_id: uuid.UUID,
-    configured_model: ConfiguredInterpretationModel,
+    model_factory: Callable[[], ConfiguredInterpretationModel],
 ) -> tuple[ChangePlan, bool]:
     existing = session.scalar(
         select(ChangePlan).where(ChangePlan.impact_assessment_id == assessment_id)
@@ -81,6 +82,7 @@ def create_or_get_change_plan(
     ):
         raise AssessmentNotInterpretableError(str(assessment_id))
 
+    configured_model = model_factory()
     interpretation_input = build_policy_interpretation_input(assessment, run, accepted_attempt)
     persisted_run_id = run.id
     persisted_assessment_id = assessment.id

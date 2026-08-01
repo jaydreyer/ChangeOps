@@ -9,6 +9,7 @@ from sqlalchemy import (
     Date,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Integer,
     String,
     Table,
@@ -490,6 +491,11 @@ class ImpactAssessment(Base):
             "policy_analysis_run_id",
             name="uq_impact_assessments_policy_analysis_run",
         ),
+        UniqueConstraint(
+            "id",
+            "policy_analysis_run_id",
+            name="uq_impact_assessments_id_policy_analysis_run",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -736,6 +742,12 @@ class PolicyInterpretationAttempt(Base):
             "status IN ('accepted', 'invalid', 'provider_failed')",
             name="ck_policy_interpretation_attempts_status",
         ),
+        UniqueConstraint(
+            "id",
+            "policy_analysis_run_id",
+            "impact_assessment_id",
+            name="uq_policy_interpretation_attempts_lifecycle",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -765,6 +777,24 @@ class ChangePlan(Base):
     __table_args__ = (
         UniqueConstraint("impact_assessment_id", name="uq_change_plans_impact_assessment"),
         UniqueConstraint("interpretation_attempt_id", name="uq_change_plans_attempt"),
+        ForeignKeyConstraint(
+            ["impact_assessment_id", "policy_analysis_run_id"],
+            ["impact_assessments.id", "impact_assessments.policy_analysis_run_id"],
+            name="fk_change_plans_assessment_lifecycle",
+        ),
+        ForeignKeyConstraint(
+            [
+                "interpretation_attempt_id",
+                "policy_analysis_run_id",
+                "impact_assessment_id",
+            ],
+            [
+                "policy_interpretation_attempts.id",
+                "policy_interpretation_attempts.policy_analysis_run_id",
+                "policy_interpretation_attempts.impact_assessment_id",
+            ],
+            name="fk_change_plans_attempt_lifecycle",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)

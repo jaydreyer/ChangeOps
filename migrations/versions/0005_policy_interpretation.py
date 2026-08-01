@@ -18,6 +18,11 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    op.create_unique_constraint(
+        "uq_impact_assessments_id_policy_analysis_run",
+        "impact_assessments",
+        ["id", "policy_analysis_run_id"],
+    )
     op.create_table(
         "policy_interpretation_attempts",
         sa.Column("id", sa.Uuid(), nullable=False),
@@ -43,6 +48,12 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["impact_assessment_id"], ["impact_assessments.id"]),
         sa.ForeignKeyConstraint(["policy_analysis_run_id"], ["policy_analysis_runs.id"]),
         sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint(
+            "id",
+            "policy_analysis_run_id",
+            "impact_assessment_id",
+            name="uq_policy_interpretation_attempts_lifecycle",
+        ),
     )
     op.create_index(
         "ix_policy_interpretation_attempts_policy_analysis_run_id",
@@ -65,7 +76,25 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.ForeignKeyConstraint(["impact_assessment_id"], ["impact_assessments.id"]),
         sa.ForeignKeyConstraint(
+            ["impact_assessment_id", "policy_analysis_run_id"],
+            ["impact_assessments.id", "impact_assessments.policy_analysis_run_id"],
+            name="fk_change_plans_assessment_lifecycle",
+        ),
+        sa.ForeignKeyConstraint(
             ["interpretation_attempt_id"], ["policy_interpretation_attempts.id"]
+        ),
+        sa.ForeignKeyConstraint(
+            [
+                "interpretation_attempt_id",
+                "policy_analysis_run_id",
+                "impact_assessment_id",
+            ],
+            [
+                "policy_interpretation_attempts.id",
+                "policy_interpretation_attempts.policy_analysis_run_id",
+                "policy_interpretation_attempts.impact_assessment_id",
+            ],
+            name="fk_change_plans_attempt_lifecycle",
         ),
         sa.ForeignKeyConstraint(["policy_analysis_run_id"], ["policy_analysis_runs.id"]),
         sa.PrimaryKeyConstraint("id"),
@@ -123,3 +152,8 @@ def downgrade() -> None:
     op.execute("DROP FUNCTION reject_policy_interpretation_attempt_mutation()")
     op.drop_table("change_plans")
     op.drop_table("policy_interpretation_attempts")
+    op.drop_constraint(
+        "uq_impact_assessments_id_policy_analysis_run",
+        "impact_assessments",
+        type_="unique",
+    )

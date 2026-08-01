@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Callable
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Response, status
@@ -29,18 +30,15 @@ from changeops.services.policy_interpretation_service import (
 router = APIRouter(prefix="/api/v1", tags=["policy-interpretation"])
 
 
-def interpretation_model_dependency() -> ConfiguredInterpretationModel:
-    try:
-        return get_configured_interpretation_model()
-    except InterpretationProviderConfigurationError as error:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={"code": "interpretation_provider_not_configured", "message": str(error)},
-        ) from error
+InterpretationModelFactory = Callable[[], ConfiguredInterpretationModel]
 
 
-InterpretationModelDependency = Annotated[
-    ConfiguredInterpretationModel, Depends(interpretation_model_dependency)
+def interpretation_model_dependency() -> InterpretationModelFactory:
+    return get_configured_interpretation_model
+
+
+InterpretationModelFactoryDependency = Annotated[
+    InterpretationModelFactory, Depends(interpretation_model_dependency)
 ]
 
 
@@ -65,10 +63,15 @@ def create_change_plan(
     assessment_id: uuid.UUID,
     response: Response,
     session: SessionDependency,
-    configured_model: InterpretationModelDependency,
+    model_factory: InterpretationModelFactoryDependency,
 ) -> ChangePlanResponse:
     try:
-        plan, created = create_or_get_change_plan(session, assessment_id, configured_model)
+        plan, created = create_or_get_change_plan(session, assessment_id, model_factory)
+    except InterpretationProviderConfigurationError as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={"code": "interpretation_provider_not_configured", "message": str(error)},
+        ) from error
     except ImpactAssessmentNotFoundError as error:
         raise HTTPException(
             status_code=404,

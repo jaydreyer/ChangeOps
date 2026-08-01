@@ -40,6 +40,38 @@ class RelationshipPathReference(BaseModel):
     sequence: int = Field(ge=0)
 
 
+class ProposedCoverageGapFinding(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    finding_key: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    observed_limitation: str = Field(min_length=1)
+    why_it_matters: str = Field(min_length=1)
+    recommended_review_action: str = Field(min_length=1)
+    conclusion_type: Literal["review_concern"] = "review_concern"
+    policy_quotes: tuple[str, ...] = Field(
+        min_length=1,
+        description="Exact passages copied from the supplied policy_text.",
+    )
+    impact_ids: tuple[uuid.UUID, ...] = Field(
+        default=(),
+        description="Existing impact IDs copied from the supplied impacts when applicable.",
+    )
+    evidence_keys: tuple[str, ...] = Field(
+        default=(),
+        description="Existing evidence keys copied from the supplied persisted artifacts.",
+    )
+    asserted_enterprise_facts: tuple[str, ...] = Field(default=(), max_length=0)
+    impact_mutations: tuple[dict[str, Any], ...] = Field(default=(), max_length=0)
+
+
+class ProposedChangePlan(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    summary: str
+    coverage_gaps: tuple[ProposedCoverageGapFinding, ...] = ()
+
+
 class CandidateCoverageGapFinding(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -110,6 +142,7 @@ class InterpretationAction(BaseModel):
 class PolicyInterpretationInput(BaseModel):
     policy_change_id: str
     policy_text: str
+    policy_effective_date: date
     policy_analysis_run_id: uuid.UUID
     accepted_extraction_attempt_id: uuid.UUID
     accepted_rules: dict[str, Any]

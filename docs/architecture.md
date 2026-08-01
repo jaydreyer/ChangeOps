@@ -190,21 +190,28 @@ answered clarifications, actions, and unresolved questions. It builds a stable, 
 calling LangChain structured output. The interpreter receives no SQLAlchemy session, repository,
 tools, ORM records, or raw enterprise source tables.
 
+The interpretation DTO exposes the validated policy effective date separately from
+`accepted_rules`, matching the deterministic `PolicyInput` boundary. The prompt defines those
+fields together as the complete accepted policy representation so normalized storage does not
+appear to be a coverage gap.
+
 The interpreter uses LangChain's `function_calling` structured-output method over OpenAI's
 Responses API because its nested Pydantic schema is outside OpenAI's stricter native JSON-schema
 subset and reasoning-enabled function tools are unsupported by the Chat Completions API.
 Start/completion logs record the run, assessment, provider/model identifiers, elapsed time, parse
 success, and a sanitized error category without persisted input or raw provider output.
 
-The candidate schema permits only review concerns with typed policy-span, impact, evidence, and
-relationship-path references. It structurally forbids impact mutations and asserted enterprise
-facts. Exact policy quotes are deterministically resolved to the nearest matching zero-based span
-before validation. Evidence references with both owner types are reduced to one valid canonical
-owner, and a wrong owner identifier is repaired only when its owner type has exactly one valid
-match. A pure validator then resolves all references against the input; absent quotes, invented
-evidence, and ambiguous ownership remain invalid. The validator also accepts an empty gap list.
-Accepted output is stored as a separate immutable JSON aggregate; it does not own or duplicate
-impacts.
+The model-facing proposal schema permits only review concerns grounded by exact policy quotes,
+existing impact IDs, and existing evidence keys. It does not ask the model to calculate offsets or
+repeat policy IDs, assessment IDs, evidence-owner IDs, or relationship-path positions. It
+structurally forbids impact mutations and asserted enterprise facts.
+
+Deterministic application code converts each proposal into the stricter candidate schema: exact
+quotes become zero-based policy spans, lifecycle IDs come from the input, and evidence owners are
+derived from persisted findings and impacts. A pure validator then resolves every typed reference
+against the input; absent quotes and invented impact or evidence identifiers remain invalid. The
+validator also accepts an empty gap list. Accepted output is stored as a separate immutable JSON
+aggregate; it does not own or duplicate impacts.
 
 Every invocation produces an append-only `policy_interpretation_attempts` row containing provider,
 model, prompt/schema versions, raw and candidate output, validation errors, and a stable failure

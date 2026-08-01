@@ -1,5 +1,6 @@
 from changeops.ai.policy_interpreter import PROMPT_VERSION
 from changeops.db.models import ImpactAssessment, PolicyAnalysisRun, PolicyExtractionAttempt
+from changeops.domain.policy_extraction import CandidateInternationalTravelPolicyRules
 from changeops.domain.policy_interpretation import (
     INTERPRETATION_SCHEMA_VERSION,
     InterpretationAction,
@@ -17,6 +18,9 @@ def build_policy_interpretation_input(
     accepted_attempt: PolicyExtractionAttempt,
 ) -> PolicyInterpretationInput:
     response = serialize_assessment(assessment)
+    candidate_rules = CandidateInternationalTravelPolicyRules.model_validate(
+        accepted_attempt.candidate_rules
+    )
     clarifications = tuple(
         {
             "clarification_id": str(item.id),
@@ -56,6 +60,7 @@ def build_policy_interpretation_input(
     return PolicyInterpretationInput(
         policy_change_id=assessment.policy_change_id,
         policy_text=run.policy_text_snapshot,
+        policy_effective_date=candidate_rules.effective_date,
         policy_analysis_run_id=run.id,
         accepted_extraction_attempt_id=accepted_attempt.id,
         accepted_rules=accepted_attempt.accepted_rules or {},

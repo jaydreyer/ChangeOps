@@ -6,24 +6,36 @@ from langchain_core.runnables import Runnable
 from pydantic import ValidationError
 
 from changeops.ai.policy_extractor import _json_safe
-from changeops.domain.policy_interpretation import CandidateChangePlan, PolicyInterpretationInput
+from changeops.domain.policy_interpretation import (
+    CandidateChangePlan,
+    CandidateCoverageGapFinding,
+    EvidenceReference,
+    ImpactReference,
+    PolicyInterpretationInput,
+    PolicySpanReference,
+    ProposedChangePlan,
+)
 
-PROMPT_VERSION = "coverage-gap-interpretation-v2"
+PROMPT_VERSION = "coverage-gap-interpretation-v4"
 
 SYSTEM_PROMPT = """You identify grounded coverage gaps in a completed deterministic
 policy assessment.
 The assessment is authoritative. Findings are review concerns only: never add, remove, contradict,
 reclassify, or modify an impact, reason code, evidence item, relationship path, action, or count.
+The authoritative policy representation intentionally stores the effective date in
+policy_effective_date rather than duplicating it inside accepted_rules. Treat policy_effective_date
+and accepted_rules together as the complete accepted policy input. The absence of effective_date
+inside accepted_rules is not a coverage gap.
 Use only supplied persisted artifacts. Every reference must resolve from the input. Omit unsupported
 claims; absence is preferable to speculation. Recommended actions must be human review actions, not
 enterprise-system execution. Use conclusion_type review_concern. Leave asserted_enterprise_facts
 and impact_mutations empty. The top-level object has exactly summary and coverage_gaps. Reference
 arrays, asserted_enterprise_facts, and impact_mutations belong only inside each coverage gap; never
-return them at the top level. Every evidence reference must identify exactly one owner: set either
-impact_id or finding_id, never both. Set impact_id only when that evidence_key appears in the cited
-impact's supplied evidence_keys and that impact is cited by the coverage gap. Set finding_id only
-when the evidence_key appears in that finding's supplied evidence_keys. Return an empty
-coverage_gaps list when no grounded gap exists."""
+return them at the top level. Ground each gap with exact policy_quotes copied from policy_text,
+existing impact_ids copied from impacts when applicable, and existing evidence_keys copied from the
+supplied artifacts when applicable. Do not calculate character offsets or return policy IDs,
+assessment IDs, evidence-owner IDs, or relationship-path positions; deterministic application code
+constructs those references. Return an empty coverage_gaps list when no grounded gap exists."""
 
 PROMPT = ChatPromptTemplate.from_messages(
     [("system", SYSTEM_PROMPT), ("human", "Interpret this persisted assessment input:\n{payload}")]
@@ -33,7 +45,7 @@ PROMPT = ChatPromptTemplate.from_messages(
 class InterpretationStructuredOutputModel(Protocol):
     def with_structured_output(
         self,
-        schema: type[CandidateChangePlan],
+        schema: type[ProposedChangePlan],
         *,
         method: Literal["function_calling"],
         include_raw: bool,
@@ -60,7 +72,7 @@ def invoke_policy_interpreter(
 ) -> InterpretationInvocation:
     try:
         structured = model.with_structured_output(
-            CandidateChangePlan,
+            ProposedChangePlan,
             method="function_calling",
             include_raw=True,
         )
@@ -80,10 +92,10 @@ def invoke_policy_interpreter(
         return InterpretationInvocation(None, raw, "structured_output_parsing_failed")
     try:
         parsed = response.get("parsed")
-        candidate = (
+        proposal = (
             parsed
-            if isinstance(parsed, CandidateChangePlan)
-            else CandidateChangePlan.model_validate(parsed)
+            if isinstance(parsed, ProposedChangePlan)
+            else ProposedChangePlan.model_validate(parsed)
         )
     except ValidationError as error:
         boundary_fields = {"asserted_enterprise_facts", "impact_mutations"}
@@ -91,101 +103,111 @@ def invoke_policy_interpreter(
             return InterpretationInvocation(None, raw, "structured_output_boundary_violation")
         return InterpretationInvocation(None, raw, "structured_output_validation_failed")
     return InterpretationInvocation(
-        _resolve_candidate_references(candidate, interpretation_input),
+        _ground_proposed_change_plan(proposal, interpretation_input),
         raw,
         None,
     )
 
 
-def _resolve_candidate_references(
-    candidate: CandidateChangePlan,
+def _ground_proposed_change_plan(
+    proposal: ProposedChangePlan,
     interpretation_input: PolicyInterpretationInput,
 ) -> CandidateChangePlan:
-    candidate = _resolve_policy_spans(candidate, interpretation_input.policy_text)
     impact_by_id = {item.id: item for item in interpretation_input.impacts}
-    finding_by_id = {item.id: item for item in interpretation_input.findings}
+    assessment_id = interpretation_input.impact_assessment_id
 
-    def resolve_finding(finding):
-        cited_impact_ids = {item.impact_id for item in finding.impact_references}
+    def ground_finding(finding) -> CandidateCoverageGapFinding:
+        impact_ids = list(dict.fromkeys(finding.impact_ids))
 
-        def valid_impact_owner(reference) -> bool:
-            impact = impact_by_id.get(reference.impact_id)
-            return (
-                impact is not None
-                and impact.id in cited_impact_ids
-                and reference.evidence_key in impact.evidence_keys
+        def ground_evidence(evidence_key: str) -> EvidenceReference:
+            cited_owner = next(
+                (
+                    impact_by_id[impact_id]
+                    for impact_id in impact_ids
+                    if impact_id in impact_by_id
+                    and evidence_key in impact_by_id[impact_id].evidence_keys
+                ),
+                None,
+            )
+            if cited_owner is not None:
+                return EvidenceReference(
+                    assessment_id=assessment_id,
+                    evidence_key=evidence_key,
+                    impact_id=cited_owner.id,
+                )
+
+            finding_owner = next(
+                (
+                    owner
+                    for owner in interpretation_input.findings
+                    if evidence_key in owner.evidence_keys
+                ),
+                None,
+            )
+            if finding_owner is not None:
+                return EvidenceReference(
+                    assessment_id=assessment_id,
+                    evidence_key=evidence_key,
+                    finding_id=finding_owner.id,
+                )
+
+            impact_owner = next(
+                (
+                    owner
+                    for owner in interpretation_input.impacts
+                    if evidence_key in owner.evidence_keys
+                ),
+                None,
+            )
+            if impact_owner is not None:
+                if impact_owner.id not in impact_ids:
+                    impact_ids.append(impact_owner.id)
+                return EvidenceReference(
+                    assessment_id=assessment_id,
+                    evidence_key=evidence_key,
+                    impact_id=impact_owner.id,
+                )
+
+            return EvidenceReference(
+                assessment_id=assessment_id,
+                evidence_key=evidence_key,
             )
 
-        def valid_finding_owner(reference) -> bool:
-            owner = finding_by_id.get(reference.finding_id)
-            return owner is not None and reference.evidence_key in owner.evidence_keys
-
-        def resolve_owner(reference):
-            if valid_impact_owner(reference):
-                return reference.model_copy(update={"finding_id": None})
-            if valid_finding_owner(reference):
-                return reference.model_copy(update={"impact_id": None})
-
-            if reference.impact_id is not None and reference.finding_id is None:
-                owners = [
-                    impact.id
-                    for impact_id in cited_impact_ids
-                    if (impact := impact_by_id.get(impact_id)) is not None
-                    and reference.evidence_key in impact.evidence_keys
-                ]
-                if len(owners) == 1:
-                    return reference.model_copy(update={"impact_id": owners[0]})
-
-            if reference.finding_id is not None and reference.impact_id is None:
-                owners = [
-                    owner.id
-                    for owner in interpretation_input.findings
-                    if reference.evidence_key in owner.evidence_keys
-                ]
-                if len(owners) == 1:
-                    return reference.model_copy(update={"finding_id": owners[0]})
-
-            return reference
-
-        return finding.model_copy(
-            update={
-                "evidence_references": tuple(
-                    resolve_owner(reference) for reference in finding.evidence_references
+        evidence_references = tuple(
+            ground_evidence(key) for key in dict.fromkeys(finding.evidence_keys)
+        )
+        policy_spans = []
+        for quote in dict.fromkeys(finding.policy_quotes):
+            start = interpretation_input.policy_text.find(quote)
+            if start < 0:
+                start = 0
+            policy_spans.append(
+                PolicySpanReference(
+                    policy_change_id=interpretation_input.policy_change_id,
+                    start=start,
+                    end=start + len(quote),
+                    quote=quote,
                 )
-            }
+            )
+
+        return CandidateCoverageGapFinding(
+            finding_key=finding.finding_key,
+            title=finding.title,
+            observed_limitation=finding.observed_limitation,
+            why_it_matters=finding.why_it_matters,
+            recommended_review_action=finding.recommended_review_action,
+            conclusion_type=finding.conclusion_type,
+            policy_spans=tuple(policy_spans),
+            impact_references=tuple(
+                ImpactReference(assessment_id=assessment_id, impact_id=impact_id)
+                for impact_id in impact_ids
+            ),
+            evidence_references=evidence_references,
+            asserted_enterprise_facts=finding.asserted_enterprise_facts,
+            impact_mutations=finding.impact_mutations,
         )
 
-    return candidate.model_copy(
-        update={"coverage_gaps": tuple(resolve_finding(item) for item in candidate.coverage_gaps)}
-    )
-
-
-def _resolve_policy_spans(
-    candidate: CandidateChangePlan,
-    policy_text: str,
-) -> CandidateChangePlan:
-    def resolve(span):
-        if policy_text[span.start : span.end] == span.quote:
-            return span
-
-        starts: list[int] = []
-        offset = 0
-        while (start := policy_text.find(span.quote, offset)) >= 0:
-            starts.append(start)
-            offset = start + 1
-        if not starts:
-            return span
-
-        start = min(starts, key=lambda match: abs(match - span.start))
-        return span.model_copy(update={"start": start, "end": start + len(span.quote)})
-
-    return candidate.model_copy(
-        update={
-            "coverage_gaps": tuple(
-                finding.model_copy(
-                    update={"policy_spans": tuple(resolve(span) for span in finding.policy_spans)}
-                )
-                for finding in candidate.coverage_gaps
-            )
-        }
+    return CandidateChangePlan(
+        summary=proposal.summary,
+        coverage_gaps=tuple(ground_finding(finding) for finding in proposal.coverage_gaps),
     )

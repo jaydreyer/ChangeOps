@@ -72,9 +72,10 @@ clarification ID, responder, timestamp, and affected field; no source span is fa
 
 The third Milestone 2 slice interprets only the persisted artifacts of a completed policy-analysis
 assessment. A structured model may propose review concerns about unsupported concepts, missing
-evidence, or incomplete mapping coverage. Pure deterministic validation resolves every policy
-span, assessment impact, evidence key, and relationship-path reference before a separate immutable
-change plan is accepted.
+evidence, or incomplete mapping coverage. Its output cites only exact policy quotes, existing impact
+IDs, and existing evidence keys. Application code deterministically adds policy and assessment IDs,
+character offsets, and evidence owners before pure validation resolves every reference and accepts
+a separate immutable change plan.
 
 Interpretation is non-authoritative: it cannot add, remove, reclassify, or edit deterministic
 impacts, evidence, reason codes, paths, actions, or counts. Provider and grounding failures create

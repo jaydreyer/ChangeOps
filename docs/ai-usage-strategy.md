@@ -226,7 +226,7 @@ interpretation explains, not as a judgment the model makes.
 |---|---|---|
 | Whether an object is affected | Deterministic analyzers | The entire point of Milestone 1. The AI may not add, remove, or reclassify an impact. |
 | Impact domains, classifications, reason codes, action types | Closed enums in `types.py` and `schemas/assessments.py` | Reason codes are the explainability contract. `milestone-1.md`: they "should not be generated dynamically." |
-| Evidence | `_evidence_specs` in the assessment service | The AI cites evidence keys; it never mints them. A citation that does not resolve is a validation failure, not a warning. |
+| Evidence and citation bookkeeping | `_evidence_specs` plus deterministic interpretation grounding | The AI cites evidence keys and exact policy quotes; it never mints evidence or calculates offsets, lifecycle IDs, or evidence owners. A citation that does not resolve is a validation failure, not a warning. |
 | Enterprise relationships | `policy_*_dependency` tables, team memberships, commitment assignments | Letting a model write dependency rows is letting it invent enterprise facts one layer down, where it is much harder to notice. |
 | Enterprise facts | Source tables | Training completion, assigned work country, booking dates. `product-brief.md`: AI is not "the authoritative source for facts already represented in enterprise data." |
 | Date arithmetic, overlap, filtering, counting, ordering | Deterministic code | Commitment overlap is three comparisons. There is no interpretation here to buy. |

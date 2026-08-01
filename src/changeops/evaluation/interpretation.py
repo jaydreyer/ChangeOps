@@ -5,12 +5,13 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from changeops.ai.policy_interpreter import PROMPT_VERSION
+from changeops.ai.policy_interpreter import PROMPT_VERSION, _ground_proposed_change_plan
 from changeops.domain.policy_interpretation import (
     INTERPRETATION_SCHEMA_VERSION,
     CandidateChangePlan,
     ChangePlanValidationError,
     PolicyInterpretationInput,
+    ProposedChangePlan,
 )
 from changeops.domain.policy_interpretation_validation import validate_candidate_change_plan
 
@@ -33,7 +34,11 @@ def evaluate(dataset_path: Path) -> tuple[dict[str, Any], bool]:
         actual_valid = False
         reasons: list[str] = []
         try:
-            candidate = CandidateChangePlan.model_validate(case["candidate"])
+            if "proposal" in case:
+                proposal = ProposedChangePlan.model_validate(case["proposal"])
+                candidate = _ground_proposed_change_plan(proposal, interpretation_input)
+            else:
+                candidate = CandidateChangePlan.model_validate(case["candidate"])
             validate_candidate_change_plan(candidate, interpretation_input)
             actual_valid = True
         except ChangePlanValidationError as error:
@@ -51,7 +56,7 @@ def evaluate(dataset_path: Path) -> tuple[dict[str, Any], bool]:
         "prompt_version": PROMPT_VERSION,
         "schema_version": INTERPRETATION_SCHEMA_VERSION,
         "provider": "fixture",
-        "model": "fixed-candidates-v1",
+        "model": "fixed-proposals-and-candidates-v1",
         "passed": all(item["passed"] for item in results),
         "cases": results,
     }

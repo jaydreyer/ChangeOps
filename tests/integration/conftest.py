@@ -13,6 +13,7 @@ TEST_DATABASE_URL = os.environ.get(
     "postgresql+psycopg://changeops:changeops@localhost:5432/changeops_test",
 )
 os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+os.environ["OPENAI_API_KEY"] = ""
 
 from changeops.config import get_settings  # noqa: E402
 

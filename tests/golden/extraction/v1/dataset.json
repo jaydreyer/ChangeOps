@@ -1,0 +1,288 @@
+{
+  "dataset_version": "international-travel-golden-v1",
+  "cases": [
+    {
+      "id": "canonical_seeded_policy",
+      "policy_text": "Effective September 1, 2026, U.S.-based employees and contractors traveling\ninternationally for business must complete the International Travel Security course before\ndeparture.\n\nManager approval is required before any nonrefundable international travel is booked.\n\nTravel booked before September 1, 2026 is exempt from the new manager-approval requirement.\nHowever, travelers departing on or after September 1, 2026 must still complete the\nInternational Travel Security course before departure.\n\nTravel between the United States and Canada is excluded from this policy.",
+      "stored_effective_date": "2026-09-01",
+      "model_output": {
+        "policy_family": "international_travel",
+        "support_status": "supported",
+        "candidate_rules": {
+          "kind": "international_travel",
+          "schema_version": 1,
+          "effective_date": "2026-09-01",
+          "worker_scope": {
+            "assigned_work_country": "US",
+            "worker_types": ["employee", "contractor"]
+          },
+          "trip_scope": {
+            "origin_country": "US",
+            "excluded_destination_countries": ["US", "CA"]
+          },
+          "manager_approval": {
+            "booking_before_effective_date_is_exempt": true
+          },
+          "security_training": {
+            "course_name": "International Travel Security"
+          }
+        },
+        "provenance_quotes": {
+          "policy_family": "traveling\ninternationally for business",
+          "candidate_rules.kind": "traveling\ninternationally for business",
+          "candidate_rules.schema_version": "traveling\ninternationally for business",
+          "candidate_rules.effective_date": "Effective September 1, 2026",
+          "candidate_rules.worker_scope.assigned_work_country": "U.S.-based",
+          "candidate_rules.worker_scope.worker_types": "employees and contractors",
+          "candidate_rules.trip_scope.origin_country": "United States",
+          "candidate_rules.trip_scope.excluded_destination_countries": "United States and Canada",
+          "candidate_rules.manager_approval.booking_before_effective_date_is_exempt": "Travel booked before September 1, 2026 is exempt",
+          "candidate_rules.security_training.course_name": "International Travel Security"
+        },
+        "findings": []
+      },
+      "expected": {
+        "support_status": "supported",
+        "validation_outcome": "accepted",
+        "accepted_rules": {
+          "kind": "international_travel",
+          "schema_version": 1,
+          "worker_scope": {
+            "assigned_work_country": "US",
+            "worker_types": ["employee", "contractor"]
+          },
+          "trip_scope": {
+            "origin_country": "US",
+            "excluded_destination_countries": ["US", "CA"]
+          },
+          "manager_approval": {
+            "booking_before_effective_date_is_exempt": true
+          },
+          "security_training": {
+            "course_identifier": "international-travel-security"
+          }
+        }
+      }
+    },
+    {
+      "id": "equivalent_wording",
+      "policy_text": "Starting September 1, 2026, employees and contractors whose assigned work country is the United States need manager approval before booking nonrefundable business travel outside the country. Bookings made earlier remain exempt from approval. Everyone departing on or after that date must finish International Travel Security before departure. Trips from the United States to Canada or within the United States are excluded.",
+      "stored_effective_date": "2026-09-01",
+      "model_output": {
+        "policy_family": "international_travel",
+        "support_status": "supported",
+        "candidate_rules": {
+          "kind": "international_travel",
+          "schema_version": 1,
+          "effective_date": "2026-09-01",
+          "worker_scope": {
+            "assigned_work_country": "US",
+            "worker_types": ["employee", "contractor"]
+          },
+          "trip_scope": {
+            "origin_country": "US",
+            "excluded_destination_countries": ["US", "CA"]
+          },
+          "manager_approval": {
+            "booking_before_effective_date_is_exempt": true
+          },
+          "security_training": {
+            "course_name": "International Travel Security"
+          }
+        },
+        "provenance_quotes": {
+          "policy_family": "business travel outside the country",
+          "candidate_rules.kind": "business travel outside the country",
+          "candidate_rules.schema_version": "business travel outside the country",
+          "candidate_rules.effective_date": "Starting September 1, 2026",
+          "candidate_rules.worker_scope.assigned_work_country": "assigned work country is the United States",
+          "candidate_rules.worker_scope.worker_types": "employees and contractors",
+          "candidate_rules.trip_scope.origin_country": "Trips from the United States",
+          "candidate_rules.trip_scope.excluded_destination_countries": "United States to Canada or within the United States",
+          "candidate_rules.manager_approval.booking_before_effective_date_is_exempt": "Bookings made earlier remain exempt from approval",
+          "candidate_rules.security_training.course_name": "International Travel Security"
+        },
+        "findings": []
+      },
+      "expected": {
+        "support_status": "supported",
+        "validation_outcome": "accepted",
+        "accepted_rules": {
+          "kind": "international_travel",
+          "schema_version": 1,
+          "worker_scope": {
+            "assigned_work_country": "US",
+            "worker_types": ["employee", "contractor"]
+          },
+          "trip_scope": {
+            "origin_country": "US",
+            "excluded_destination_countries": ["US", "CA"]
+          },
+          "manager_approval": {
+            "booking_before_effective_date_is_exempt": true
+          },
+          "security_training": {
+            "course_identifier": "international-travel-security"
+          }
+        }
+      }
+    },
+    {
+      "id": "unsupported_policy_family",
+      "policy_text": "Effective September 1, 2026, employees working remotely must submit home-office expenses within 30 days.",
+      "stored_effective_date": "2026-09-01",
+      "model_output": {
+        "policy_family": "remote_work_expense",
+        "support_status": "unsupported",
+        "candidate_rules": null,
+        "provenance_quotes": {
+          "policy_family": "home-office expenses"
+        },
+        "findings": [
+          {
+            "kind": "unsupported",
+            "code": "unsupported_policy_family",
+            "message": "Remote-work expense policy is outside the supported family.",
+            "field_path": "policy_family",
+            "quote": "home-office expenses"
+          }
+        ]
+      },
+      "expected": {
+        "support_status": "unsupported",
+        "validation_outcome": "unsupported",
+        "accepted_rules": null
+      }
+    },
+    {
+      "id": "unrepresentable_international_travel",
+      "policy_text": "International business travel requires director approval for high-risk countries and manager approval elsewhere. Approval rules vary by destination risk tier.",
+      "stored_effective_date": "2026-09-01",
+      "model_output": {
+        "policy_family": "international_travel",
+        "support_status": "unsupported",
+        "candidate_rules": null,
+        "provenance_quotes": {
+          "policy_family": "International business travel"
+        },
+        "findings": [
+          {
+            "kind": "unsupported",
+            "code": "destination_risk_tiers_unsupported",
+            "message": "Schema version 1 cannot represent approval rules by destination risk tier.",
+            "field_path": "candidate_rules.manager_approval",
+            "quote": "Approval rules vary by destination risk tier"
+          }
+        ]
+      },
+      "expected": {
+        "support_status": "unsupported",
+        "validation_outcome": "unsupported",
+        "accepted_rules": null
+      }
+    },
+    {
+      "id": "unresolvable_training_course",
+      "policy_text": "Effective September 1, 2026, U.S.-based employees and contractors traveling internationally for business must complete Global Mobility Safety before departure. Manager approval is required before booking, but bookings made before September 1, 2026 are exempt. Travel between the United States and Canada is excluded.",
+      "stored_effective_date": "2026-09-01",
+      "model_output": {
+        "policy_family": "international_travel",
+        "support_status": "supported",
+        "candidate_rules": {
+          "kind": "international_travel",
+          "schema_version": 1,
+          "effective_date": "2026-09-01",
+          "worker_scope": {
+            "assigned_work_country": "US",
+            "worker_types": ["employee", "contractor"]
+          },
+          "trip_scope": {
+            "origin_country": "US",
+            "excluded_destination_countries": ["US", "CA"]
+          },
+          "manager_approval": {
+            "booking_before_effective_date_is_exempt": true
+          },
+          "security_training": {
+            "course_name": "Global Mobility Safety"
+          }
+        },
+        "provenance_quotes": {
+          "policy_family": "traveling internationally for business",
+          "candidate_rules.kind": "traveling internationally for business",
+          "candidate_rules.schema_version": "traveling internationally for business",
+          "candidate_rules.effective_date": "Effective September 1, 2026",
+          "candidate_rules.worker_scope.assigned_work_country": "U.S.-based",
+          "candidate_rules.worker_scope.worker_types": "employees and contractors",
+          "candidate_rules.trip_scope.origin_country": "United States",
+          "candidate_rules.trip_scope.excluded_destination_countries": "United States and Canada",
+          "candidate_rules.manager_approval.booking_before_effective_date_is_exempt": "bookings made before September 1, 2026 are exempt",
+          "candidate_rules.security_training.course_name": "Global Mobility Safety"
+        },
+        "findings": []
+      },
+      "expected": {
+        "support_status": "supported",
+        "validation_outcome": "validation_failed",
+        "accepted_rules": null
+      }
+    },
+    {
+      "id": "conflicting_exception_behavior",
+      "policy_text": "Effective September 1, 2026, U.S.-based employees and contractors traveling internationally for business must complete International Travel Security before departure. Manager approval is required for every booking, including travel booked before September 1, 2026. Travel between the United States and Canada is excluded.",
+      "stored_effective_date": "2026-09-01",
+      "model_output": {
+        "policy_family": "international_travel",
+        "support_status": "supported",
+        "candidate_rules": {
+          "kind": "international_travel",
+          "schema_version": 1,
+          "effective_date": "2026-09-01",
+          "worker_scope": {
+            "assigned_work_country": "US",
+            "worker_types": ["employee", "contractor"]
+          },
+          "trip_scope": {
+            "origin_country": "US",
+            "excluded_destination_countries": ["US", "CA"]
+          },
+          "manager_approval": {
+            "booking_before_effective_date_is_exempt": false
+          },
+          "security_training": {
+            "course_name": "International Travel Security"
+          }
+        },
+        "provenance_quotes": {
+          "policy_family": "traveling internationally for business",
+          "candidate_rules.kind": "traveling internationally for business",
+          "candidate_rules.schema_version": "traveling internationally for business",
+          "candidate_rules.effective_date": "Effective September 1, 2026",
+          "candidate_rules.worker_scope.assigned_work_country": "U.S.-based",
+          "candidate_rules.worker_scope.worker_types": "employees and contractors",
+          "candidate_rules.trip_scope.origin_country": "United States",
+          "candidate_rules.trip_scope.excluded_destination_countries": "United States and Canada",
+          "candidate_rules.manager_approval.booking_before_effective_date_is_exempt": "including travel booked before September 1, 2026",
+          "candidate_rules.security_training.course_name": "International Travel Security"
+        },
+        "findings": []
+      },
+      "expected": {
+        "support_status": "supported",
+        "validation_outcome": "validation_failed",
+        "accepted_rules": null
+      }
+    },
+    {
+      "id": "malformed_structured_output",
+      "policy_text": "International travel requires manager approval and training.",
+      "stored_effective_date": "2026-09-01",
+      "malformed_output": "{not valid structured output",
+      "expected": {
+        "support_status": null,
+        "validation_outcome": "validation_failed",
+        "accepted_rules": null
+      }
+    }
+  ]
+}

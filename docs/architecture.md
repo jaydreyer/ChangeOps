@@ -1,6 +1,7 @@
 # ChangeOps Architecture
 
-This document describes the current Milestone 1 implementation.
+This document describes the current implementation: Milestone 1 plus the first Milestone 2
+vertical slice for structured policy extraction.
 
 ## High-level architecture
 
@@ -10,6 +11,7 @@ flowchart LR
 
     subgraph Compose["Local Docker Compose environment"]
         API["FastAPI API<br/>Uvicorn"]
+        LLM["Configured chat-model provider"]
         Migrate["Alembic migration job"]
         Seed["Idempotent seed job"]
         DB[("PostgreSQL 17<br/>persistent volume")]
@@ -18,6 +20,9 @@ flowchart LR
     subgraph Application["ChangeOps synchronous modular monolith"]
         Routes["API routes and<br/>Pydantic schemas"]
         Service["Assessment application service"]
+        Extraction["Policy extraction service"]
+        LC["LangChain structured output"]
+        Validation["Deterministic extraction validation"]
         Rules["Typed policy-rule validation"]
         WorkerAnalyzer["Pure worker-and-trip analyzer"]
         EnterpriseAnalyzer["Pure enterprise-impact analyzer"]
@@ -29,6 +34,11 @@ flowchart LR
     Client -->|"POST or GET /api/v1"| API
     API --> Routes
     Routes --> Service
+    Routes --> Extraction
+    Extraction --> LC
+    LC --> LLM
+    Extraction --> Validation
+    Extraction --> ORM
     Service --> Rules
     Service --> WorkerAnalyzer
     Service --> EnterpriseAnalyzer
@@ -41,17 +51,20 @@ flowchart LR
 ```
 
 ChangeOps remains a synchronous modular monolith. The HTTP, application, domain, serialization, and
-persistence code run in one Python process. PostgreSQL is the only separate application runtime.
+persistence code run in one Python process. PostgreSQL stores source, extraction, and assessment
+data; a configured OpenAI chat model is the only external service used by the extraction endpoint.
 
 ## Major runtime components
 
 ### API
 
-The FastAPI application preserves the existing endpoints:
+The FastAPI application exposes:
 
 - `GET /healthz`
 - `POST /api/v1/policy-changes/{policy_change_id}/impact-assessments`
 - `GET /api/v1/impact-assessments/{assessment_id}`
+- `POST /api/v1/policy-changes/{policy_change_id}/extraction-attempts`
+- `GET /api/v1/policy-extraction-attempts/{attempt_id}`
 
 The create response adds an input fingerprint, enterprise-impact summary, and categorized
 enterprise impacts. Existing worker results, findings, evidence, proposed actions, and unresolved
@@ -59,6 +72,28 @@ questions remain available.
 
 Pydantic constrains impact domains, object types, classifications, and action types. It also
 validates allowed domain-classification combinations.
+
+### Policy extraction service
+
+The extraction endpoint loads only the policy text, effective date, and organization identifier
+before invoking the model. LangChain binds a strict Pydantic output schema with
+`with_structured_output(..., include_raw=True)`. The prompt contains policy text and the supported
+schema boundary; it never contains workers, trips, completions, teams, dependencies, commitments,
+existing impacts, or enterprise identifiers.
+
+Model output is proposed data. A pure deterministic validator:
+
+1. validates the structured schema and closed literals;
+2. resolves every material field's exact zero-based text span against the stored policy snapshot;
+3. checks supported family and version-1 business invariants;
+4. verifies the extracted effective date against the policy record;
+5. resolves the human-readable training-course name to exactly one active organization course;
+6. constructs `InternationalTravelPolicyRules` only after every check passes.
+
+The model never receives or proposes `training_courses.id`. Unsupported families and
+unrepresentable constructs terminate with an explicit unsupported outcome. Parsing, grounding,
+business-rule, and reference failures terminate with validation-failed. Neither outcome reaches the
+assessment service.
 
 ### Assessment application service
 
@@ -162,6 +197,30 @@ sequenceDiagram
 Retrieval loads the aggregate with `selectinload` and serializes it with the same stable ordering.
 There are no assessment update or delete endpoints.
 
+Policy extraction is a separate synchronous flow:
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API as FastAPI route
+    participant Extract as Extraction service
+    participant Model as Chat model through LangChain
+    participant Validate as Deterministic validator
+    participant DB as PostgreSQL
+
+    Client->>API: POST extraction attempt
+    API->>Extract: create attempt(policy_change_id)
+    Extract->>DB: Load policy-text snapshot
+    Extract->>Model: Policy text plus typed output schema
+    Model-->>Extract: Raw and parsed proposal or parsing error
+    Extract->>DB: Load active course catalog
+    Extract->>Validate: Proposal, text snapshot, date, course references
+    Validate-->>Extract: Accepted rules, unsupported, or validation-failed
+    Extract->>DB: Append immutable attempt
+    Extract-->>API: Persisted attempt
+    API-->>Client: 201 Created and Location
+```
+
 ## Persistence model
 
 ### Source data
@@ -193,6 +252,13 @@ table gives each demonstration worker one current team. Separate dependency tabl
 foreign keys to systems, documents, and courses; there is no polymorphic graph target.
 
 `training_records.course_identifier` now references `training_courses.id`.
+
+### Append-only extraction attempts
+
+`policy_extraction_attempts` stores the policy-text snapshot, raw and parsed model output, candidate
+and accepted rules, provenance, findings, validation errors, and provider/model/prompt/schema
+versions. Every POST inserts a new UUID row. A PostgreSQL trigger rejects updates and deletes so
+failed and superseded attempts remain inspectable. There is no workflow-run table in this slice.
 
 ### Immutable assessment aggregate
 
@@ -250,11 +316,12 @@ The completed golden assessment returns:
 
 ## External dependencies and boundaries
 
-The running application communicates only with PostgreSQL.
+The assessment endpoints communicate only with PostgreSQL. The extraction endpoint additionally
+uses LangChain Core and the configured `langchain-openai` chat model integration.
 
 There are no:
 
-- LLM, LangChain, LangGraph, prompt, agent, embedding, or vector-search dependencies;
+- LangGraph, agent, tool-calling loop, embedding, RAG, or vector-search components;
 - MCP or live enterprise integrations;
 - graph databases;
 - background workers or message queues;
@@ -269,6 +336,8 @@ There are no:
 - FastAPI 0.141.1
 - Uvicorn 0.52.0
 - Pydantic Settings 2.14.2
+- LangChain Core 1.5.3
+- LangChain OpenAI 1.4.1
 - SQLAlchemy 2.0.51
 - Psycopg 3.3.4
 - Alembic 1.18.5

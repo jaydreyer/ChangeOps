@@ -2,12 +2,14 @@ from fastapi import FastAPI
 
 from changeops.api.assessments import router as assessments_router
 from changeops.api.health import router as health_router
+from changeops.api.policy_extractions import router as policy_extractions_router
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="ChangeOps", version="0.1.0")
     app.include_router(health_router)
     app.include_router(assessments_router)
+    app.include_router(policy_extractions_router)
     return app
 
 

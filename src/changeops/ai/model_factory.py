@@ -53,6 +53,7 @@ def get_configured_interpretation_model() -> ConfiguredInterpretationModel:
             temperature=0,
             timeout=settings.interpretation_model_timeout_seconds,
             max_retries=settings.interpretation_model_max_retries,
+            use_responses_api=True,
         ),
         provider=settings.interpretation_model_provider,
         identifier=settings.interpretation_model,

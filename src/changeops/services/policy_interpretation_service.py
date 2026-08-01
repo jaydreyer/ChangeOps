@@ -1,6 +1,8 @@
+import logging
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime
+from time import monotonic
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -29,6 +31,8 @@ from changeops.services.policy_analysis_service import get_policy_analysis_run
 from changeops.services.policy_interpretation_serializer import (
     build_policy_interpretation_input,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class AssessmentNotInterpretableError(Exception):
@@ -87,7 +91,27 @@ def create_or_get_change_plan(
     persisted_run_id = run.id
     persisted_assessment_id = assessment.id
     session.rollback()
+    started_at = monotonic()
+    logger.info(
+        "Policy interpretation model call started: run_id=%s assessment_id=%s provider=%s model=%s",
+        persisted_run_id,
+        persisted_assessment_id,
+        configured_model.provider,
+        configured_model.identifier,
+    )
     invocation = invoke_policy_interpreter(configured_model.model, interpretation_input)
+    error_code = invocation.parsing_error.split(":", 1)[0] if invocation.parsing_error else None
+    logger.info(
+        "Policy interpretation model call completed: run_id=%s assessment_id=%s "
+        "provider=%s model=%s elapsed_seconds=%.3f parsed=%s error=%s",
+        persisted_run_id,
+        persisted_assessment_id,
+        configured_model.provider,
+        configured_model.identifier,
+        monotonic() - started_at,
+        invocation.candidate is not None,
+        error_code,
+    )
     now = datetime.now(UTC)
     candidate_json = (
         invocation.candidate.model_dump(mode="json") if invocation.candidate is not None else None

@@ -25,6 +25,35 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v6
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Type-check frontend
+        working-directory: web
+        run: npm run typecheck
+
+      - name: Lint frontend
+        working-directory: web
+        run: npm run lint
+
+      - name: Test frontend
+        working-directory: web
+        run: npm test
+
+      - name: Build frontend
+        working-directory: web
+        env:
+          CHANGEOPS_API_BASE_URL: http://api:8000
+        run: npm run build
+
       - name: Restore cached API image
         id: api-image-cache
         uses: actions/cache@v4

@@ -2,9 +2,9 @@
 
 ## Status
 
-In progress. PR 1 implements the action-review and decision foundation. PR 2 adds the separate
+Complete. PR 1 implements the action-review and decision foundation. PR 2 adds the separate
 durable action-approval run, deterministic interruption/resume, ordered review membership, and
-workflow audit history. The reviewer interface remains a later slice.
+workflow audit history. PR 3 adds the focused local approval workbench.
 
 ## Product goal
 
@@ -169,9 +169,23 @@ python -m changeops.evaluation.approval_workflow \
   tests/golden/approval_workflow/v1/dataset.json
 ```
 
-## Planned later slices
+## PR 3 — Focused approval workbench
 
-- PR 3: add the focused reviewer interface at the roadmap-approved frontend boundary.
+The minimal local Next.js application begins at a completed assessment. It creates or retrieves
+one approval run, renders immutable membership order, resolves persisted evidence and deterministic
+context, and submits terminal decisions through the existing item write API. A same-origin Next.js
+proxy uses the configurable API base URL; browser state is limited to form inputs.
 
-The later slices must consume this review aggregate without mutating historical assessments,
-proposed actions, or decision events.
+`GET /api/v1/action-approval-runs/{run_id}/workbench` is a deterministic read projection, not a
+domain aggregate or generic backend-for-frontend framework. It performs no writes and stores no
+snapshot. Missing membership, finding, impact, evidence, reason-code, or relationship-path context
+fails with a stable sanitized error.
+
+The workbench uses explicit provenance labels for AI proposals, deterministic conclusions, human
+decisions, workflow state, and execution state. After every decision or manual reconciliation it
+reloads authoritative API state. Approval can edit description and due date only. No decision
+executes an action; completed review explicitly states that approved actions remain unexecuted.
+
+The Compose seed supplies a stable provider-free completed demonstration assessment. Policy
+submission, extraction monitoring, clarification, and interpretation screens remain intentionally
+deferred.

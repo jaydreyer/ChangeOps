@@ -402,3 +402,39 @@ neither. The completed policy-analysis run and impact assessment are never chang
 - This slice adds approval-specific orchestration rather than a generic workflow platform.
 - No action executes, and demonstration authorization headers still require replacement before
   public deployment.
+
+# ADR-0012 — Add a Read-Only Approval Workbench Projection
+
+## Status
+
+Accepted
+
+## Context
+
+The reviewer screen needs approval lifecycle data, full item snapshots, deterministic finding or
+enterprise-impact context, resolved evidence, and ordered relationship paths. Making the browser
+assemble these resources would duplicate reference validation and workflow ordering outside the
+backend ownership boundary.
+
+## Decision
+
+The frontend consumes one screen-oriented deterministic projection:
+`GET /api/v1/action-approval-runs/{run_id}/workbench`.
+
+- The projection reuses persisted domain records and existing run/review serializers.
+- Immutable approval membership determines item order.
+- Every evidence and context reference must resolve or the endpoint returns a stable inconsistency
+  error.
+- Domain write APIs for run creation, decisions, and manual resume remain unchanged.
+- No durable workbench aggregate or snapshot is created.
+- This is a focused application projection, not a generic backend-for-frontend framework.
+
+## Consequences
+
+- Initial server rendering can load one coherent reviewer representation.
+- The backend remains authoritative for validation, ordering, progress, provenance, and effective
+  approved-action derivation.
+- Read retrieval performs no database mutation.
+- The frontend can refresh after writes without reproducing approval transition logic.
+- A future screen with materially different needs may require its own explicit projection rather
+  than expanding this endpoint into generic query infrastructure.

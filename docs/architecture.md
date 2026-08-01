@@ -532,6 +532,22 @@ The completed golden assessment returns:
 - 13 proposed actions, all unexecuted;
 - eight copied unresolved questions.
 
+The Compose seed also persists that deterministic assessment behind stable demonstration ID
+`8f4f647d-7f2d-4da8-8e02-77d5301f2002` and associates it with an explicitly marked provider-free
+seeded policy-analysis run.
+
+## Approval workbench read boundary
+
+The Next.js App Router application lives under `web/`. Initial workbench loading is server
+rendered. Client state owns only reviewer identity and pending form values; native fetch submits to
+a same-origin proxy configured by `CHANGEOPS_API_BASE_URL`, and route refresh reloads
+PostgreSQL-backed state after every write.
+
+The API projection service loads one approval run, its immutable membership, review snapshots, the
+completed assessment, findings, enterprise impacts, evidence records, and relationship-path rows.
+It preserves membership sequence and validates every reference before serialization. It neither
+mutates domain records nor persists a screen snapshot.
+
 ## External dependencies and boundaries
 
 The assessment endpoints communicate only with PostgreSQL. Extraction and policy-analysis create
@@ -545,7 +561,7 @@ There are no:
 - graph databases;
 - background workers or message queues;
 - action execution;
-- frontend, authentication, or authorization components.
+- production authentication or user-administration components.
 
 ## Quality and provider verification boundaries
 
@@ -578,10 +594,13 @@ names, elapsed time, lifecycle identifiers, terminal outcome, and a stable failu
 - Alembic 1.18.5
 - PostgreSQL 17
 - Docker Compose
+- Next.js 16.2.12 and React 19.2
+- TypeScript 5.9
 
 ### Development and testing
 
 - pytest 9.1.1
 - httpx2 2.9.1 through FastAPI `TestClient`
 - Ruff 0.16.1
+- Vitest and Testing Library for focused frontend behavior tests
 - a dedicated PostgreSQL `changeops_test` database created and removed by the integration fixture

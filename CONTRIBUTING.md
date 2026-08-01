@@ -312,6 +312,22 @@ docker compose run --rm api python -m changeops.evaluation.approval_workflow \
   tests/golden/approval_workflow/v1/dataset.json
 ```
 
+Frontend checks use the committed lockfile and remain provider-free:
+
+```bash
+cd web
+npm ci
+npm run typecheck
+npm run lint
+npm test
+npm run build
+```
+
+For an integrated manual check, run `docker compose up --build`, open
+<http://localhost:3000>, and use seeded assessment
+`8f4f647d-7f2d-4da8-8e02-77d5301f2002`. Confirm that decisions reload persisted counts and that
+every action remains `not_executed`.
+
 The manually dispatched `live-ai-smoke` check uses a real provider secret and is diagnostic; it is
 not a required pull-request check. Ordinary CI must keep model-provider secrets empty.
 

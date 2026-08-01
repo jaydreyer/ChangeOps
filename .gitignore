@@ -30,8 +30,10 @@ htmlcov/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+web/.next/
+web/node_modules/
+web/tsconfig.tsbuildinfo
 
 # Local runtime data
 *.log
 *.pid
-

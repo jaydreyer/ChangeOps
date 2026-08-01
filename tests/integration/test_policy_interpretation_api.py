@@ -137,6 +137,48 @@ def test_completed_assessment_produces_one_separate_idempotent_plan(client) -> N
         assert run is not None and run.status == "completed"
 
 
+def test_interpretation_resolves_exact_quote_with_incorrect_offsets(client) -> None:
+    _, assessment_id = completed_assessment(client)
+    candidate = configured_interpreter().model.candidate
+    span = candidate["coverage_gaps"][0]["policy_spans"][0]
+    expected_start = POLICY_TEXT.index(span["quote"])
+    span["start"] = expected_start + 9
+    span["end"] = span["start"] + len(span["quote"])
+    client.app.dependency_overrides[interpretation_model_dependency] = lambda: (
+        lambda: configured_interpreter(candidate)
+    )
+
+    response = client.post(f"/api/v1/impact-assessments/{assessment_id}/change-plans")
+
+    assert response.status_code == 201, response.text
+    resolved = response.json()["change_plan"]["coverage_gaps"][0]["policy_spans"][0]
+    assert resolved["start"] == expected_start
+    assert resolved["end"] == expected_start + len(resolved["quote"])
+    assert POLICY_TEXT[resolved["start"] : resolved["end"]] == resolved["quote"]
+
+
+def test_interpretation_rejects_quote_absent_from_policy(client) -> None:
+    _, assessment_id = completed_assessment(client)
+    candidate = configured_interpreter().model.candidate
+    span = candidate["coverage_gaps"][0]["policy_spans"][0]
+    span["quote"] = "invented policy language"
+    span["end"] = span["start"] + len(span["quote"])
+    client.app.dependency_overrides[interpretation_model_dependency] = lambda: (
+        lambda: configured_interpreter(candidate)
+    )
+
+    response = client.post(f"/api/v1/impact-assessments/{assessment_id}/change-plans")
+
+    assert response.status_code == 422
+    attempt = client.get(
+        f"/api/v1/policy-interpretation-attempts/{response.json()['detail']['attempt_id']}"
+    ).json()
+    assert attempt["failure_code"] == "interpretation_invalid_reference"
+    assert {error["code"] for error in attempt["validation_errors"]} == {
+        "policy_quote_mismatch"
+    }
+
+
 def test_provider_failure_is_auditable_and_does_not_change_completed_run(client) -> None:
     run_id, assessment_id = completed_assessment(client)
     client.app.dependency_overrides[interpretation_model_dependency] = lambda: (

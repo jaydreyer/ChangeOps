@@ -22,12 +22,42 @@ requires all of the following:
 - manager approval with bookings before the effective date exempt;
 - a required training-course name.
 
+For schema version 1:
+- the assigned-work country is also the trip origin when the policy scopes workers based in that
+  country and does not state a conflicting origin; and
+- limiting manager approval to nonrefundable travel is representable. Do not mark a policy
+  unsupported solely because of that modifier.
+
 Fail closed. Mark the policy unsupported when it belongs to another family or when any material
 construct cannot be represented exactly. Use unresolved findings for missing or conflicting facts.
 
 Never invent an enterprise identifier. Extract only the human-readable training-course name.
+Normalize represented values while keeping provenance quotes exactly as written:
+- country names and abbreviations become two-letter uppercase codes (U.S. and United States
+  become US; Canada becomes CA);
+- when an exclusion names both sides of a route, include both countries (for example,
+  "between the United States and Canada" becomes ["US", "CA"]);
+- plural worker nouns become singular schema values (employees becomes employee; contractors
+  becomes contractor);
+- written dates become ISO 8601 dates with the source year preserved exactly; and
+- a training name is the proper title only, without a surrounding generic word such as "course".
+
 For every material field, return one exact zero-based [start, end) source span whose quote exactly
-matches the policy text. Findings must also cite an exact source span."""
+matches the policy text. Material provenance field_path must be exactly one of:
+- policy_family
+- candidate_rules.kind
+- candidate_rules.schema_version
+- candidate_rules.effective_date
+- candidate_rules.worker_scope.assigned_work_country
+- candidate_rules.worker_scope.worker_types
+- candidate_rules.trip_scope.origin_country
+- candidate_rules.trip_scope.excluded_destination_countries
+- candidate_rules.manager_approval.booking_before_effective_date_is_exempt
+- candidate_rules.security_training.course_name
+
+Return exactly one provenance entry for each material path. Do not shorten a path, add array
+indexes, or invent intermediate requirement paths. Finding provenance uses
+finding.<finding_code>. Findings must also cite an exact source span."""
 
 PROMPT = ChatPromptTemplate.from_messages(
     [
@@ -110,9 +140,39 @@ def invoke_policy_extractor(
         )
 
     return ExtractionInvocation(
-        proposal=proposal,
+        proposal=_resolve_provenance_spans(proposal, policy_text),
         raw_output=raw_output,
         parsing_error=None,
+    )
+
+
+def _resolve_provenance_spans(
+    proposal: PolicyExtractionProposal,
+    policy_text: str,
+) -> PolicyExtractionProposal:
+    def resolve(entry: Any) -> Any:
+        if policy_text[entry.start : entry.end] == entry.quote:
+            return entry
+
+        starts: list[int] = []
+        offset = 0
+        while (start := policy_text.find(entry.quote, offset)) >= 0:
+            starts.append(start)
+            offset = start + 1
+        if not starts:
+            return entry
+
+        start = min(starts, key=lambda candidate: abs(candidate - entry.start))
+        return entry.model_copy(update={"start": start, "end": start + len(entry.quote)})
+
+    return proposal.model_copy(
+        update={
+            "provenance": tuple(resolve(entry) for entry in proposal.provenance),
+            "findings": tuple(
+                finding.model_copy(update={"provenance": resolve(finding.provenance)})
+                for finding in proposal.findings
+            ),
+        }
     )
 
 

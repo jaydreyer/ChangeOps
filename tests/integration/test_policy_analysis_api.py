@@ -35,6 +35,43 @@ class TransientThenSuccessfulModel:
         return RunnableLambda(respond)
 
 
+class RunStateObservingModel:
+    def __init__(self) -> None:
+        self.observed_state: tuple[str, str] | None = None
+
+    def with_structured_output(self, schema, *, include_raw: bool) -> RunnableLambda:
+        def respond(_: Any) -> dict[str, Any]:
+            with SessionLocal() as session:
+                run = session.scalar(
+                    select(PolicyAnalysisRun).order_by(PolicyAnalysisRun.created_at.desc())
+                )
+                assert run is not None
+                self.observed_state = (run.status, run.current_step)
+            return accepted_model_response(canonical_proposal_payload())
+
+        return RunnableLambda(respond)
+
+
+def test_run_is_observable_as_extracting_during_model_call(client) -> None:
+    model = RunStateObservingModel()
+    client.app.dependency_overrides[extraction_model_dependency] = lambda: (
+        ConfiguredExtractionModel(
+            model=model,
+            provider="fixture",
+            identifier="state-observer-v1",
+        )
+    )
+
+    response = client.post(
+        "/api/v1/policy-analysis-runs",
+        json={"policy_change_id": POLICY_CHANGE_ID},
+    )
+
+    assert response.status_code == 201
+    assert response.json()["status"] == "completed"
+    assert model.observed_state == ("running", "extract")
+
+
 def test_accepted_policy_completes_with_one_assessment_and_no_policy_mutation(client) -> None:
     client.app.dependency_overrides[extraction_model_dependency] = lambda: (
         configured_fixture_model()

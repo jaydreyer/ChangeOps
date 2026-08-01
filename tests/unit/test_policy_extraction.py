@@ -1,7 +1,9 @@
 from copy import deepcopy
 from datetime import date
 
+import pytest
 from langchain_core.messages import AIMessage
+from pydantic import ValidationError
 
 from changeops.ai.policy_extractor import invoke_policy_extractor
 from changeops.domain.policy_extraction import (
@@ -40,6 +42,67 @@ def test_langchain_structured_output_extracts_typed_proposal_without_enterprise_
     assert POLICY_TEXT in rendered_prompt
     assert "international-travel-security" not in rendered_prompt
     assert "Sarah Johnson" not in rendered_prompt
+    assert "candidate_rules.security_training.course_name" in rendered_prompt
+    assert "Do not shorten a path" in rendered_prompt
+    assert "assigned-work country is also the trip origin" in rendered_prompt
+    assert "nonrefundable travel is representable" in rendered_prompt
+
+
+def test_material_provenance_rejects_noncanonical_field_paths() -> None:
+    payload = canonical_proposal_payload()
+    payload["provenance"][0]["field_path"] = "effective_date"
+
+    with pytest.raises(ValidationError):
+        PolicyExtractionProposal.model_validate(payload)
+
+
+def test_extractor_resolves_exact_quotes_to_nearest_source_spans() -> None:
+    payload = canonical_proposal_payload()
+    course_entry = next(
+        item
+        for item in payload["provenance"]
+        if item["field_path"] == "candidate_rules.security_training.course_name"
+    )
+    second_course_start = POLICY_TEXT.rindex(course_entry["quote"])
+    course_entry.update(
+        {
+            "start": second_course_start + 3,
+            "end": second_course_start + 3 + len(course_entry["quote"]),
+        }
+    )
+    model = FixtureStructuredOutputModel(accepted_model_response(payload))
+
+    invocation = invoke_policy_extractor(model, POLICY_TEXT)
+
+    assert invocation.proposal is not None
+    resolved_entry = next(
+        item
+        for item in invocation.proposal.provenance
+        if item.field_path == "candidate_rules.security_training.course_name"
+    )
+    assert resolved_entry.start == second_course_start
+    assert resolved_entry.end == second_course_start + len(resolved_entry.quote)
+
+
+@pytest.mark.parametrize(
+    ("field_path", "raw_value"),
+    [
+        ("worker_scope.assigned_work_country", "U.S.-based"),
+        ("worker_scope.worker_types", ["employees", "contractors"]),
+        ("trip_scope.origin_country", "United States"),
+        ("trip_scope.excluded_destination_countries", ["United States", "Canada"]),
+    ],
+)
+def test_candidate_rules_reject_unnormalized_values(
+    field_path: str,
+    raw_value: str | list[str],
+) -> None:
+    payload = canonical_proposal_payload()
+    section, field = field_path.split(".")
+    payload["candidate_rules"][section][field] = raw_value
+
+    with pytest.raises(ValidationError):
+        PolicyExtractionProposal.model_validate(payload)
 
 
 def test_validation_resolves_course_name_and_accepts_rules() -> None:

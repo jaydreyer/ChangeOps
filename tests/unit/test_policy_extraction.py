@@ -1,6 +1,8 @@
 from copy import deepcopy
 from datetime import date
 
+from langchain_core.messages import AIMessage
+
 from changeops.ai.policy_extractor import invoke_policy_extractor
 from changeops.domain.policy_extraction import (
     PolicyExtractionProposal,
@@ -164,6 +166,24 @@ def test_malformed_structured_output_is_explicit_failure() -> None:
     assert result.raw_output == {"content": "{not-json"}
     assert result.parsing_error is not None
     assert result.parsing_error.startswith("structured_output_parsing_failed:")
+
+
+def test_raw_model_metadata_dates_are_json_safe() -> None:
+    payload = canonical_proposal_payload()
+    model = FixtureStructuredOutputModel(
+        {
+            "raw": AIMessage(
+                content="fixture",
+                response_metadata={"provider_date": date(2026, 8, 1)},
+            ),
+            "parsed": PolicyExtractionProposal.model_validate(payload),
+            "parsing_error": None,
+        }
+    )
+
+    result = invoke_policy_extractor(model, POLICY_TEXT)
+
+    assert result.raw_output["data"]["response_metadata"]["provider_date"] == "2026-08-01"
 
 
 def test_invalid_closed_literal_is_a_structured_output_failure() -> None:

@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import date, datetime
 from typing import Any, Protocol, runtime_checkable
 
 from langchain_core.messages import BaseMessage, message_to_dict
@@ -117,9 +118,11 @@ def invoke_policy_extractor(
 
 def _json_safe(value: Any) -> Any:
     if isinstance(value, BaseMessage):
-        return message_to_dict(value)
+        return _json_safe(message_to_dict(value))
     if value is None or isinstance(value, (str, int, float, bool)):
         return value
+    if isinstance(value, (date, datetime)):
+        return value.isoformat()
     if isinstance(value, dict):
         return {str(key): _json_safe(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):

@@ -1,4 +1,5 @@
 import uuid
+from datetime import date
 
 import pytest
 
@@ -25,6 +26,7 @@ def interpretation_input() -> PolicyInterpretationInput:
     return PolicyInterpretationInput(
         policy_change_id="policy-1",
         policy_text="Employees must complete security training.",
+        policy_effective_date=date(2026, 9, 1),
         policy_analysis_run_id=uuid.UUID("00000000-0000-0000-0000-000000000003"),
         accepted_extraction_attempt_id=uuid.UUID("00000000-0000-0000-0000-000000000004"),
         accepted_rules={"kind": "international_travel"},

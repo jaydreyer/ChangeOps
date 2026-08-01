@@ -29,6 +29,7 @@ class FixtureInterpretationModel:
         self.schema: type[CandidateChangePlan] | None = None
         self.method: str | None = None
         self.include_raw: bool | None = None
+        self.inputs: list[Any] = []
 
     def with_structured_output(
         self,
@@ -41,7 +42,8 @@ class FixtureInterpretationModel:
         self.method = method
         self.include_raw = include_raw
 
-        def respond(_: Any) -> dict[str, Any]:
+        def respond(value: Any) -> dict[str, Any]:
+            self.inputs.append(value)
             if self.fail:
                 raise TimeoutError("sensitive provider detail")
             return {
@@ -122,8 +124,13 @@ def test_completed_assessment_produces_one_separate_idempotent_plan(client) -> N
     assert configured_model.model.method == "function_calling"
     assert configured_model.model.include_raw is True
     assert "top-level object has exactly summary and coverage_gaps" in SYSTEM_PROMPT
+    assert "absence of effective_date\ninside accepted_rules is not a coverage gap" in SYSTEM_PROMPT
     assert "exactly one owner" in SYSTEM_PROMPT
     assert "either\nimpact_id or finding_id, never both" in SYSTEM_PROMPT
+    rendered_prompt = "\n".join(
+        str(message.content) for message in configured_model.model.inputs[0].to_messages()
+    )
+    assert '"policy_effective_date":"2026-09-01"' in rendered_prompt
     assert repeated.status_code == 200
     assert repeated.json() == created.json()
     assert created.json()["policy_analysis_run_id"] == run_id

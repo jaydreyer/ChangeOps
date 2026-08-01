@@ -8,12 +8,16 @@ from pydantic import ValidationError
 from changeops.ai.policy_extractor import _json_safe
 from changeops.domain.policy_interpretation import CandidateChangePlan, PolicyInterpretationInput
 
-PROMPT_VERSION = "coverage-gap-interpretation-v2"
+PROMPT_VERSION = "coverage-gap-interpretation-v3"
 
 SYSTEM_PROMPT = """You identify grounded coverage gaps in a completed deterministic
 policy assessment.
 The assessment is authoritative. Findings are review concerns only: never add, remove, contradict,
 reclassify, or modify an impact, reason code, evidence item, relationship path, action, or count.
+The authoritative policy representation intentionally stores the effective date in
+policy_effective_date rather than duplicating it inside accepted_rules. Treat policy_effective_date
+and accepted_rules together as the complete accepted policy input. The absence of effective_date
+inside accepted_rules is not a coverage gap.
 Use only supplied persisted artifacts. Every reference must resolve from the input. Omit unsupported
 claims; absence is preferable to speculation. Recommended actions must be human review actions, not
 enterprise-system execution. Use conclusion_type review_concern. Leave asserted_enterprise_facts

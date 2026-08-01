@@ -83,6 +83,7 @@ def create_or_get_change_plan(
         accepted_attempt is None
         or accepted_attempt.validation_outcome != "accepted"
         or accepted_attempt.accepted_rules is None
+        or accepted_attempt.candidate_rules is None
     ):
         raise AssessmentNotInterpretableError(str(assessment_id))
 

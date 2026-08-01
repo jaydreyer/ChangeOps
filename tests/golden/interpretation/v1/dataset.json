@@ -3,6 +3,7 @@
   "input": {
     "policy_change_id": "policy-1",
     "policy_text": "Employees must complete security training.",
+    "policy_effective_date": "2026-09-01",
     "policy_analysis_run_id": "00000000-0000-0000-0000-000000000003",
     "accepted_extraction_attempt_id": "00000000-0000-0000-0000-000000000004",
     "accepted_rules": {"kind": "international_travel"},
@@ -35,7 +36,7 @@
     }],
     "proposed_actions": [],
     "unresolved_questions": [],
-    "prompt_version": "coverage-gap-interpretation-v1",
+    "prompt_version": "coverage-gap-interpretation-v3",
     "schema_version": "policy-interpretation-v1"
   },
   "cases": [

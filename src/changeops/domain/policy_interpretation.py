@@ -110,6 +110,7 @@ class InterpretationAction(BaseModel):
 class PolicyInterpretationInput(BaseModel):
     policy_change_id: str
     policy_text: str
+    policy_effective_date: date
     policy_analysis_run_id: uuid.UUID
     accepted_extraction_attempt_id: uuid.UUID
     accepted_rules: dict[str, Any]

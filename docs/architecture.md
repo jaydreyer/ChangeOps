@@ -190,6 +190,11 @@ answered clarifications, actions, and unresolved questions. It builds a stable, 
 calling LangChain structured output. The interpreter receives no SQLAlchemy session, repository,
 tools, ORM records, or raw enterprise source tables.
 
+The interpretation DTO exposes the validated policy effective date separately from
+`accepted_rules`, matching the deterministic `PolicyInput` boundary. The prompt defines those
+fields together as the complete accepted policy representation so normalized storage does not
+appear to be a coverage gap.
+
 The interpreter uses LangChain's `function_calling` structured-output method over OpenAI's
 Responses API because its nested Pydantic schema is outside OpenAI's stricter native JSON-schema
 subset and reasoning-enabled function tools are unsupported by the Chat Completions API.

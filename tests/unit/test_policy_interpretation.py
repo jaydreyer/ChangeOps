@@ -2,6 +2,7 @@ import uuid
 
 import pytest
 
+from changeops.ai.policy_interpreter import _resolve_candidate_references
 from changeops.domain.policy_interpretation import (
     CandidateChangePlan,
     CandidateCoverageGapFinding,
@@ -9,6 +10,7 @@ from changeops.domain.policy_interpretation import (
     EvidenceReference,
     ImpactReference,
     InterpretationEvidence,
+    InterpretationFinding,
     InterpretationImpact,
     PolicyInterpretationInput,
     PolicySpanReference,
@@ -105,6 +107,89 @@ def test_grounded_plan_and_empty_plan_are_accepted() -> None:
     )
     assert validated.schema_version == "policy-interpretation-v1"
     assert empty.coverage_gaps == ()
+
+
+def test_interpreter_resolves_mechanical_evidence_owner_errors() -> None:
+    finding_id = uuid.UUID("00000000-0000-0000-0000-000000000005")
+    wrong_finding_id = uuid.UUID("00000000-0000-0000-0000-000000000006")
+    input_with_finding = interpretation_input().model_copy(
+        update={
+            "findings": (
+                InterpretationFinding(
+                    id=finding_id,
+                    rule_code="TRAINING_REVIEW",
+                    finding_type="review",
+                    severity="warning",
+                    explanation="Review training timing.",
+                    evidence_keys=("policy:text", "trip:trip-1"),
+                ),
+            ),
+            "evidence": (
+                *interpretation_input().evidence,
+                InterpretationEvidence(
+                    id=uuid.uuid4(),
+                    evidence_key="trip:trip-1",
+                    evidence_type="trip",
+                    source_type="trip",
+                    source_id="trip-1",
+                    label="Trip",
+                    snapshot={},
+                ),
+            ),
+        }
+    )
+    candidate = CandidateChangePlan(
+        summary="Grounded concern.",
+        coverage_gaps=(
+            finding(
+                evidence_references=(
+                    EvidenceReference(
+                        assessment_id=ASSESSMENT_ID,
+                        evidence_key="policy:text",
+                        impact_id=IMPACT_ID,
+                        finding_id=finding_id,
+                    ),
+                    EvidenceReference(
+                        assessment_id=ASSESSMENT_ID,
+                        evidence_key="trip:trip-1",
+                        finding_id=wrong_finding_id,
+                    ),
+                )
+            ),
+        ),
+    )
+
+    resolved = _resolve_candidate_references(candidate, input_with_finding)
+    references = resolved.coverage_gaps[0].evidence_references
+
+    assert references[0].impact_id == IMPACT_ID
+    assert references[0].finding_id is None
+    assert references[1].impact_id is None
+    assert references[1].finding_id == finding_id
+    validate_candidate_change_plan(resolved, input_with_finding)
+
+
+def test_interpreter_leaves_invented_evidence_owners_invalid() -> None:
+    unresolved = CandidateChangePlan(
+        summary="Unsupported concern.",
+        coverage_gaps=(
+            finding(
+                evidence_references=(
+                    EvidenceReference(
+                        assessment_id=ASSESSMENT_ID,
+                        evidence_key="invented",
+                        finding_id=uuid.uuid4(),
+                    ),
+                )
+            ),
+        ),
+    )
+
+    resolved = _resolve_candidate_references(unresolved, interpretation_input())
+
+    with pytest.raises(ChangePlanValidationError) as captured:
+        validate_candidate_change_plan(resolved, interpretation_input())
+    assert "invalid_evidence_reference" in {item.code for item in captured.value.issues}
 
 
 @pytest.mark.parametrize(

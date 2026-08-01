@@ -122,7 +122,8 @@ def test_completed_assessment_produces_one_separate_idempotent_plan(client) -> N
     assert configured_model.model.method == "function_calling"
     assert configured_model.model.include_raw is True
     assert "top-level object has exactly summary and coverage_gaps" in SYSTEM_PROMPT
-    assert "set impact_id only when that evidence_key" in SYSTEM_PROMPT
+    assert "exactly one owner" in SYSTEM_PROMPT
+    assert "either\nimpact_id or finding_id, never both" in SYSTEM_PROMPT
     assert repeated.status_code == 200
     assert repeated.json() == created.json()
     assert created.json()["policy_analysis_run_id"] == run_id
@@ -174,9 +175,7 @@ def test_interpretation_rejects_quote_absent_from_policy(client) -> None:
         f"/api/v1/policy-interpretation-attempts/{response.json()['detail']['attempt_id']}"
     ).json()
     assert attempt["failure_code"] == "interpretation_invalid_reference"
-    assert {error["code"] for error in attempt["validation_errors"]} == {
-        "policy_quote_mismatch"
-    }
+    assert {error["code"] for error in attempt["validation_errors"]} == {"policy_quote_mismatch"}
 
 
 def test_provider_failure_is_auditable_and_does_not_change_completed_run(client) -> None:

@@ -38,48 +38,56 @@ def create_or_get_action_review(
     proposed_action_id: uuid.UUID,
 ) -> tuple[ActionReview, bool]:
     with session.begin():
-        action = session.get(ProposedAction, proposed_action_id, with_for_update=True)
-        if action is None:
-            raise ProposedActionNotFoundError(str(proposed_action_id))
-        assessment = session.get(ImpactAssessment, action.assessment_id)
-        if assessment is None or assessment.status != "completed":
-            raise ActionReviewLifecycleMismatchError(str(proposed_action_id))
-
-        existing = session.scalar(
-            select(ActionReview).where(ActionReview.proposed_action_id == proposed_action_id)
+        review, created = create_or_get_action_review_in_transaction(
+            session,
+            proposed_action_id,
         )
-        if existing is not None:
-            review_id = existing.id
-            created = False
-        else:
-            action = session.scalar(
-                select(ProposedAction)
-                .where(ProposedAction.id == proposed_action_id)
-                .options(
-                    selectinload(ProposedAction.finding).selectinload(Finding.evidence),
-                    selectinload(ProposedAction.enterprise_impact).selectinload(
-                        AssessmentEnterpriseImpact.evidence
-                    ),
-                )
-            )
-            if action is None:
-                raise ProposedActionNotFoundError(str(proposed_action_id))
-            original_snapshot = _original_snapshot(action)
-            review_context = _review_context(action)
-            review = ActionReview(
-                assessment_id=action.assessment_id,
-                proposed_action_id=action.id,
-                status="pending",
-                original_action_snapshot=original_snapshot.model_dump(mode="json"),
-                review_context_snapshot=review_context.model_dump(mode="json"),
-                created_at=datetime.now(UTC),
-                completed_at=None,
-            )
-            session.add(review)
-            session.flush()
-            review_id = review.id
-            created = True
+        review_id = review.id
     return get_action_review(session, review_id), created
+
+
+def create_or_get_action_review_in_transaction(
+    session: Session,
+    proposed_action_id: uuid.UUID,
+) -> tuple[ActionReview, bool]:
+    """Create or reuse a review inside a caller-owned transaction."""
+    action = session.get(ProposedAction, proposed_action_id, with_for_update=True)
+    if action is None:
+        raise ProposedActionNotFoundError(str(proposed_action_id))
+    assessment = session.get(ImpactAssessment, action.assessment_id)
+    if assessment is None or assessment.status != "completed":
+        raise ActionReviewLifecycleMismatchError(str(proposed_action_id))
+
+    existing = session.scalar(
+        select(ActionReview).where(ActionReview.proposed_action_id == proposed_action_id)
+    )
+    if existing is not None:
+        return existing, False
+
+    action = session.scalar(
+        select(ProposedAction)
+        .where(ProposedAction.id == proposed_action_id)
+        .options(
+            selectinload(ProposedAction.finding).selectinload(Finding.evidence),
+            selectinload(ProposedAction.enterprise_impact).selectinload(
+                AssessmentEnterpriseImpact.evidence
+            ),
+        )
+    )
+    if action is None:
+        raise ProposedActionNotFoundError(str(proposed_action_id))
+    review = ActionReview(
+        assessment_id=action.assessment_id,
+        proposed_action_id=action.id,
+        status="pending",
+        original_action_snapshot=_original_snapshot(action).model_dump(mode="json"),
+        review_context_snapshot=_review_context(action).model_dump(mode="json"),
+        created_at=datetime.now(UTC),
+        completed_at=None,
+    )
+    session.add(review)
+    session.flush()
+    return review, True
 
 
 def submit_action_review_decision(

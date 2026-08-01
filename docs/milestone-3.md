@@ -2,8 +2,9 @@
 
 ## Status
 
-In progress. PR 1 implements the action-review and decision foundation. Durable workflow
-interruption/resume and the reviewer interface remain later slices.
+In progress. PR 1 implements the action-review and decision foundation. PR 2 adds the separate
+durable action-approval run, deterministic interruption/resume, ordered review membership, and
+workflow audit history. The reviewer interface remains a later slice.
 
 ## Product goal
 
@@ -95,9 +96,81 @@ This milestone slice does not execute an action, update an execution status, cal
 systems, introduce MCP, or allow AI to make or recommend approval decisions. Approval is a durable
 human record only.
 
+## PR 2 — Durable action-approval workflow
+
+### Separate lifecycle
+
+Approval is a separate aggregate and graph:
+
+```text
+PolicyAnalysisRun(completed)
+  → ImpactAssessment(completed, immutable)
+  → ActionApprovalRun(initializing)
+  → ActionApprovalRun(awaiting_decisions)
+  → ActionApprovalRun(completed)
+```
+
+The completed policy-analysis run never moves backward. Approval can happen hours or days later,
+has its own technical failures and audit history, and will be the boundary consumed by future
+execution work.
+
+### Initialization and membership
+
+One database-enforced run exists per assessment. Creation locks the completed assessment, requires
+that it belongs to a completed policy-analysis run, and returns the existing run under repeated or
+concurrent requests. Initialization loads all proposed actions in stable worker/type/target order,
+uses the PR 1 transaction-owned review helper to create or reuse each review, and atomically inserts
+one immutable membership item per action and review. Existing pending and terminal decisions are
+preserved and counted.
+
+### Pause and resume
+
+PostgreSQL is authoritative. LangGraph state contains only the run ID and small routing values. The
+graph ends after persisting `awaiting_decisions / await_decisions`; it never holds an HTTP request,
+sleeps, polls, or relies on an in-memory thread while waiting for people.
+
+After an authorized decision commits, the API finds the run through immutable membership and
+invokes the graph. Evaluation locks the run row, reloads every persisted review, validates
+membership, and recalculates all six counts. It pauses again when any review is pending and
+completes when none are pending. An authorized `reviewer` or `admin` can call the explicit resume
+endpoint for recovery. No-op awaiting resumes and completed resumes are idempotent.
+
+### Completion, failure isolation, and audit
+
+Approved, rejected, deferred, and revision-requested reviews are all terminal for this slice. A
+mixed decision set completes the workflow; the summary makes no business-success judgment.
+Deferred and revision-requested actions are closed for this workflow but are not executable.
+
+Human decisions commit before automatic resume. An unexpected resume failure cannot erase or roll
+back the decision, and explicit resume can reconcile later. Initialization membership is atomic.
+Stable failure codes and sanitized messages are stored without unrestricted exception details.
+
+Append-only transitions expose run creation, initialization, meaningful reevaluation, completion,
+and failure. Database constraints enforce assessment/analysis ownership, action/review/run
+ownership, unique ordered membership, count totals, terminal timestamps, immutable completed runs,
+and append-only items and transitions.
+
+### API and evaluation
+
+```text
+POST /api/v1/impact-assessments/{assessment_id}/approval-run
+GET  /api/v1/impact-assessments/{assessment_id}/approval-run
+GET  /api/v1/action-approval-runs/{run_id}
+POST /api/v1/action-approval-runs/{run_id}/resume
+```
+
+Explicit resume uses the same demonstration actor and role headers as decisions. These headers are
+not production authentication.
+
+The offline fixture evaluation uses deterministic review-state fixtures and no provider:
+
+```bash
+python -m changeops.evaluation.approval_workflow \
+  tests/golden/approval_workflow/v1/dataset.json
+```
+
 ## Planned later slices
 
-- PR 2: connect durable workflow interruption and resume to persisted action decisions;
 - PR 3: add the focused reviewer interface at the roadmap-approved frontend boundary.
 
 The later slices must consume this review aggregate without mutating historical assessments,

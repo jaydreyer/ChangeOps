@@ -731,6 +731,12 @@ class ActionReview(Base):
             name="ck_action_reviews_completion",
         ),
         UniqueConstraint("proposed_action_id", name="uq_action_reviews_proposed_action"),
+        UniqueConstraint(
+            "id",
+            "proposed_action_id",
+            "assessment_id",
+            name="uq_action_reviews_id_action_assessment",
+        ),
         ForeignKeyConstraint(
             ["proposed_action_id", "assessment_id"],
             ["proposed_actions.id", "proposed_actions.assessment_id"],
@@ -782,6 +788,176 @@ class ActionReviewDecision(Base):
     reviewer_role: Mapped[str] = mapped_column(String(30))
     rationale: Mapped[str] = mapped_column(Text)
     edited_action_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class ActionApprovalRun(Base):
+    __tablename__ = "action_approval_runs"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('initializing', 'awaiting_decisions', 'completed', 'failed')",
+            name="ck_action_approval_runs_status",
+        ),
+        CheckConstraint(
+            "current_step IN ('create_reviews', 'evaluate_reviews', 'await_decisions', 'finalize')",
+            name="ck_action_approval_runs_current_step",
+        ),
+        CheckConstraint(
+            "total_action_count >= 0 AND pending_count >= 0 AND approved_count >= 0 "
+            "AND rejected_count >= 0 AND deferred_count >= 0 "
+            "AND revision_requested_count >= 0",
+            name="ck_action_approval_runs_nonnegative_counts",
+        ),
+        CheckConstraint(
+            "total_action_count = pending_count + approved_count + rejected_count "
+            "+ deferred_count + revision_requested_count",
+            name="ck_action_approval_runs_count_total",
+        ),
+        CheckConstraint(
+            "(status = 'awaiting_decisions' AND pending_count > 0) "
+            "OR status <> 'awaiting_decisions'",
+            name="ck_action_approval_runs_awaiting_pending",
+        ),
+        CheckConstraint(
+            "(status = 'completed' AND pending_count = 0 AND completed_at IS NOT NULL) "
+            "OR (status <> 'completed' AND completed_at IS NULL)",
+            name="ck_action_approval_runs_completion",
+        ),
+        UniqueConstraint("assessment_id", name="uq_action_approval_runs_assessment"),
+        UniqueConstraint(
+            "id",
+            "assessment_id",
+            name="uq_action_approval_runs_id_assessment",
+        ),
+        ForeignKeyConstraint(
+            ["assessment_id", "policy_analysis_run_id"],
+            ["impact_assessments.id", "impact_assessments.policy_analysis_run_id"],
+            name="fk_action_approval_runs_assessment_analysis",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    assessment_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("impact_assessments.id"),
+        index=True,
+    )
+    policy_analysis_run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("policy_analysis_runs.id"),
+        index=True,
+    )
+    status: Mapped[str] = mapped_column(String(30))
+    current_step: Mapped[str] = mapped_column(String(30))
+    total_action_count: Mapped[int] = mapped_column(Integer)
+    pending_count: Mapped[int] = mapped_column(Integer)
+    approved_count: Mapped[int] = mapped_column(Integer)
+    rejected_count: Mapped[int] = mapped_column(Integer)
+    deferred_count: Mapped[int] = mapped_column(Integer)
+    revision_requested_count: Mapped[int] = mapped_column(Integer)
+    failure_code: Mapped[str | None] = mapped_column(String(100))
+    failure_message: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    items: Mapped[list["ActionApprovalRunItem"]] = relationship(
+        order_by="ActionApprovalRunItem.sequence",
+        primaryjoin="ActionApprovalRun.id == ActionApprovalRunItem.approval_run_id",
+        foreign_keys="ActionApprovalRunItem.approval_run_id",
+    )
+    transitions: Mapped[list["ActionApprovalRunTransition"]] = relationship(
+        order_by="ActionApprovalRunTransition.created_at",
+    )
+
+
+class ActionApprovalRunItem(Base):
+    __tablename__ = "action_approval_run_items"
+    __table_args__ = (
+        CheckConstraint("sequence >= 0", name="ck_action_approval_run_items_sequence"),
+        UniqueConstraint(
+            "approval_run_id",
+            "proposed_action_id",
+            name="uq_action_approval_run_items_action",
+        ),
+        UniqueConstraint(
+            "approval_run_id",
+            "action_review_id",
+            name="uq_action_approval_run_items_review",
+        ),
+        UniqueConstraint(
+            "approval_run_id",
+            "sequence",
+            name="uq_action_approval_run_items_sequence",
+        ),
+        ForeignKeyConstraint(
+            ["approval_run_id", "assessment_id"],
+            ["action_approval_runs.id", "action_approval_runs.assessment_id"],
+            name="fk_action_approval_items_run_assessment",
+        ),
+        ForeignKeyConstraint(
+            ["proposed_action_id", "assessment_id"],
+            ["proposed_actions.id", "proposed_actions.assessment_id"],
+            name="fk_action_approval_items_action_assessment",
+        ),
+        ForeignKeyConstraint(
+            ["action_review_id", "proposed_action_id", "assessment_id"],
+            [
+                "action_reviews.id",
+                "action_reviews.proposed_action_id",
+                "action_reviews.assessment_id",
+            ],
+            name="fk_action_approval_items_review_action_assessment",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    approval_run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("action_approval_runs.id"),
+        index=True,
+    )
+    assessment_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("impact_assessments.id"),
+    )
+    proposed_action_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("proposed_actions.id"),
+        index=True,
+    )
+    action_review_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("action_reviews.id"),
+        index=True,
+    )
+    sequence: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    review: Mapped[ActionReview] = relationship(
+        primaryjoin="ActionReview.id == ActionApprovalRunItem.action_review_id",
+        foreign_keys=[action_review_id],
+    )
+
+
+class ActionApprovalRunTransition(Base):
+    __tablename__ = "action_approval_run_transitions"
+    __table_args__ = (
+        CheckConstraint(
+            "trigger_type IN "
+            "('run_created', 'initialized', 'decision_recorded', "
+            "'manual_resume', 'completed', 'failed')",
+            name="ck_action_approval_run_transitions_trigger",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    approval_run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("action_approval_runs.id"),
+        index=True,
+    )
+    from_status: Mapped[str | None] = mapped_column(String(30))
+    to_status: Mapped[str] = mapped_column(String(30))
+    from_step: Mapped[str | None] = mapped_column(String(30))
+    to_step: Mapped[str] = mapped_column(String(30))
+    reason_code: Mapped[str] = mapped_column(String(100))
+    trigger_type: Mapped[str] = mapped_column(String(30))
+    trigger_reference: Mapped[str | None] = mapped_column(String(200))
+    actor_identity: Mapped[str | None] = mapped_column(String(200))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 

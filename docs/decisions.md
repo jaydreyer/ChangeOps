@@ -359,3 +359,46 @@ narrow request-header authorization context. The proposed action is never update
   supersession semantics.
 - Request headers demonstrate an authorization boundary but must be replaced by production
   authentication before external deployment.
+
+# ADR-0011 — Separate Durable Approval Run from Completed Policy Analysis
+
+## Status
+
+Accepted
+
+## Context
+
+Policy analysis completes when it persists one immutable deterministic assessment. Human review can
+begin much later, pause repeatedly, and fail independently. Reopening the completed analysis run or
+inferring approval membership forever from all reviews would combine two business lifecycles and
+make historical workflow scope unstable.
+
+## Decision
+
+ChangeOps uses one approval-specific aggregate per completed policy-analysis assessment:
+
+- `ActionApprovalRun` stores lifecycle state, current step, deterministic counts, failure state, and
+  timestamps;
+- `ActionApprovalRunItem` snapshots ordered proposed-action and action-review membership;
+- `ActionApprovalRunTransition` stores append-only transition visibility;
+- a narrow deterministic LangGraph initializes membership, evaluates persisted reviews, ends at
+  each human wait state, and completes when no item is pending;
+- PostgreSQL remains authoritative, and each invocation starts from the persisted run ID;
+- a committed review decision triggers synchronous post-commit resume, while an authorized
+  idempotent endpoint provides explicit reconciliation.
+
+The existing item-level review owns decisions and action snapshots. The approval run duplicates
+neither. The completed policy-analysis run and impact assessment are never changed.
+
+## Consequences
+
+- Approval waiting and progress survive API restart without a worker, queue, scheduler, polling
+  loop, or open HTTP request.
+- Stable membership and transition records make the assessment-level process auditable.
+- Row locking plus deterministic recalculation reconciles concurrent decisions safely.
+- Automatic-resume failure cannot erase a valid human decision.
+- All terminal decision types complete workflow items, but only approval may become a candidate for
+  future execution.
+- This slice adds approval-specific orchestration rather than a generic workflow platform.
+- No action executes, and demonstration authorization headers still require replacement before
+  public deployment.

@@ -305,6 +305,13 @@ before merging to `main`. Together they cover Compose build reproducibility, Ruf
 the complete deterministic and PostgreSQL integration suite, all offline AI evaluations, and the
 current-head migration round trip.
 
+The deterministic approval workflow evaluation is part of the required offline checks:
+
+```bash
+docker compose run --rm api python -m changeops.evaluation.approval_workflow \
+  tests/golden/approval_workflow/v1/dataset.json
+```
+
 The manually dispatched `live-ai-smoke` check uses a real provider secret and is diagnostic; it is
 not a required pull-request check. Ordinary CI must keep model-provider secrets empty.
 

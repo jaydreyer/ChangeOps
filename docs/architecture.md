@@ -1,8 +1,8 @@
 # ChangeOps Architecture
 
-This document describes the current implementation: the completed Milestone 2 backend plus the
-first Milestone 3 slice for item-level action review and terminal human decisions. Durable approval
-workflow interruption/resume and the integrated reviewer UI remain deferred.
+This document describes the current implementation: the completed Milestone 2 backend plus
+Milestone 3 item-level action review and the separate durable action-approval workflow. The
+integrated reviewer UI remains deferred.
 
 ## High-level architecture
 
@@ -32,6 +32,8 @@ flowchart LR
         Fingerprint["Canonical input fingerprint"]
         Serializer["Stable response serializer"]
         Review["Action review service<br/>and pure validation"]
+        ApprovalWorkflow["LangGraph action-approval workflow"]
+        ApprovalService["Approval run, membership,<br/>counts, and transitions"]
         ORM["SQLAlchemy models and sessions"]
     end
 
@@ -55,6 +57,10 @@ flowchart LR
     Service --> ORM
     Service --> Serializer
     Routes --> Review
+    Routes --> ApprovalWorkflow
+    ApprovalWorkflow --> ApprovalService
+    ApprovalService --> Review
+    ApprovalService --> ORM
     Review --> ORM
     ORM --> DB
     Migrate --> DB
@@ -63,8 +69,8 @@ flowchart LR
 
 ChangeOps remains a synchronous modular monolith. The HTTP, application, domain, serialization, and
 persistence code run in one Python process. PostgreSQL stores source, extraction, workflow,
-assessment, interpretation, and review data; a configured chat-model provider is the only external
-service used by the extraction and interpretation endpoints.
+assessment, interpretation, review, and approval-run data; a configured chat-model provider is the
+only external service used by the extraction and interpretation endpoints.
 
 ## Major runtime components
 
@@ -88,6 +94,10 @@ The FastAPI application exposes:
 - `GET /api/v1/proposed-actions/{proposed_action_id}/review`
 - `GET /api/v1/action-reviews/{review_id}`
 - `POST /api/v1/action-reviews/{review_id}/decisions`
+- `POST /api/v1/impact-assessments/{assessment_id}/approval-run`
+- `GET /api/v1/impact-assessments/{assessment_id}/approval-run`
+- `GET /api/v1/action-approval-runs/{run_id}`
+- `POST /api/v1/action-approval-runs/{run_id}/resume`
 
 The create response adds an input fingerprint, enterprise-impact summary, and categorized
 enterprise impacts. Existing worker results, findings, evidence, proposed actions, and unresolved
@@ -117,6 +127,49 @@ constraint triggers require pending reviews to have no decision and terminal rev
 matching decision. Other triggers reject decision update/delete, snapshot or review-identity
 changes, and all terminal review mutation. `proposed_actions` is never updated, and its database
 constraint continues to require `execution_status = not_executed`.
+
+### Durable action-approval workflow
+
+Approval orchestration is separate from policy analysis. A completed `PolicyAnalysisRun` owns one
+immutable completed `ImpactAssessment`; that assessment may own one `ActionApprovalRun`. Analysis
+remains completed throughout review and approval.
+
+Creation locks the assessment, validates its completed analysis lifecycle, and persists an
+`initializing / create_reviews` run. The deterministic LangGraph then creates or reuses reviews
+through the action-review service's transaction-owned helper and atomically stores ordered
+`ActionApprovalRunItem` membership. Ordering uses worker, action type, target identifier, and action
+ID, so the membership snapshot remains stable.
+
+```text
+START → load
+  initializing/create_reviews → initialize_reviews → evaluate_reviews
+  initializing/evaluate_reviews or awaiting_decisions → evaluate_reviews
+  completed or failed → END
+
+evaluate_reviews
+  pending > 0 → persist awaiting_decisions/await_decisions → END
+  pending = 0 → persist completed/finalize → END
+```
+
+PostgreSQL is authoritative durable state; graph state contains only identifiers, routing values,
+and audit trigger context. Reaching `END` at the wait state returns control immediately. There is no
+sleep, polling task, worker, scheduler, queue, or in-memory durable thread.
+
+Decision submission commits the immutable human decision first. The API then resolves run
+membership and synchronously invokes the graph. Evaluation locks the run row and derives counts
+from every persisted review. Concurrent decisions can both commit, and serialized evaluations
+reconcile both. Unexpected orchestration failure cannot roll back the decision; the authorized
+explicit resume endpoint is the recovery path.
+
+Run retrieval includes deterministic counts, stable item identifiers and links, sanitized failure
+state, and append-only transitions. No-op waiting resumes and completed resumes do not mutate the
+run. PostgreSQL constrains lifecycle ownership, one run per assessment, unique item sequence and
+membership, count totals, terminal timestamps, immutable completed runs, and append-only
+membership and transition records.
+
+All four human decisions are terminal for this workflow. A mixed decision set completes once
+pending reaches zero. Completion does not imply that rejected, deferred, or revision-requested
+actions succeeded, and even approved actions remain `not_executed`.
 
 ### Policy extraction service
 
@@ -491,14 +544,14 @@ There are no:
 - MCP or live enterprise integrations;
 - graph databases;
 - background workers or message queues;
-- approval workflows or action execution;
+- action execution;
 - frontend, authentication, or authorization components.
 
 ## Quality and provider verification boundaries
 
 GitHub Actions runs two read-only merge checks on pull requests and pushes to `main`. The `quality`
 job builds and executes the development Compose services for Ruff, the complete pytest suite, and
-all three versioned offline evaluations. `OPENAI_API_KEY` is explicitly empty in this workflow, so
+all four versioned offline evaluations. `OPENAI_API_KEY` is explicitly empty in this workflow, so
 fixture-backed tests cannot inherit a live provider secret. The `migration` job uses an empty
 PostgreSQL database and verifies the current Alembic head can upgrade, downgrade one revision, and
 upgrade again.

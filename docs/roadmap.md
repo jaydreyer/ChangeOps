@@ -245,10 +245,10 @@ Exit criteria
 
 Milestone 3 — Human Review and Approval
 
-Status: in progress. PR 1 implements item-level review persistence, deterministic terminal
-decisions, constrained edited snapshots, request-header authorization, concurrency protection,
-and audit retrieval. Workflow interruption/resume and the reviewer interface remain separate
-later slices.
+Status: in progress. PR 1 implements item-level review persistence and deterministic terminal
+decisions. PR 2 implements the separate durable assessment-level approval run, stable membership,
+deterministic interruption/resume, count reconciliation, and transition audit history. The
+reviewer interface remains a separate later slice.
 
 Product capability
 
@@ -271,7 +271,7 @@ Technologies added
 Planned slices
 
 * PR 1 — action review and decision foundation;
-* PR 2 — durable approval interruption and resume;
+* PR 2 — durable approval interruption and resume (implemented);
 * PR 3 — focused reviewer interface.
 
 Approval behavior

@@ -776,6 +776,11 @@ class ActionReviewDecision(Base):
             name="ck_action_review_decisions_approved_edit",
         ),
         UniqueConstraint("action_review_id", name="uq_action_review_decisions_review"),
+        UniqueConstraint(
+            "id",
+            "action_review_id",
+            name="uq_action_review_decisions_id_review",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -888,6 +893,13 @@ class ActionApprovalRunItem(Base):
             "sequence",
             name="uq_action_approval_run_items_sequence",
         ),
+        UniqueConstraint(
+            "approval_run_id",
+            "action_review_id",
+            "proposed_action_id",
+            "assessment_id",
+            name="uq_action_approval_items_execution_owner",
+        ),
         ForeignKeyConstraint(
             ["approval_run_id", "assessment_id"],
             ["action_approval_runs.id", "action_approval_runs.assessment_id"],
@@ -932,6 +944,99 @@ class ActionApprovalRunItem(Base):
         primaryjoin="ActionReview.id == ActionApprovalRunItem.action_review_id",
         foreign_keys=[action_review_id],
     )
+
+
+class ExecutionCommand(Base):
+    __tablename__ = "execution_commands"
+    __table_args__ = (
+        CheckConstraint(
+            "status = 'pending_execution'",
+            name="ck_execution_commands_status",
+        ),
+        CheckConstraint(
+            "schema_version = 'execution-command-v1'",
+            name="ck_execution_commands_schema_version",
+        ),
+        CheckConstraint(
+            "system = 'learning' AND operation = 'assign_training'",
+            name="ck_execution_commands_supported_mapping",
+        ),
+        CheckConstraint(
+            "prepared_role = 'admin'",
+            name="ck_execution_commands_prepared_role",
+        ),
+        UniqueConstraint(
+            "action_review_id",
+            name="uq_execution_commands_action_review",
+        ),
+        UniqueConstraint(
+            "idempotency_key",
+            name="uq_execution_commands_idempotency_key",
+        ),
+        ForeignKeyConstraint(
+            [
+                "approval_run_id",
+                "action_review_id",
+                "proposed_action_id",
+                "assessment_id",
+            ],
+            [
+                "action_approval_run_items.approval_run_id",
+                "action_approval_run_items.action_review_id",
+                "action_approval_run_items.proposed_action_id",
+                "action_approval_run_items.assessment_id",
+            ],
+            name="fk_execution_commands_membership",
+        ),
+        ForeignKeyConstraint(
+            ["action_review_decision_id", "action_review_id"],
+            ["action_review_decisions.id", "action_review_decisions.action_review_id"],
+            name="fk_execution_commands_approval_decision",
+        ),
+        ForeignKeyConstraint(
+            ["action_review_id", "proposed_action_id", "assessment_id"],
+            [
+                "action_reviews.id",
+                "action_reviews.proposed_action_id",
+                "action_reviews.assessment_id",
+            ],
+            name="fk_execution_commands_review_lifecycle",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    approval_run_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("action_approval_runs.id"),
+        index=True,
+    )
+    action_review_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("action_reviews.id"),
+        index=True,
+    )
+    action_review_decision_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("action_review_decisions.id"),
+        index=True,
+    )
+    proposed_action_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("proposed_actions.id"),
+        index=True,
+    )
+    assessment_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("impact_assessments.id"),
+        index=True,
+    )
+    schema_version: Mapped[str] = mapped_column(String(50))
+    system: Mapped[str] = mapped_column(String(50))
+    operation: Mapped[str] = mapped_column(String(100))
+    target_type: Mapped[str] = mapped_column(String(50))
+    target_identifier: Mapped[str] = mapped_column(String(200))
+    parameters_snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    effective_action_snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    idempotency_key: Mapped[str] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(30))
+    prepared_by: Mapped[str] = mapped_column(String(200))
+    prepared_role: Mapped[str] = mapped_column(String(30))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class ActionApprovalRunTransition(Base):

@@ -4,12 +4,13 @@ ChangeOps analyzes operational and policy changes, identifies affected people an
 
 ## Current milestone
 
-Milestone 3, PR 2: Durable Action-Approval Workflow.
+Milestone 4, Slice 1: Execution Command Preparation.
 
-The complete Milestone 2 backend remains protected by automated merge-quality checks. Milestone 3
-now adds item-level review creation and decisions plus a separate durable assessment-level approval
-run that pauses and resumes around those human decisions. The reviewer UI remains a later slice;
-Milestone 3 is not complete.
+Milestones 0–3 are complete. The current slice deterministically materializes immutable,
+connector-neutral execution commands from approved reviews after an approval run completes. Only
+the seeded training-assignment mapping is executable; every other approved recommendation is
+reported explicitly as unsupported. Commands remain `pending_execution`, proposed actions remain
+`not_executed`, and no MCP tool or enterprise system is called.
 
 Milestone 0 is complete and preserved by the `v0.0.1-milestone-0` tag.
 
@@ -20,6 +21,7 @@ See:
 - `docs/milestone-1.md`
 - `docs/milestone-2.md`
 - `docs/milestone-3.md`
+- `docs/milestone-4.md`
 - `docs/demo-scenario.md`
 - `docs/decisions.md`
 - [Contributing and engineering standards](CONTRIBUTING.md)
@@ -121,6 +123,28 @@ Unexpected automatic-resume failure cannot roll back a committed human decision.
 reviewers and admins can use the idempotent explicit resume endpoint to reconcile persisted state.
 Completed runs and no-op waiting resumes remain unchanged. Nothing executes, including approved
 actions.
+
+## Execution command preparation
+
+An authorized demonstration `admin` can prepare commands after an approval run completes.
+Preparation considers approved reviews only, reuses the existing effective-action overlay, and
+maps supported action semantics through a pure deterministic domain function. The current golden
+mapping is deliberately narrow:
+
+```text
+training_assignment / worker
+  → learning / assign_training
+```
+
+Manager approval, team review, system-workflow review, document, and customer-commitment
+recommendations remain visible as unsupported approved actions. Each supported review owns at most
+one immutable command with separate `effective-approved-action-v1` and `execution-command-v1`
+snapshots. A SHA-256 idempotency key covers the approval decision and canonical command semantics.
+Row locking and PostgreSQL uniqueness make repeated and concurrent preparation safe.
+
+Every command is linked to its approval run, review, approval decision, proposed action, and
+assessment. Its only status is `pending_execution`. Preparation performs no current-state check,
+tool invocation, or external write.
 
 ## Requirements
 
@@ -385,6 +409,21 @@ immediately when every reused review was already terminal. Resume returns `200` 
 including for waiting runs with no new decision and completed runs. The demonstration headers are
 not safe production authentication.
 
+Inspect command eligibility, prepare commands, and retrieve one immutable command:
+
+```http
+GET  /api/v1/action-approval-runs/{run_id}/execution-commands
+POST /api/v1/action-approval-runs/{run_id}/execution-commands
+X-ChangeOps-Actor: operator@example.com
+X-ChangeOps-Role: admin
+
+GET  /api/v1/execution-commands/{command_id}
+```
+
+The POST has no action-detail request body. It returns `201` when at least one command is created
+and `200` when fully idempotent. The response preserves approval membership order, includes
+unsupported approved actions, and always reports `execution_performed: false`.
+
 The workbench endpoint is a read-only, screen-oriented projection. It resolves immutable run
 membership, complete review snapshots, findings, enterprise impacts, persisted evidence, and
 ordered relationship paths without creating a durable workbench record. A missing reference
@@ -409,13 +448,15 @@ idempotently creates or retrieves its approval run and displays every action in 
 membership order.
 
 The reviewer email field populates `X-ChangeOps-Actor`; decision and retry requests send
-`X-ChangeOps-Role: reviewer`. These are trusted local demonstration headers, not login or
-production authentication.
+`X-ChangeOps-Role: reviewer`, while command preparation sends the narrowly authorized
+`X-ChangeOps-Role: admin`. These are trusted local demonstration headers, not login or production
+authentication.
 
 The interface labels AI proposals, deterministic conclusions, human decisions, workflow state,
 and execution state in text. Approval may edit only description and due date. Every write is
 followed by an authoritative server refresh. All terminal outcomes remain durable, and every
-action remains `not_executed`.
+action remains `not_executed`. Once the run completes, the same page shows execution eligibility,
+explicit unsupported results, and immutable pending commands. It contains no execute control.
 
 Policy submission, extraction monitoring, clarification, and interpretation screens are
 intentionally deferred. This slice begins at a completed assessment and does not call an LLM or an

@@ -125,6 +125,42 @@ export interface Workbench {
   items: WorkbenchItem[];
 }
 
+export interface ExecutionCommand {
+  id: string;
+  sequence: number;
+  system: "learning";
+  operation: "assign_training";
+  target_type: string;
+  target_identifier: string;
+  parameters: Record<string, unknown>;
+  effective_action: OriginalAction & { schema_version: "effective-approved-action-v1" };
+  idempotency_key: string;
+  status: "pending_execution";
+  prepared_by: string;
+  created_at: string;
+  execution_performed: false;
+}
+
+export interface ExecutionPreparation {
+  approval_run_id: string;
+  approved_action_count: number;
+  eligible_action_count: number;
+  prepared_command_count: number;
+  unsupported_approved_action_count: number;
+  commands: ExecutionCommand[];
+  unsupported_items: {
+    sequence: number;
+    action_review_id: string;
+    proposed_action_id: string;
+    action_type: string;
+    target_type: string;
+    target_identifier: string;
+    reason_code: "unsupported_action_type" | "unsupported_target_type";
+    reason: string;
+  }[];
+  execution_performed: false;
+}
+
 export interface ApiError {
   code: string;
   message: string;

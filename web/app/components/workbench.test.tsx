@@ -1,7 +1,7 @@
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { Workbench } from "@/lib/types";
+import type { ExecutionPreparation, Workbench } from "@/lib/types";
 import { WorkbenchView } from "./workbench";
 
 const refresh = vi.fn();
@@ -103,6 +103,54 @@ function workbench(status: "pending" | "approved" = "pending"): Workbench {
         enterprise_impact: null,
       },
     ],
+  };
+}
+
+function preparation(prepared = false): ExecutionPreparation {
+  return {
+    approval_run_id: "run-1",
+    approved_action_count: 2,
+    eligible_action_count: 1,
+    prepared_command_count: prepared ? 1 : 0,
+    unsupported_approved_action_count: 1,
+    commands: prepared
+      ? [
+          {
+            id: "command-1",
+            sequence: 0,
+            system: "learning",
+            operation: "assign_training",
+            target_type: "worker",
+            target_identifier: "worker-1",
+            parameters: { course_identifier: "international-travel-security" },
+            effective_action: {
+              ...originalAction,
+              schema_version: "effective-approved-action-v1",
+              target_type: "worker",
+              target_identifier: "worker-1",
+              description: "Assign revised training.",
+            },
+            idempotency_key: "abcdef0123456789abcdef0123456789",
+            status: "pending_execution",
+            prepared_by: "operator@example.com",
+            created_at: "2026-08-02T12:00:00Z",
+            execution_performed: false,
+          },
+        ]
+      : [],
+    unsupported_items: [
+      {
+        sequence: 1,
+        action_review_id: "review-2",
+        proposed_action_id: "action-2",
+        action_type: "review_team_travel",
+        target_type: "team",
+        target_identifier: "team-1",
+        reason_code: "unsupported_action_type",
+        reason: "Action type 'review_team_travel' has no execution mapping.",
+      },
+    ],
+    execution_performed: false,
   };
 }
 
@@ -211,6 +259,92 @@ describe("approval workbench", () => {
 
     expect(
       await screen.findByText(/Another committed decision already completed this review/),
+    ).toBeInTheDocument();
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it("shows execution preparation only after approval completes", () => {
+    const { rerender } = render(
+      <WorkbenchView
+        initialWorkbench={workbench()}
+        initialPreparation={preparation()}
+      />,
+    );
+    expect(screen.queryByText("Execution Preparation")).not.toBeInTheDocument();
+
+    rerender(
+      <WorkbenchView
+        initialWorkbench={workbench("approved")}
+        initialPreparation={preparation()}
+      />,
+    );
+    expect(screen.getByText("Execution Preparation")).toBeInTheDocument();
+    expect(screen.getByText("Preparable").nextElementSibling).toHaveTextContent("1");
+    expect(screen.getByText("Unsupported approved actions")).toBeInTheDocument();
+    expect(screen.getByText("Review team travel")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Pending execution — no enterprise system called\./),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Execute/ })).not.toBeInTheDocument();
+  });
+
+  it("prepares commands and refreshes authoritative state", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(preparation(true)), { status: 201 }),
+    );
+    render(
+      <WorkbenchView
+        initialWorkbench={workbench("approved")}
+        initialPreparation={preparation()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Prepare execution commands" }));
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    expect(fetchMock.mock.calls[0][1]).toMatchObject({
+      method: "POST",
+      headers: {
+        "X-ChangeOps-Actor": "reviewer@example.com",
+        "X-ChangeOps-Role": "admin",
+      },
+    });
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it("shows prepared command details without execution controls", () => {
+    render(
+      <WorkbenchView
+        initialWorkbench={workbench("approved")}
+        initialPreparation={preparation(true)}
+      />,
+    );
+
+    expect(screen.getByText("Immutable prepared commands")).toBeInTheDocument();
+    expect(screen.getByText("Learning · Assign training")).toBeInTheDocument();
+    expect(screen.getByText("Assign revised training.", { selector: ".command-card p" })).toBeInTheDocument();
+    expect(screen.getByText(/abcdef012345…/)).toBeInTheDocument();
+    expect(
+      screen.getByText("Pending execution — no enterprise system called", { selector: "span" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Execute/ })).not.toBeInTheDocument();
+  });
+
+  it("reconciles an ambiguous preparation response by refreshing", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(new TypeError("connection closed"));
+    render(
+      <WorkbenchView
+        initialWorkbench={workbench("approved")}
+        initialPreparation={preparation()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Prepare execution commands" }));
+
+    expect(
+      await screen.findByText(/Preparation response was ambiguous/),
     ).toBeInTheDocument();
     expect(refresh).toHaveBeenCalled();
   });

@@ -438,3 +438,47 @@ The frontend consumes one screen-oriented deterministic projection:
 - The frontend can refresh after writes without reproducing approval transition logic.
 - A future screen with materially different needs may require its own explicit projection rather
   than expanding this endpoint into generic query infrastructure.
+
+# ADR-0013 — Materialize Immutable Execution Commands Before Tool Invocation
+
+## Status
+
+Accepted
+
+## Context
+
+An approved review currently proves what a person decided, but deriving connector input only at
+execution time would make historical authorization depend on later application mapping code.
+Allowing an MCP tool or adapter to derive action semantics would also couple integrations to review
+serialization, assessment-era schemas, and approval workflow internals.
+
+## Decision
+
+ChangeOps materializes a separate immutable execution command before any tool invocation:
+
+- command construction is pure and deterministic;
+- the command snapshots exact effective approved values;
+- a separate versioned snapshot stores connector-neutral parameters;
+- relational provenance links the command to run, review, approval decision, proposed action, and
+  assessment;
+- canonical semantic JSON plus the approval decision produces a SHA-256 idempotency key;
+- one command may exist per approved review;
+- unsupported approved actions are explicit projection results;
+- command rows are immutable and remain `pending_execution`;
+- preparation runs synchronously in the modular monolith and changes no enterprise state.
+
+The first mapping supports only seeded learning assignments. MCP and simulated adapters will
+consume the stable command contract in later slices. This decision introduces neither a queue nor
+a generic command bus, adapter registry, or preparation workflow.
+
+## Consequences
+
+- Approval and deterministic execution authorization are independently auditable.
+- Future mapping-code changes cannot rewrite already prepared commands.
+- Repeated and concurrent preparation reuses the same semantic command.
+- Connectors can focus on current-state validation and invocation rather than deciding approval
+  semantics.
+- The system gains a table, migration, API projection, and lifecycle boundary before execution.
+- Unsupported recommendations stay visible instead of being silently skipped or falsely treated
+  as executable.
+- No MCP tool, simulated system, or external service is called in this slice.

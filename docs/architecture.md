@@ -1,17 +1,18 @@
 # ChangeOps Architecture
 
-This document describes the current implementation: the completed Milestone 2 backend plus
-Milestone 3 item-level action review and the separate durable action-approval workflow. The
-integrated reviewer UI remains deferred.
+This document describes the current implementation through Milestone 4, Slice 1: the completed
+policy-analysis and approval lifecycles, the integrated focused Next.js workbench, and
+deterministic preparation of immutable execution commands. No command executes.
 
 ## High-level architecture
 
 ```mermaid
 flowchart LR
-    Client["HTTP client"]
+    Client["Browser or HTTP client"]
 
     subgraph Compose["Local Docker Compose environment"]
         API["FastAPI API<br/>Uvicorn"]
+        Web["Next.js approval workbench"]
         LLM["Configured chat-model provider"]
         Migrate["Alembic migration job"]
         Seed["Idempotent seed job"]
@@ -34,10 +35,15 @@ flowchart LR
         Review["Action review service<br/>and pure validation"]
         ApprovalWorkflow["LangGraph action-approval workflow"]
         ApprovalService["Approval run, membership,<br/>counts, and transitions"]
+        WorkbenchProjection["Focused approval<br/>workbench projection"]
+        CommandPreparation["Execution command<br/>preparation service"]
+        CommandMapping["Pure supported-action<br/>command mapping"]
         ORM["SQLAlchemy models and sessions"]
     end
 
+    Client --> Web
     Client -->|"POST or GET /api/v1"| API
+    Web -->|"same-origin proxy"| API
     API --> Routes
     Routes --> Service
     Routes --> Extraction
@@ -62,6 +68,12 @@ flowchart LR
     ApprovalService --> Review
     ApprovalService --> ORM
     Review --> ORM
+    Routes --> WorkbenchProjection
+    WorkbenchProjection --> ORM
+    Routes --> CommandPreparation
+    CommandPreparation --> Review
+    CommandPreparation --> CommandMapping
+    CommandPreparation --> ORM
     ORM --> DB
     Migrate --> DB
     Seed --> DB
@@ -69,8 +81,9 @@ flowchart LR
 
 ChangeOps remains a synchronous modular monolith. The HTTP, application, domain, serialization, and
 persistence code run in one Python process. PostgreSQL stores source, extraction, workflow,
-assessment, interpretation, review, and approval-run data; a configured chat-model provider is the
-only external service used by the extraction and interpretation endpoints.
+assessment, interpretation, review, approval-run, and execution-command data. The Next.js runtime
+provides the focused local workbench. A configured chat-model provider is the only external
+service used by extraction and interpretation; command preparation has no external dependency.
 
 ## Major runtime components
 
@@ -97,7 +110,11 @@ The FastAPI application exposes:
 - `POST /api/v1/impact-assessments/{assessment_id}/approval-run`
 - `GET /api/v1/impact-assessments/{assessment_id}/approval-run`
 - `GET /api/v1/action-approval-runs/{run_id}`
+- `GET /api/v1/action-approval-runs/{run_id}/workbench`
 - `POST /api/v1/action-approval-runs/{run_id}/resume`
+- `POST /api/v1/action-approval-runs/{run_id}/execution-commands`
+- `GET /api/v1/action-approval-runs/{run_id}/execution-commands`
+- `GET /api/v1/execution-commands/{command_id}`
 
 The create response adds an input fingerprint, enterprise-impact summary, and categorized
 enterprise impacts. Existing worker results, findings, evidence, proposed actions, and unresolved
@@ -170,6 +187,40 @@ membership and transition records.
 All four human decisions are terminal for this workflow. A mixed decision set completes once
 pending reaches zero. Completion does not imply that rejected, deferred, or revision-requested
 actions succeeded, and even approved actions remain `not_executed`.
+
+### Execution command preparation
+
+Preparation is a synchronous application service invoked only for a completed approval run. It
+locks that run, loads immutable membership in sequence order, ignores every non-approved review,
+and requires exactly one approval decision for each approved review. The service reuses the pure
+effective-action overlay from action review, then calls a pure command mapper with no FastAPI,
+SQLAlchemy, LangChain, LangGraph, or MCP dependency.
+
+The current closed mapping supports only seeded worker training assignments:
+
+```text
+Completed Approval Run
+  → approved ActionReview and approval decision
+  → effective approved action
+  → learning.assign_training command candidate
+  → immutable ExecutionCommand(pending_execution)
+```
+
+All other golden-scenario action types, and invalid targets for the supported type, produce stable
+unsupported projection items. Unsupported results are recalculated from immutable approval data;
+there is no preparation-run aggregate or lifecycle.
+
+`execution_commands` stores explicit `effective-approved-action-v1` and `execution-command-v1`
+snapshots plus run, review, decision, proposed-action, and assessment references. The deterministic
+idempotency key is SHA-256 over canonical JSON containing command schema, approval decision,
+system, operation, target, and parameters. A run row lock serializes preparation; unique review and
+fingerprint constraints provide final duplicate protection. Composite foreign keys bind each
+command to the same run membership and review lifecycle.
+
+Database triggers require a completed run and approved review decision, validate snapshot
+identity, reject update and delete, and constrain status to `pending_execution`. Preparation never
+changes `proposed_actions.execution_status`, calls an enterprise system, checks mutable enterprise
+state, or creates an execution attempt.
 
 ### Policy extraction service
 
@@ -511,6 +562,14 @@ Assessment immutability is an application invariant:
 - the API exposes no assessment mutation;
 - all aggregate rows commit atomically.
 
+### Immutable execution commands
+
+`execution_commands` is the audit boundary between human approval and future tool invocation.
+Approval proves what a person decided; a command proves what deterministic mapping code prepared.
+Command snapshots remain meaningful even if a later mapping version changes. Unsupported
+eligibility is derived rather than persisted because all inputs are immutable and no preparation
+workflow state is required.
+
 ## Seeded demonstration
 
 The idempotent seed contains:
@@ -547,6 +606,12 @@ The API projection service loads one approval run, its immutable membership, rev
 completed assessment, findings, enterprise impacts, evidence records, and relationship-path rows.
 It preserves membership sequence and validates every reference before serialization. It neither
 mutates domain records nor persists a screen snapshot.
+
+After completion, the page separately loads the focused execution-command projection. The panel
+shows approved, eligible, unsupported, and prepared counts; prepared command target and operation;
+effective approved values; pending status; and a shortened idempotency key. POST preparation uses
+the same local actor field with the `admin` demonstration role, then refreshes authoritative server
+state. There is no execute, retry, or bulk-execution control.
 
 ## External dependencies and boundaries
 

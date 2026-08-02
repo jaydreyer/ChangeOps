@@ -240,19 +240,22 @@ Because clarification can change the validated rules and therefore the resulting
 
 ### Workflow orchestration
 
-LangGraph will be used as a durable workflow state machine, not as an autonomous agent framework.
+LangGraph is used for declarative workflow topology, typed orchestration state, conditional
+routing, and explicit node and transition boundaries. It is not an autonomous agent framework or
+the durable system of record.
 
-It is introduced because a policy-analysis run must be able to:
+PostgreSQL persists policy-analysis lifecycle state, extraction attempts, clarification records,
+artifacts, and audit data. Both graphs are compiled without a LangGraph checkpointer. A resumed
+analysis is a fresh graph invocation whose initial route is derived deterministically from those
+records; it does not resume an opaque checkpoint thread.
 
-- pause for human clarification;
-- persist its state;
-- resume later in a different process;
-- continue without losing accepted prior work;
-- expose inspectable transitions across deterministic and probabilistic steps.
+Workflow routing is implemented in code. Model output may be an input to a routing decision, but
+the model is never the router.
 
-Workflow routing is implemented in code. Model output may be an input to a routing decision, but the model is never the router.
-
-If pause-and-resume behavior were removed, sequential Python orchestration over persisted state would be sufficient and LangGraph would not be justified.
+The current workflow could be expressed as sequential Python over the same persisted state.
+LangGraph is retained because its explicit topology and transition model improve explainability,
+separation of orchestration from business rules, inspection, and maintainable extension. This is a
+tradeoff, not a claim that cross-process durability requires LangGraph.
 
 A workflow run and an impact assessment have separate lifecycles. A run may be paused, unsupported, failed, abandoned, or completed without an assessment. A completed run may reference the assessment it produced.
 
@@ -261,8 +264,12 @@ A workflow run and an impact assessment have separate lifecycles. A run may be p
 Evaluation responsibilities are separated by architectural layer:
 
 - **Grounding and referential integrity** are deterministic assertions and must fail tests when references do not resolve.
-- **Policy extraction** is evaluated against a golden dataset of policy text, expected typed rules, provenance, and negative cases that must fail closed.
-- **Interpretation quality** is evaluated with a rubric covering grounding, coverage, and usefulness. Initially, these results may be tracked without blocking merges.
+- **Required CI contract evaluations** replay fixed model outputs and deterministic cases to protect
+  structured-output, routing, lifecycle, provenance, grounding, and fail-closed behavior. They do
+  not measure live provider accuracy.
+- **Live provider verification** is a manually dispatched, non-gating smoke of the canonical
+  extraction and interpretation path. It checks provider compatibility and end-to-end invariants,
+  not comprehensive model quality.
 
 No conclusion may be jointly owned by the deterministic engine and an AI step.
 
@@ -303,7 +310,10 @@ Rejected because it would allow policy extraction to become influenced by enterp
 
 #### Sequential Python workflow without LangGraph
 
-Rejected for Milestone 2 because the required clarification interrupt must persist and resume across requests and processes. This alternative would be reconsidered if durable interruption were removed from scope.
+Viable: PostgreSQL already provides the required persistence and cross-process recovery. Retaining
+LangGraph adds an explicit, inspectable topology and conditional transition model at the cost of
+another framework. Reconsider this choice if the graph stops improving explainability or
+maintainability relative to straightforward sequential orchestration.
 
 ### Follow-up decisions
 
@@ -534,3 +544,48 @@ consumer's product behavior. The architectural question is whether an immutable 
 drive an approved, idempotent side effect. An in-process adapter answers that question directly.
 MCP remains a possible later transport when multiple external tool providers or a genuine
 cross-process integration boundary makes it useful.
+
+# ADR-0015 — Defer Replacement of Legacy Assessment Questions
+
+## Status
+
+Accepted
+
+## Context
+
+Uncertainty currently has two unrelated lineages. The policy-analysis workflow persists
+model-proposed extraction findings and bounded `policy_analysis_clarifications`. Separately, the
+Milestone 0 seed creates eight `PolicyChangeQuestion` rows, and every assessment copies them into
+`assessment_unresolved_questions`.
+
+The copied questions have no independent effect on validation, workflow routing, impact analysis,
+approval, or execution. They are nevertheless part of the assessment fingerprint, immutable
+historical aggregates, the assessment response, interpretation input, golden-scenario assertions,
+and the manual live smoke. The response name does not reveal that they are seed fixtures, so an API
+consumer may infer that a completed AI run detected them.
+
+## Decision
+
+Extraction findings and persisted clarification records are authoritative for current
+policy-analysis uncertainty and human resolution. The copied assessment questions are classified
+as a legacy schema-v1 scenario fixture, not AI-derived uncertainty.
+
+This cleanup will not delete, rename, or replace the field. A safe replacement first needs an
+explicit response-compatibility decision and a projection that can expose relevant clarification
+history without rewriting completed assessments or duplicating authoritative clarification data.
+
+The preferred direction is to project clarification history for assessments created by a
+policy-analysis run, preserve provenance and resolution status, and keep any legacy fixture field
+clearly labeled during a compatibility window. A new snapshot table is not justified unless a
+concrete immutable-assessment requirement cannot be met by projecting the existing durable
+records.
+
+## Consequences
+
+- Existing database rows, fingerprints, API consumers, and historical assessments remain stable.
+- Current clients can still misread `unresolved_questions` unless they follow the documented
+  schema-v1 limitation.
+- The next product-facing analysis journey must resolve response compatibility before presenting
+  assessment uncertainty as AI-derived.
+- Tests that assert eight questions remain regression tests for the legacy seeded scenario, not
+  model-quality assertions.

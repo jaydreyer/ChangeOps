@@ -2,12 +2,12 @@
 
 ## Status
 
-Milestone 2 backend complete; preparing Milestone 3.
+Milestone 2 backend complete.
 
 The API workflow, deterministic validation and analysis, durable clarification, grounded
 interpretation, offline evaluations, automated merge gates, and manual live-provider smoke path
-are complete. The integrated reviewer UI is a deferred product-experience criterion because the
-roadmap intentionally introduces Next.js later. Milestone 3 approval work has not started.
+are complete. Milestones 3 and 4 subsequently added the focused approval workbench and one
+controlled simulated execution path. Broader policy-analysis screens remain deferred.
 
 Milestone 1 is complete and merged into `main`.
 
@@ -30,12 +30,12 @@ By the end of this milestone, a reviewer can submit an unstructured internationa
 The milestone should demonstrate:
 
 - LangChain structured output;
-- LangGraph durable workflow orchestration;
+- LangGraph declarative workflow topology and deterministic orchestration transitions;
 - typed extraction from policy text;
 - deterministic validation of probabilistic output;
 - human-in-the-loop clarification;
 - evidence-grounded interpretation;
-- automated AI evaluation.
+- automated deterministic AI-boundary contract evaluation.
 
 The goal is not to demonstrate that an LLM can read a policy. The goal is to demonstrate how AI can participate safely in an enterprise workflow.
 
@@ -131,7 +131,8 @@ Extraction and interpretation must have explicit tests or evaluations that can f
 
 Workflow transitions, retries, clarification gates, and completion rules are implemented in code.
 
-LangGraph is used for durable orchestration, not autonomous agent behavior.
+LangGraph is used for explicit orchestration topology, not autonomous agent behavior or
+authoritative persistence.
 
 ---
 
@@ -183,16 +184,15 @@ Clarification is persisted as explicit human input and used when validating the 
 
 #### Durable workflow
 
-Use LangGraph to support:
+Use PostgreSQL application records for authoritative workflow state, pause-and-resume data,
+clarifications, artifacts, and recovery across processes and restarts. Use LangGraph to express:
 
-- persisted workflow state;
-- pause;
-- resume;
-- bounded retry;
-- unsupported outcomes;
-- terminal failure;
+- typed orchestration state;
+- conditional routing;
+- bounded retry transitions;
+- unsupported and terminal outcomes;
 - successful completion;
-- inspection of workflow progress.
+- explicit node and transition boundaries.
 
 A workflow run may exist without an assessment and may end without producing one.
 
@@ -342,11 +342,17 @@ It never mutates the assessment.
 
 ## Why LangGraph
 
-LangGraph is introduced because the workflow must pause for human clarification and resume later in a different request or process without losing state.
+LangGraph provides declarative topology, typed orchestration state, conditional routing, and
+explicit node and transition boundaries. PostgreSQL provides authoritative durability and
+pause-and-resume state.
 
-If pause and resume were removed, sequential Python orchestration over persisted state would be sufficient.
+ChangeOps does not configure a LangGraph checkpointer. A resumed analysis is a fresh graph
+invocation whose route is derived from persisted run, attempt, and clarification records.
 
-LangGraph is therefore used as a durable state machine with typed transitions and checkpoints.
+The workflow could be implemented as sequential Python over the same persisted state. LangGraph is
+retained because its explicit topology and transition model make the mixed deterministic and
+probabilistic workflow easier to inspect, explain, and extend—not because it is the durable system
+of record.
 
 It is not used to create an autonomous agent loop.
 
@@ -430,6 +436,12 @@ Interpretation failure does not invalidate the deterministic assessment.
 
 ## Evaluation
 
+The required CI evaluations use deterministic fixtures to protect workflow and grounding
+contracts. They are not production model-accuracy benchmarks. Live provider behavior is checked
+separately through the manual AI smoke workflow because provider calls introduce cost,
+availability dependencies, and nondeterministic output. That smoke checks compatibility and one
+canonical path; it is not a comprehensive live model-quality benchmark.
+
 ### Grounding
 
 Grounding is a hard deterministic assertion.
@@ -442,16 +454,15 @@ Tests must fail when:
 - an interpretation attempts to alter assessment content;
 - a clarification references the wrong workflow run.
 
-### Extraction
+### Extraction contract
 
-Create a versioned golden dataset containing:
+Create a versioned fixed-case dataset containing policy text, fixture model output, and expected:
 
-- policy text;
-- expected support status;
-- expected typed rules;
-- expected provenance;
-- expected clarification behavior;
-- unsupported cases.
+- support status;
+- typed rules;
+- provenance resolution;
+- clarification behavior;
+- fail-closed unsupported and malformed cases.
 
 The seeded policy and hand-verified rules form the first golden case.
 
@@ -465,24 +476,22 @@ The dataset should include:
 - unresolvable enterprise reference;
 - conflicting dates or exceptions.
 
-Required-field extraction regressions should block merge.
+Required-field extraction-contract regressions should block merge. Because the runner replays
+fixed model outputs, a passing result does not show that a live model will produce those outputs.
 
-### Interpretation
+### Interpretation grounding contract
 
-Use fixed assessment fixtures with annotated expected coverage concerns.
+Use fixed assessment fixtures and fixed proposals/candidates to verify grounding and boundary
+behavior.
 
-Evaluate:
+Verify:
 
 - grounding;
-- relevance;
-- specificity;
-- usefulness;
 - boundary compliance;
 - absence of invented impacts.
 
-Grounding and boundary compliance are hard gates.
-
-Usefulness may initially be measured without blocking merge.
+Grounding and boundary compliance are hard deterministic gates. Relevance, specificity, and
+usefulness require separate live-output review and are not measured by the current CI runner.
 
 ---
 
@@ -537,9 +546,9 @@ Usefulness may initially be measured without blocking merge.
 
 ### Product experience
 
-These criteria describe the integrated reviewer UI and are intentionally deferred until the
-portfolio milestone introduces Next.js. The Milestone 2 API exposes each artifact and state
-transition needed by that future experience without introducing frontend technology early.
+These criteria describe the broader policy-analysis journey and remain deferred. Next.js arrived
+in Milestone 3 for the narrower approval workbench; the Milestone 2 API exposes each artifact and
+state transition needed by a future analysis interface.
 
 - [ ] A reviewer can complete the flagship workflow through the integrated reviewer UI (deferred).
 - [ ] AI proposals, deterministic conclusions, and human input are visibly distinguished in the

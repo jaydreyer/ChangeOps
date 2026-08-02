@@ -180,9 +180,9 @@ Technologies added
 * LangChain
 * structured model output
 * LangGraph
-* persisted graph state
+* PostgreSQL-authoritative workflow state
 * tracing
-* prompt and workflow evaluation support
+* deterministic AI-boundary contract evaluation support
 
 Expected workflow
 
@@ -237,7 +237,7 @@ Exit criteria
 * graph state, retries, failures, and transitions are visible;
 * no consequential action executes automatically.
 * pull requests protect deterministic tests, PostgreSQL integration tests, migrations, lint,
-  formatting, and offline AI evaluations;
+  formatting, and offline fixture-based contract evaluations;
 * a manually triggered live-provider smoke verifies provider contracts without adding live calls
   to ordinary CI.
 
@@ -414,6 +414,12 @@ workbench. Milestone 5 expands that narrow screen into the complete deployed por
 application with production authentication, infrastructure, observability, and the earlier
 policy-analysis screens.
 
+Before deployment work, the product-facing slice should resolve the schema-v1 uncertainty
+projection documented by ADR-0015. Extraction findings and persisted clarifications are
+authoritative; the UI must not present the eight copied seed questions as model-derived
+uncertainty. The compatibility design should preserve immutable historical assessments and avoid
+duplicating clarification records without a concrete snapshot requirement.
+
 User experience
 
 The portfolio application should support:
@@ -430,18 +436,13 @@ The portfolio application should support:
 
 The interface should explain the workflow rather than hide it behind a generic chatbot.
 
-Likely AWS architecture
+AWS architecture selection
 
-* ECS Fargate for the API and workflow service;
-* RDS PostgreSQL;
-* ECR;
-* Application Load Balancer;
-* Secrets Manager or Parameter Store;
-* CloudWatch;
-* S3 where document storage is required;
-* a suitable frontend deployment target for Next.js.
-
-The final deployment architecture should be selected based on operating cost, maintainability, and demonstration needs rather than maximum service count.
+AWS deployment and Terraform remain required capstone outcomes because deployment experience is
+an explicit portfolio objective. The deployment architecture is intentionally not selected yet.
+It should be chosen after the functional application is stable, based on the actual runtime,
+persistence, AI-provider, security, observability, cost, and demonstration requirements rather
+than a predetermined service list.
 
 Production-readiness scope
 
@@ -465,7 +466,8 @@ Exit criteria
 * deployment occurs through CI/CD;
 * authentication and authorization protect sensitive actions;
 * logs and traces connect user requests, workflow runs, assessments, approvals, and executions;
-* deterministic and AI evaluations run automatically;
+* deterministic correctness and AI-boundary contract evaluations run automatically, while live
+  model-quality evidence is reported with its provider and sampling limitations;
 * the public demo contains no real employer, worker, or customer data;
 * the README and architecture documentation accurately describe the deployed system;
 * a reviewer can understand the product, architecture, tradeoffs, and safety controls without source-code archaeology.
@@ -474,17 +476,20 @@ Exit criteria
 
 Deployment Sequencing
 
-Deployment should occur incrementally rather than being deferred entirely until Milestone 5.
+Deployment is deliberately sequenced after the functional golden path is stable so product
+debugging and infrastructure debugging are not combined prematurely.
 
 Recommended sequence:
 
-* local Docker Compose through Milestone 1;
-* minimal non-production cloud deployment during or immediately after Milestone 2;
-* persistent hosted workflow and approval environment by Milestone 3;
-* integrated simulated-tool environment by Milestone 4;
-* portfolio-grade infrastructure, security, observability, and CI/CD in Milestone 5.
+1. complete the functional golden path;
+2. resolve important product and architecture inconsistencies;
+3. make the full journey demonstrable through the UI;
+4. deploy the stable application to AWS;
+5. represent the selected infrastructure through Terraform;
+6. add only the operational capabilities justified by that deployment.
 
-The minimal deployment should validate deployability without prematurely building full production infrastructure.
+AWS and Terraform are mandatory outcomes, not optional future ideas. This sequencing defers their
+implementation, not the portfolio commitment.
 
 ⸻
 
@@ -541,10 +546,12 @@ Examples:
 
 * PostgreSQL enters when normalized enterprise data and immutable assessments must persist.
 * LangChain enters when unstructured policy text must be converted into validated typed input and evidence-backed recommendations.
-* LangGraph enters when the workflow requires branching, durable state, retries, interruption, clarification, and resume.
+* LangGraph enters when explicit topology and conditional transition modeling materially improve a
+  branching workflow; PostgreSQL remains authoritative for durable state and resume.
 * MCP enters when approved actions must invoke enterprise-style tools through a governed interface.
 * Next.js enters when reviewers need a usable end-to-end workflow.
-* AWS enters once a stable application slice exists and deployment risk needs to be addressed.
-* Terraform enters when the hosted environment must be reproducible.
+* AWS enters after the functional golden path and demonstration UI are stable.
+* Terraform enters immediately after the AWS architecture is selected so the required hosted
+  environment is reproducible.
 
 Technologies should not be introduced solely to increase the number of tools represented in the repository.

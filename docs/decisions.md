@@ -545,7 +545,7 @@ drive an approved, idempotent side effect. An in-process adapter answers that qu
 MCP remains a possible later transport when multiple external tool providers or a genuine
 cross-process integration boundary makes it useful.
 
-# ADR-0015 — Defer Replacement of Legacy Assessment Questions
+# ADR-0015 — Project Authoritative Analysis Uncertainty
 
 ## Status
 
@@ -570,22 +570,22 @@ Extraction findings and persisted clarification records are authoritative for cu
 policy-analysis uncertainty and human resolution. The copied assessment questions are classified
 as a legacy schema-v1 scenario fixture, not AI-derived uncertainty.
 
-This cleanup will not delete, rename, or replace the field. A safe replacement first needs an
-explicit response-compatibility decision and a projection that can expose relevant clarification
-history without rewriting completed assessments or duplicating authoritative clarification data.
+The historical assessment endpoint will not delete, rename, or reinterpret the field. The
+product-facing policy-analysis journey instead provides an additive screen-oriented projection
+that exposes extraction findings and clarification history from their authoritative persisted
+records. Its assessment sub-projection omits `unresolved_questions` and explicitly classifies the
+legacy field as an omitted schema-v1 fixture.
 
-The preferred direction is to project clarification history for assessments created by a
-policy-analysis run, preserve provenance and resolution status, and keep any legacy fixture field
-clearly labeled during a compatibility window. A new snapshot table is not justified unless a
-concrete immutable-assessment requirement cannot be met by projecting the existing durable
-records.
+The projection reads workflow lineage and current immutable artifacts; it does not rewrite
+completed assessments, copy clarification data, persist screen snapshots, or become another
+system of record.
 
 ## Consequences
 
 - Existing database rows, fingerprints, API consumers, and historical assessments remain stable.
-- Current clients can still misread `unresolved_questions` unless they follow the documented
-  schema-v1 limitation.
-- The next product-facing analysis journey must resolve response compatibility before presenting
-  assessment uncertainty as AI-derived.
+- Existing clients of the historical assessment response can still misread
+  `unresolved_questions` unless they follow the documented schema-v1 limitation.
+- The product-facing journey cannot misrepresent those fixtures because they are absent from its
+  assessment sub-projection and its uncertainty lineage is explicit.
 - Tests that assert eight questions remain regression tests for the legacy seeded scenario, not
   model-quality assertions.

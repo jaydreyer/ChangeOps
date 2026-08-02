@@ -1,4 +1,10 @@
-import type { ApiError, ExecutionPreparation, Workbench } from "./types";
+import type {
+  ApiError,
+  ExecutionPreparation,
+  PolicyAnalysisEntry,
+  PolicyAnalysisJourney,
+  Workbench,
+} from "./types";
 
 export function apiBaseUrl(): string {
   return (process.env.CHANGEOPS_API_BASE_URL ?? "http://localhost:8000").replace(/\/$/, "");
@@ -42,4 +48,27 @@ export async function getExecutionPreparation(runId: string): Promise<ExecutionP
     throw new Error(`${error.code}|${error.message}`);
   }
   return response.json() as Promise<ExecutionPreparation>;
+}
+
+export async function getPolicyAnalysisEntry(): Promise<PolicyAnalysisEntry> {
+  const response = await fetch(`${apiBaseUrl()}/api/v1/policy-analysis-entry`, {
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const error = await parseApiError(response);
+    throw new Error(`${error.code}|${error.message}`);
+  }
+  return response.json() as Promise<PolicyAnalysisEntry>;
+}
+
+export async function getPolicyAnalysisJourney(runId: string): Promise<PolicyAnalysisJourney> {
+  const response = await fetch(
+    `${apiBaseUrl()}/api/v1/policy-analysis-runs/${encodeURIComponent(runId)}/journey`,
+    { cache: "no-store" },
+  );
+  if (!response.ok) {
+    const error = await parseApiError(response);
+    throw new Error(`${error.code}|${error.message}`);
+  }
+  return response.json() as Promise<PolicyAnalysisJourney>;
 }

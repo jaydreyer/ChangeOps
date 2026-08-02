@@ -1,25 +1,34 @@
-import { AssessmentEntry } from "./components/assessment-entry";
+import { PolicyAnalysisEntryView } from "./components/policy-analysis-entry";
+import { getPolicyAnalysisEntry } from "@/lib/api";
 
-export default function HomePage() {
+export default async function HomePage() {
+  const result = await loadEntry();
+  if (result.entry) {
+    return <PolicyAnalysisEntryView entry={result.entry} />;
+  }
   return (
     <main className="entry-shell">
-      <section className="entry-card" aria-labelledby="entry-title">
-        <p className="eyebrow">ChangeOps · Milestone 4</p>
-        <h1 id="entry-title">Human Approval Workbench</h1>
-        <p className="lede">
-          Open a completed impact assessment to create or retrieve its durable approval run.
+      <section className="entry-card">
+        <p className="eyebrow">Policy analysis unavailable</p>
+        <h1>Unable to load the analysis entry</h1>
+        <p className="error" role="alert">
+          {result.message}
         </p>
-        <AssessmentEntry />
-        <aside className="notice">
-          <strong>Approval alone does not execute actions.</strong>
-          <span>
-            {" "}
-            An authorized user must explicitly execute the supported training-assignment command
-            against the simulated Learning System. Other approved actions remain visible and
-            unsupported.
-          </span>
-        </aside>
       </section>
     </main>
   );
+}
+
+async function loadEntry() {
+  try {
+    const entry = await getPolicyAnalysisEntry();
+    return { entry, message: "" };
+  } catch (caught) {
+    const message = caught instanceof Error ? caught.message.split("|").slice(1).join("|") : "";
+    return {
+      entry: null,
+      message:
+        message || "The ChangeOps API is unavailable. Check that the local stack is running.",
+    };
+  }
 }

@@ -198,3 +198,242 @@ export interface ApiError {
   code: string;
   message: string;
 }
+
+export interface AnalysisPolicy {
+  id: string;
+  organization_id: string;
+  organization_name: string;
+  title: string;
+  owner: string;
+  version: string;
+  effective_date: string;
+  policy_text: string;
+}
+
+export interface AnalysisRunSummary {
+  id: string;
+  policy_change_id: string;
+  status: string;
+  current_step: string;
+  assessment_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PolicyAnalysisEntry {
+  policies: AnalysisPolicy[];
+  recent_runs: AnalysisRunSummary[];
+}
+
+export interface AnalysisClarification {
+  id: string;
+  question_code: string;
+  question_text: string;
+  expected_answer_contract: {
+    type?: string;
+    allowed_values?: unknown[];
+  };
+  affected_fields: string[];
+  status: "pending" | "answered" | "superseded";
+  answer: Record<string, unknown> | null;
+  responder_identity: string | null;
+  answer_provenance: Record<string, unknown> | null;
+  created_at: string;
+  answered_at: string | null;
+}
+
+export interface AnalysisRun {
+  id: string;
+  organization_id: string;
+  policy_change_id: string;
+  status:
+    | "pending"
+    | "running"
+    | "awaiting_clarification"
+    | "completed"
+    | "unsupported"
+    | "failed";
+  current_step: string;
+  latest_extraction_attempt_id: string | null;
+  assessment_id: string | null;
+  retry_count: number;
+  failure_code: string | null;
+  failure_detail: string | null;
+  accepted_rule_provenance: Record<string, unknown>[];
+  clarifications: AnalysisClarification[];
+  metadata: Record<string, string>;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+}
+
+export interface AnalysisExtraction {
+  id: string;
+  policy_change_id: string;
+  policy_family: string | null;
+  support_status: "supported" | "unsupported" | null;
+  validation_outcome: "accepted" | "unsupported" | "validation_failed";
+  candidate_rules: Record<string, unknown> | null;
+  accepted_rules: Record<string, unknown> | null;
+  provenance: {
+    field_path: string;
+    start: number;
+    end: number;
+    quote: string;
+  }[];
+  findings: {
+    kind?: string;
+    code?: string;
+    message?: string;
+    field_path?: string | null;
+    provenance?: { field_path: string; start: number; end: number; quote: string };
+  }[];
+  validation_errors: { code: string; message: string; field_path: string | null }[];
+  metadata: Record<string, string>;
+  created_at: string;
+}
+
+export interface AnalysisAssessment {
+  id: string;
+  policy_change_id: string;
+  status: "completed";
+  analyzer_version: string;
+  created_at: string;
+  completed_at: string;
+  summary: {
+    affected_workers: number;
+    unaffected_workers: number;
+    manager_approvals_required: number;
+    training_assignments_required: number;
+    enterprise_impacts: number;
+    impacts_by_domain: Record<string, number>;
+  };
+  worker_results: {
+    worker: { id: string; name: string };
+    trip_id: string;
+    classification: "affected" | "unaffected";
+    explanation: string;
+    reason_codes: string[];
+  }[];
+  findings: {
+    id: string;
+    type: string;
+    severity: string;
+    rule_code: string;
+    worker_id: string;
+    explanation: string;
+    evidence_ids: string[];
+  }[];
+  evidence: {
+    id: string;
+    type: string;
+    source_type: string;
+    source_id: string;
+    label: string;
+    snapshot: Record<string, unknown>;
+  }[];
+  enterprise_impacts: Record<
+    string,
+    {
+      id: string;
+      domain: string;
+      object_type: string;
+      source_key: string;
+      display_name: string;
+      classification: string;
+      explanation: string;
+      reason_code: string;
+      evidence_ids: string[];
+      relationship_path: {
+        sequence: number;
+        object_type: string;
+        stable_key: string;
+        display_label: string;
+        relationship_to_next: string | null;
+      }[];
+      proposed_action_ids: string[];
+      sort_key: string;
+    }[]
+  >;
+  proposed_actions: {
+    id: string;
+    type: string;
+    worker_id: string | null;
+    enterprise_impact_id: string | null;
+    target: { type: string; identifier: string };
+    description: string;
+    due_date: string | null;
+    execution_status: "not_executed";
+  }[];
+}
+
+export interface EnterpriseCoverageDomain {
+  domain: "systems" | "documents" | "teams" | "customer_commitments";
+  considered: number;
+  affected: number;
+  cleared: number;
+  objects: {
+    id: string;
+    display_name: string;
+    classification: "affected" | "cleared";
+    impact_ids: string[];
+  }[];
+}
+
+export interface ChangePlan {
+  id: string;
+  policy_analysis_run_id: string;
+  impact_assessment_id: string;
+  interpretation_attempt_id: string;
+  schema_version: string;
+  created_at: string;
+  change_plan: {
+    schema_version: string;
+    summary: string;
+    coverage_gaps: {
+      finding_key: string;
+      title: string;
+      observed_limitation: string;
+      why_it_matters: string;
+      recommended_review_action: string;
+      conclusion_type: "review_concern";
+      policy_spans: {
+        policy_change_id: string;
+        start: number;
+        end: number;
+        quote: string;
+      }[];
+      impact_references: { assessment_id: string; impact_id: string }[];
+      evidence_references: {
+        assessment_id: string;
+        evidence_key: string;
+        impact_id: string | null;
+        finding_id: string | null;
+      }[];
+      relationship_path_references: {
+        assessment_id: string;
+        impact_id: string;
+        sequence: number;
+      }[];
+    }[];
+  };
+}
+
+export interface PolicyAnalysisJourney {
+  policy: AnalysisPolicy;
+  run: AnalysisRun;
+  extraction: AnalysisExtraction | null;
+  uncertainty: {
+    extraction_findings: AnalysisExtraction["findings"];
+    clarifications: AnalysisClarification[];
+    legacy_assessment_questions: "omitted_schema_v1_fixture";
+  };
+  assessment: AnalysisAssessment | null;
+  enterprise_coverage: EnterpriseCoverageDomain[];
+  interpretation: {
+    status: "not_available" | "not_created" | "available" | "failed";
+    failure_code: string | null;
+    change_plan: ChangePlan | null;
+  };
+  approval_run: { id: string; status: string } | null;
+}

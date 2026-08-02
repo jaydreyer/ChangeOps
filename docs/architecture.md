@@ -105,6 +105,8 @@ The FastAPI application exposes:
 - `GET /api/v1/policy-extraction-attempts/{attempt_id}`
 - `POST /api/v1/policy-analysis-runs`
 - `GET /api/v1/policy-analysis-runs/{run_id}`
+- `GET /api/v1/policy-analysis-entry`
+- `GET /api/v1/policy-analysis-runs/{run_id}/journey`
 - `POST /api/v1/policy-analysis-runs/{run_id}/clarifications/{clarification_id}/answer`
 - `POST /api/v1/impact-assessments/{assessment_id}/change-plans`
 - `GET /api/v1/impact-assessments/{assessment_id}/change-plan`
@@ -618,7 +620,7 @@ Assessment immutability is an application invariant:
 - the API exposes no assessment mutation;
 - all aggregate rows commit atomically.
 
-### Uncertainty records and current projection gap
+### Uncertainty records and product-facing projection
 
 ChangeOps currently has two uncertainty representations with different lineage:
 
@@ -636,10 +638,17 @@ assessment API and interpretation input. Because the current response calls them
 were detected by the model that produced a policy-analysis assessment.
 
 The authoritative current uncertainty workflow is the extraction finding followed, when the
-deterministic materiality gate requires it, by the persisted clarification record. The assessment
-projection does not yet expose that clarification history. Existing immutable assessments and the
-schema-v1 response are left unchanged in this cleanup; ADR-0015 records the compatibility decision
-needed before replacing the legacy field.
+deterministic materiality gate requires it, by the persisted clarification record. The
+policy-analysis journey projection exposes that history directly and marks the legacy assessment
+questions as omitted schema-v1 fixtures. Existing immutable assessments and the schema-v1
+assessment response remain unchanged.
+
+The same journey projection derives evaluated-object coverage without adding persistence. Active
+systems, non-archived documents, teams, and active customer commitments in the analysis
+organization are considered; persisted impact source keys classify affected objects, and the
+remaining evaluated objects are projected as cleared. Impact records and coverage therefore stay
+distinct: affected objects own immutable impact records, while cleared objects exist only in this
+read model.
 
 ### Immutable execution commands
 

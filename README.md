@@ -4,14 +4,14 @@ ChangeOps analyzes operational and policy changes, identifies affected people an
 
 ## Current milestone
 
-Milestone 4, Slice 2: First Executable Integration.
+Milestone 5, product-facing policy-analysis journey.
 
-Milestones 0–3 and Milestone 4 command preparation are complete. The current slice explicitly
-executes only `learning.assign_training` against a durable simulated learning system. It creates one
-training assignment and an immutable execution result in a single PostgreSQL transaction.
-Repeated or concurrent execution appends an `already_applied` result and reuses the assignment.
-Every other approved recommendation remains visible and unsupported. No MCP tool or external
-enterprise system is called.
+The local application now starts with the seeded international-travel policy and exposes the
+governed journey from source language through extraction, deterministic validation, bounded
+clarification, immutable assessment, enterprise coverage, grounded interpretation, approval, and
+the existing controlled execution workbench. Milestones 0–4 remain intact. Production
+authentication, AWS, Terraform, observability, additional policy families, and additional
+enterprise adapters remain deferred.
 
 Milestone 0 is complete and preserved by the `v0.0.1-milestone-0` tag.
 
@@ -89,6 +89,21 @@ Only a persisted extraction attempt with `validation_outcome = accepted`, resolv
 and no pending clarification can cross the assessment adapter. Human answers retain their own
 clarification ID, responder, timestamp, and affected field; no source span is fabricated.
 `policy_changes.structured_rules` is never changed.
+
+## Product-facing analysis journey
+
+`GET /api/v1/policy-analysis-entry` supplies the compact golden-scenario entry view.
+`GET /api/v1/policy-analysis-runs/{run_id}/journey` assembles a read-only lineage projection from
+the authoritative policy, current extraction attempt, extraction findings, clarification records,
+assessment, coverage, change plan, and approval reference.
+
+The projection deliberately omits the legacy schema-v1 assessment `unresolved_questions`. Those
+eight copied seed fixtures remain available through the historical assessment API, but are not
+presented as model-discovered uncertainty. Enterprise coverage is derived on read from the active
+organization universe and persisted impact source keys; cleared objects do not receive empty
+impact rows. The journey can submit the existing typed clarification, create or retrieve a
+grounded interpretation, and create or open the existing approval workbench without duplicating
+those workflows.
 
 ## Grounded coverage-gap interpretation
 

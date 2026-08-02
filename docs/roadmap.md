@@ -386,6 +386,9 @@ Exit criteria
 
 Milestone 5 — Portfolio Application and Production Readiness
 
+Status: the local product-facing policy-analysis journey is implemented. Production deployment,
+authentication, infrastructure, and observability remain planned.
+
 Product capability
 
 Deliver ChangeOps as a usable, deployable, observable end-to-end application that demonstrates realistic enterprise AI engineering.
@@ -414,11 +417,10 @@ workbench. Milestone 5 expands that narrow screen into the complete deployed por
 application with production authentication, infrastructure, observability, and the earlier
 policy-analysis screens.
 
-Before deployment work, the product-facing slice should resolve the schema-v1 uncertainty
-projection documented by ADR-0015. Extraction findings and persisted clarifications are
-authoritative; the UI must not present the eight copied seed questions as model-derived
-uncertainty. The compatibility design should preserve immutable historical assessments and avoid
-duplicating clarification records without a concrete snapshot requirement.
+The pre-deployment product-facing slice resolves the schema-v1 uncertainty projection documented
+by ADR-0015. Extraction findings and persisted clarifications are authoritative; the UI does not
+present the eight copied seed questions as model-derived uncertainty. Immutable historical
+assessments remain unchanged, and no clarification or screen snapshot is duplicated.
 
 User experience
 

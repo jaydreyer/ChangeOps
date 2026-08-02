@@ -145,15 +145,20 @@ def upgrade() -> None:
             run_status text;
             review_status text;
             decision_value text;
+            original_action jsonb;
+            edited_action jsonb;
+            authorized_effective_action jsonb;
         BEGIN
             SELECT status INTO run_status
             FROM action_approval_runs
             WHERE id = NEW.approval_run_id
             FOR UPDATE;
-            SELECT status INTO review_status
+            SELECT status, original_action_snapshot
+            INTO review_status, original_action
             FROM action_reviews
             WHERE id = NEW.action_review_id;
-            SELECT decision INTO decision_value
+            SELECT decision, edited_action_snapshot
+            INTO decision_value, edited_action
             FROM action_review_decisions
             WHERE id = NEW.action_review_decision_id
               AND action_review_id = NEW.action_review_id;
@@ -165,19 +170,32 @@ def upgrade() -> None:
                OR decision_value IS DISTINCT FROM 'approved' THEN
                 RAISE EXCEPTION 'execution command requires an approved review decision';
             END IF;
-            IF NEW.effective_action_snapshot->>'schema_version'
-               IS DISTINCT FROM 'effective-approved-action-v1'
-               OR NEW.effective_action_snapshot->>'proposed_action_id'
+
+            authorized_effective_action :=
+                original_action
+                || jsonb_build_object(
+                    'schema_version',
+                    'effective-approved-action-v1'
+                )
+                || COALESCE(edited_action, '{}'::jsonb);
+
+            IF NEW.effective_action_snapshot
+               IS DISTINCT FROM authorized_effective_action
+               OR authorized_effective_action->>'proposed_action_id'
                   IS DISTINCT FROM NEW.proposed_action_id::text
-               OR NEW.effective_action_snapshot->>'assessment_id'
+               OR authorized_effective_action->>'assessment_id'
                   IS DISTINCT FROM NEW.assessment_id::text
-               OR NEW.effective_action_snapshot->>'action_type'
+               OR authorized_effective_action->>'action_type'
                   IS DISTINCT FROM 'training_assignment'
-               OR NEW.effective_action_snapshot->>'target_type'
+               OR authorized_effective_action->>'target_type'
+                  IS DISTINCT FROM 'worker'
+               OR authorized_effective_action->>'worker_id'
+                  IS DISTINCT FROM authorized_effective_action->>'target_identifier'
+               OR authorized_effective_action->>'target_type'
                   IS DISTINCT FROM NEW.target_type
-               OR NEW.effective_action_snapshot->>'target_identifier'
+               OR authorized_effective_action->>'target_identifier'
                   IS DISTINCT FROM NEW.target_identifier
-               OR NEW.effective_action_snapshot->>'execution_status'
+               OR authorized_effective_action->>'execution_status'
                   IS DISTINCT FROM 'not_executed' THEN
                 RAISE EXCEPTION 'execution command effective action snapshot is inconsistent';
             END IF;
@@ -185,13 +203,13 @@ def upgrade() -> None:
                 RAISE EXCEPTION 'execution command parameters must be an object';
             END IF;
             IF NEW.parameters_snapshot->>'worker_identifier'
-               IS DISTINCT FROM NEW.target_identifier
+               IS DISTINCT FROM authorized_effective_action->>'worker_id'
                OR NEW.parameters_snapshot->>'course_identifier'
                   IS DISTINCT FROM 'international-travel-security'
                OR NEW.parameters_snapshot->>'description'
-                  IS DISTINCT FROM NEW.effective_action_snapshot->>'description'
+                  IS DISTINCT FROM authorized_effective_action->>'description'
                OR NEW.parameters_snapshot->'due_date'
-                  IS DISTINCT FROM NEW.effective_action_snapshot->'due_date' THEN
+                  IS DISTINCT FROM authorized_effective_action->'due_date' THEN
                 RAISE EXCEPTION 'execution command parameters are inconsistent';
             END IF;
             RETURN NEW;

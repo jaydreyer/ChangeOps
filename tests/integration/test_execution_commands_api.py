@@ -1,3 +1,4 @@
+import json
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
@@ -171,4 +172,125 @@ def test_execution_command_rows_are_database_immutable(client) -> None:
         session.execute(
             text("DELETE FROM execution_commands WHERE id = :id"),
             {"id": command_id},
+        )
+
+
+@pytest.mark.parametrize(
+    ("field", "fabricated_value"),
+    [
+        ("description", "Fabricated description not approved by the reviewer."),
+        ("due_date", "2099-12-31"),
+    ],
+)
+def test_database_rejects_command_payload_not_derived_from_approval(
+    client,
+    field: str,
+    fabricated_value: str,
+) -> None:
+    _, run = _complete_run(client, approve_training_only=True)
+
+    with SessionLocal() as session:
+        approved = (
+            session.execute(
+                text(
+                    """
+                SELECT
+                    item.approval_run_id,
+                    item.action_review_id,
+                    decision.id AS action_review_decision_id,
+                    item.proposed_action_id,
+                    item.assessment_id,
+                    review.original_action_snapshot,
+                    decision.edited_action_snapshot
+                FROM action_approval_run_items AS item
+                JOIN action_reviews AS review
+                  ON review.id = item.action_review_id
+                JOIN action_review_decisions AS decision
+                  ON decision.action_review_id = review.id
+                WHERE item.approval_run_id = :run_id
+                  AND review.status = 'approved'
+                  AND review.original_action_snapshot->>'action_type'
+                      = 'training_assignment'
+                ORDER BY item.sequence
+                LIMIT 1
+                """
+                ),
+                {"run_id": run["id"]},
+            )
+            .mappings()
+            .one()
+        )
+
+    effective_action = {
+        **approved["original_action_snapshot"],
+        "schema_version": "effective-approved-action-v1",
+        **(approved["edited_action_snapshot"] or {}),
+    }
+    fabricated_action = {**effective_action, field: fabricated_value}
+    fabricated_parameters = {
+        "course_identifier": "international-travel-security",
+        "description": fabricated_action["description"],
+        "due_date": fabricated_action["due_date"],
+        "worker_identifier": fabricated_action["worker_id"],
+    }
+
+    with pytest.raises(DBAPIError), SessionLocal.begin() as session:
+        session.execute(
+            text(
+                """
+                INSERT INTO execution_commands (
+                    id,
+                    approval_run_id,
+                    action_review_id,
+                    action_review_decision_id,
+                    proposed_action_id,
+                    assessment_id,
+                    schema_version,
+                    system,
+                    operation,
+                    target_type,
+                    target_identifier,
+                    parameters_snapshot,
+                    effective_action_snapshot,
+                    idempotency_key,
+                    status,
+                    prepared_by,
+                    prepared_role,
+                    created_at
+                )
+                VALUES (
+                    :id,
+                    :approval_run_id,
+                    :action_review_id,
+                    :action_review_decision_id,
+                    :proposed_action_id,
+                    :assessment_id,
+                    'execution-command-v1',
+                    'learning',
+                    'assign_training',
+                    :target_type,
+                    :target_identifier,
+                    CAST(:parameters_snapshot AS jsonb),
+                    CAST(:effective_action_snapshot AS jsonb),
+                    :idempotency_key,
+                    'pending_execution',
+                    'direct-sql@example.com',
+                    'admin',
+                    NOW()
+                )
+                """
+            ),
+            {
+                "id": uuid.uuid4(),
+                "approval_run_id": approved["approval_run_id"],
+                "action_review_id": approved["action_review_id"],
+                "action_review_decision_id": approved["action_review_decision_id"],
+                "proposed_action_id": approved["proposed_action_id"],
+                "assessment_id": approved["assessment_id"],
+                "target_type": fabricated_action["target_type"],
+                "target_identifier": fabricated_action["target_identifier"],
+                "parameters_snapshot": json.dumps(fabricated_parameters),
+                "effective_action_snapshot": json.dumps(fabricated_action),
+                "idempotency_key": "f" * 64,
+            },
         )

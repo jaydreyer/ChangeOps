@@ -155,9 +155,9 @@ Exit criteria
 
 Milestone 2 — AI-Assisted Change Planning
 
-Status: backend complete. The API workflow and quality gates satisfy this milestone's backend exit
-criteria. The integrated reviewer UI remains deferred to Milestone 5, where Next.js is
-intentionally introduced.
+Status: complete. The API workflow and quality gates satisfy this milestone's backend exit
+criteria. The focused Next.js reviewer UI was subsequently delivered in Milestone 3; broader
+policy-analysis screens remain a Milestone 5 concern.
 
 Product capability
 
@@ -309,11 +309,15 @@ Exit criteria
 
 ⸻
 
-Milestone 4 — Simulated Enterprise Execution
+Milestone 4 — Controlled Enterprise Execution
+
+Status: Slice 1 complete. Immutable execution commands can be prepared from approved reviews, but
+simulated execution and MCP remain deferred to later Milestone 4 slices.
 
 Product capability
 
-Execute approved actions against simulated enterprise systems and record the result as part of the audit trail.
+Prepare exact authorized command contracts, then execute them against simulated enterprise systems
+in later slices and record results as part of the audit trail.
 
 Proves
 
@@ -324,14 +328,20 @@ Proves
 * tool inputs and outputs can be audited;
 * execution remains subordinate to approval and permissions.
 
-Technologies added
+Technologies added in Slice 1
 
-* MCP
-* simulated enterprise-system APIs
-* execution adapters
-* idempotency keys
-* retry and failure handling
-* execution audit events
+* immutable connector-neutral command records;
+* canonical semantic idempotency keys;
+* deterministic execution mapping;
+* focused post-approval workbench projection.
+
+Deferred technologies
+
+* MCP;
+* simulated enterprise-system APIs;
+* execution adapters and attempts;
+* retry and failure handling;
+* execution audit events.
 
 Simulated systems
 
@@ -349,15 +359,16 @@ Do not build complete replicas of these products.
 
 Expected execution flow
 
-1. load an approved action;
-2. verify approval and authorization;
-3. validate the action against the current system state;
-4. generate or reuse an idempotency key;
-5. call the appropriate MCP tool;
-6. capture the request and response;
-7. update execution status;
-8. record audit events;
-9. surface partial or failed execution for review.
+1. load a completed approval run;
+2. derive exact effective approved values;
+3. deterministically prepare or reuse an immutable command;
+4. expose unsupported approved actions;
+5. in a later slice, validate current simulated-system state;
+6. call the appropriate MCP tool;
+7. capture the request and response;
+8. update execution status;
+9. record audit events;
+10. surface partial or failed execution for review.
 
 Exit criteria
 

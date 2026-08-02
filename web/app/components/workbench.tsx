@@ -3,7 +3,13 @@
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { parseApiError } from "@/lib/api";
-import type { Evidence, Review, Workbench, WorkbenchItem } from "@/lib/types";
+import type {
+  Evidence,
+  ExecutionPreparation,
+  Review,
+  Workbench,
+  WorkbenchItem,
+} from "@/lib/types";
 
 const labels: Record<string, string> = {
   ai_proposal: "AI proposal",
@@ -17,6 +23,9 @@ const labels: Record<string, string> = {
   deterministic_finding: "Deterministic conclusion",
   enterprise_impact: "Deterministic conclusion",
   relationship_path: "Deterministic relationship path",
+  pending_execution: "Pending execution",
+  unsupported_action_type: "Unsupported action type",
+  unsupported_target_type: "Unsupported target type",
 };
 
 function humanize(value: string) {
@@ -27,7 +36,13 @@ function ProvenanceLabel({ kind }: { kind: string }) {
   return <span className={`badge provenance ${kind}`}>{humanize(kind)}</span>;
 }
 
-export function WorkbenchView({ initialWorkbench }: { initialWorkbench: Workbench }) {
+export function WorkbenchView({
+  initialWorkbench,
+  initialPreparation = null,
+}: {
+  initialWorkbench: Workbench;
+  initialPreparation?: ExecutionPreparation | null;
+}) {
   const router = useRouter();
   const [actor, setActor] = useState("reviewer@example.com");
   const [message, setMessage] = useState("");
@@ -127,6 +142,15 @@ export function WorkbenchView({ initialWorkbench }: { initialWorkbench: Workbenc
         </label>
       </section>
 
+      {run.status === "completed" && initialPreparation && (
+        <ExecutionPreparationPanel
+          runId={run.id}
+          actor={actor}
+          preparation={initialPreparation}
+          onStatus={setMessage}
+        />
+      )}
+
       {run.failure_code && (
         <section className="failure-panel" aria-labelledby="failure-heading">
           <h2 id="failure-heading">Approval reconciliation failed</h2>
@@ -141,7 +165,9 @@ export function WorkbenchView({ initialWorkbench }: { initialWorkbench: Workbenc
       {message && (
         <p
           className={
-            /^(Approval reconciliation|Decision recorded|Another committed)/.test(message)
+            /^(Approval reconciliation|Decision recorded|Another committed|Execution commands|Preparation)/.test(
+              message,
+            )
               ? "status-message"
               : "error"
           }
@@ -202,6 +228,141 @@ export function WorkbenchView({ initialWorkbench }: { initialWorkbench: Workbenc
         </ol>
       </details>
     </main>
+  );
+}
+
+function ExecutionPreparationPanel({
+  runId,
+  actor,
+  preparation,
+  onStatus,
+}: {
+  runId: string;
+  actor: string;
+  preparation: ExecutionPreparation;
+  onStatus: (message: string) => void;
+}) {
+  const router = useRouter();
+  const [preparing, setPreparing] = useState(false);
+
+  async function prepare() {
+    setPreparing(true);
+    onStatus("");
+    try {
+      const response = await fetch(
+        `/api/v1/action-approval-runs/${runId}/execution-commands`,
+        {
+          method: "POST",
+          headers: {
+            "X-ChangeOps-Actor": actor,
+            "X-ChangeOps-Role": "admin",
+          },
+        },
+      );
+      if (!response.ok) {
+        const error = await parseApiError(response);
+        if (response.status === 409) {
+          onStatus(
+            "Preparation state changed concurrently. Reloaded authoritative command state.",
+          );
+          router.refresh();
+          return;
+        }
+        onStatus(error.message);
+        return;
+      }
+      onStatus("Execution commands prepared. Reloaded authoritative command state.");
+      router.refresh();
+    } catch {
+      onStatus(
+        "Preparation response was ambiguous. Reloaded authoritative command state for reconciliation.",
+      );
+      router.refresh();
+    } finally {
+      setPreparing(false);
+    }
+  }
+
+  return (
+    <section className="preparation-panel" aria-labelledby="preparation-heading">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Deterministic execution boundary</p>
+          <h2 id="preparation-heading">Execution Preparation</h2>
+        </div>
+        <ProvenanceLabel kind="not_executed" />
+      </div>
+      <p>
+        Approval is complete. ChangeOps can materialize the exact authorized command contract,
+        but no enterprise system has been called.
+      </p>
+      <dl className="preparation-counts">
+        <div>
+          <dt>Approved</dt>
+          <dd>{preparation.approved_action_count}</dd>
+        </div>
+        <div>
+          <dt>Preparable</dt>
+          <dd>{preparation.eligible_action_count}</dd>
+        </div>
+        <div>
+          <dt>Unsupported</dt>
+          <dd>{preparation.unsupported_approved_action_count}</dd>
+        </div>
+        <div>
+          <dt>Prepared</dt>
+          <dd>{preparation.prepared_command_count}</dd>
+        </div>
+      </dl>
+      <button type="button" onClick={prepare} disabled={preparing || !actor.trim()}>
+        {preparing ? "Preparing…" : "Prepare execution commands"}
+      </button>
+
+      {preparation.commands.length > 0 && (
+        <div className="command-list">
+          <h3>Immutable prepared commands</h3>
+          {preparation.commands.map((command) => (
+            <article className="command-card" key={command.id}>
+              <div>
+                <strong>
+                  {humanize(command.system)} · {humanize(command.operation)}
+                </strong>
+                <span className="badge execution">Pending execution — no enterprise system called</span>
+              </div>
+              <p>
+                {humanize(command.target_type)}: {command.target_identifier}
+              </p>
+              <p>{command.effective_action.description}</p>
+              <small>
+                Due {command.effective_action.due_date ?? "none"} · Idempotency{" "}
+                <code>{command.idempotency_key.slice(0, 12)}…</code>
+              </small>
+            </article>
+          ))}
+        </div>
+      )}
+
+      {preparation.unsupported_items.length > 0 && (
+        <div className="unsupported-list">
+          <h3>Unsupported approved actions</h3>
+          {preparation.unsupported_items.map((item) => (
+            <article key={item.action_review_id}>
+              <strong>{humanize(item.action_type)}</strong>
+              <p>
+                {humanize(item.target_type)}: {item.target_identifier}
+              </p>
+              <small>
+                {humanize(item.reason_code)} — {item.reason}
+              </small>
+            </article>
+          ))}
+        </div>
+      )}
+      <p className="execution-inline">
+        <strong>Pending execution — no enterprise system called.</strong> This panel contains no
+        execution controls.
+      </p>
+    </section>
   );
 }
 

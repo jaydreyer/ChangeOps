@@ -1,4 +1,4 @@
-import type { ApiError, Workbench } from "./types";
+import type { ApiError, ExecutionPreparation, Workbench } from "./types";
 
 export function apiBaseUrl(): string {
   return (process.env.CHANGEOPS_API_BASE_URL ?? "http://localhost:8000").replace(/\/$/, "");
@@ -30,4 +30,16 @@ export async function getWorkbench(runId: string): Promise<Workbench> {
     throw new Error(`${error.code}|${error.message}`);
   }
   return response.json() as Promise<Workbench>;
+}
+
+export async function getExecutionPreparation(runId: string): Promise<ExecutionPreparation> {
+  const response = await fetch(
+    `${apiBaseUrl()}/api/v1/action-approval-runs/${runId}/execution-commands`,
+    { cache: "no-store" },
+  );
+  if (!response.ok) {
+    const error = await parseApiError(response);
+    throw new Error(`${error.code}|${error.message}`);
+  }
+  return response.json() as Promise<ExecutionPreparation>;
 }

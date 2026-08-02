@@ -2,40 +2,34 @@
 
 ## Status
 
-Slice 1, Execution Command Preparation, is implemented. No command executes.
+Slices 1 and 2 are implemented. Slice 1 prepares immutable commands. Slice 2 explicitly executes
+only `learning.assign_training` against a durable simulated learning system.
 
 ## Product boundary
 
-Milestone 4 converts exact human-approved values into controlled enterprise effects. The first
-slice establishes a durable boundary before any adapter or MCP tool exists:
+Milestone 4 converts exact human-approved values into controlled enterprise effects:
 
 ```text
 completed approval run
   → approved review
   → effective approved action
-  → deterministic supported-action mapping
   → immutable execution command
-  → pending execution
+  → explicit execution request
+  → simulated learning adapter
+  ├── durable learning assignment
+  └── immutable execution result
 ```
 
-Approval decisions and execution commands are separate audit artifacts. The former proves what a
-human decided; the latter proves what deterministic code authorized a future connector to do.
+Approval, authorization, execution intent, simulated enterprise state, and attempt history remain
+separate artifacts. AI participates in none of these decisions or writes.
 
-## Slice 1 capability
+## Slice 1 — Execution Command Preparation
 
-An authorized local `admin` may prepare commands for a completed approval run. Preparation:
+An authorized local `admin` may prepare commands for a completed approval run. Preparation uses
+immutable membership order, approved reviews only, exact approved edits, canonical SHA-256
+idempotency, and at most one command per review.
 
-- uses immutable run membership order;
-- considers approved reviews only;
-- reuses approved description and due-date overlay rules;
-- reports unsupported approved actions explicitly;
-- stores at most one command per review;
-- uses a canonical semantic SHA-256 idempotency key;
-- snapshots effective approved values and command parameters;
-- keeps every command `pending_execution`;
-- keeps every proposed action `not_executed`.
-
-The only supported golden-scenario mapping is:
+The only supported mapping is:
 
 ```text
 training_assignment / worker
@@ -43,54 +37,91 @@ training_assignment / worker
   → course international-travel-security
 ```
 
-The other 11 golden actions are intentionally informational, human-owned, or not yet supported:
-manager approval requests, team travel review, system-workflow review, document update/review, and
-customer-commitment review. Approval does not make an action mechanically executable.
+Manager approval, team review, system-workflow review, document, and customer-commitment actions
+remain explicit unsupported projections. Approval does not make them executable.
 
-## Persistence and API
+## Slice 2 — First Executable Integration
 
-`execution_commands` contains relational provenance to the approval run, review, approval decision,
-proposed action, and assessment. It stores versioned effective-action and command-parameter
-snapshots, target and operation columns, a unique idempotency key, preparer identity and role, and
-creation time.
+The existing command contract is sufficient. It contains or references:
 
-PostgreSQL enforces lifecycle ownership, one command per review, approved-decision eligibility,
-completed-run eligibility, immutable rows, and the only current status:
-`pending_execution`.
+- the approved action and effective approved-action snapshot;
+- worker and course identifiers;
+- target system and operation;
+- canonical idempotency key;
+- assessment and optional assessment-linked change plan;
+- approval run, review, decision, and proposed-action lineage;
+- preparer identity, role, and time.
 
-```text
-POST /api/v1/action-approval-runs/{run_id}/execution-commands
-GET  /api/v1/action-approval-runs/{run_id}/execution-commands
-GET  /api/v1/execution-commands/{command_id}
-```
+Execution-specific actor, outcome, time, and side-effect identity belong to the immutable execution
+result and simulated assignment, so the command was not changed.
 
-The POST accepts no action overrides. It returns `201` when any command is new and `200` when fully
-idempotent. List responses derive unsupported results from immutable approvals instead of creating
-a preparation-run aggregate.
+`POST /api/v1/execution-commands/{command_id}/execute` requires an explicit demonstration `admin`.
+The service does not trust the submitted ID alone: it row-locks the command and reconstructs the
+completed approval run, exact membership, approved review decision, effective action, deterministic
+mapping, snapshot, and idempotency key from PostgreSQL.
+
+The narrow `SimulatedLearningAdapter` then:
+
+1. verifies `learning.assign_training`;
+2. validates the closed payload;
+3. verifies the worker and active course;
+4. reuses an assignment already owned by the command, if present;
+5. otherwise creates one simulated assignment;
+6. appends an immutable execution result.
+
+The assignment and successful result commit together. The same command cannot create a duplicate
+assignment because execution locks the command and PostgreSQL uniquely owns assignments by
+`source_execution_command_id`. Each replay deliberately appends an `already_applied` result
+referencing the original assignment. This preserves every explicit attempt without duplicating
+enterprise state.
+
+## Persistence
+
+`simulated_learning_assignments` is the authoritative simulated learning-system state for this
+slice. It stores the worker, course, assigned state and time, source command, and source approved
+action.
+
+`execution_results` is immutable audit history. It distinguishes:
+
+- `succeeded`;
+- `already_applied`;
+- `rejected_unsupported`;
+- `failed_validation`.
+
+Results store stable outcome codes and explanations, command identity, optional assignment, actor,
+role, and timestamp. Commands remain immutable `pending_execution` authorization records.
+Proposed actions remain immutable `not_executed` assessment records. Neither value is overloaded to
+represent mutable connector state.
 
 ## Workbench
 
-The existing focused approval page adds one post-completion panel. It shows approved, preparable,
-unsupported, and prepared counts; one explicit preparation control; immutable command details; and
-unsupported reasons. Every command is labeled “Pending execution — no enterprise system called.”
-There are no execution controls.
+The existing post-completion panel shows:
 
-## Explicitly deferred
+- target system and operation;
+- affected worker and training identifier;
+- approval-decision and proposed-action lineage;
+- pending, executed, or failed execution state;
+- an explicit execution control only for supported prepared commands;
+- durable assignment details and immutable result history;
+- unsupported approved actions without active execution controls.
 
-- MCP and tool invocation;
-- simulated enterprise APIs;
-- execution attempts, responses, retries, and compensation;
-- queues, workers, schedulers, and generic command buses;
-- current-system precondition checks;
-- production authentication or generalized RBAC;
-- generic adapter registries;
-- earlier policy workflow screens;
-- cloud infrastructure and observability.
+Execution never occurs during page load. Re-execution is labeled as safe and reports that the
+original assignment was reused.
+
+## Deliberate architectural limits
+
+This slice adds no MCP, adapter registry, plugin system, connector interface, command bus, queue,
+worker, scheduler, polling, retry orchestration, or generic execution engine. One explicit service
+call is enough to validate the command boundary and transactional/idempotency behavior.
+
+MCP is deferred because the current consumer runs safely within the modular monolith and has no
+external protocol or process-boundary requirement. A later slice should introduce MCP only when a
+real external tool boundary proves its value.
 
 ## Exit criteria
 
-Slice 1 is complete when supported approved reviews produce one immutable, idempotent command;
-non-approved reviews never produce commands; unsupported approvals remain visible; approved edits
-are snapshotted exactly; concurrent preparation cannot duplicate rows; commands remain pending;
-proposed actions remain unexecuted; the workbench exposes the boundary; and backend, frontend,
-migration, and offline quality checks pass.
+The slice is complete when a reviewer can trace an approved training action through its immutable
+command, explicitly execute it, inspect one durable assignment and immutable result, repeat
+execution without a duplicate, and continue to see every unsupported approval. Authorization,
+lineage, validation, transactionality, concurrency, immutability, API behavior, UI behavior,
+migrations, regressions, and offline evaluations must pass.

@@ -106,7 +106,54 @@ function workbench(status: "pending" | "approved" = "pending"): Workbench {
   };
 }
 
-function preparation(prepared = false): ExecutionPreparation {
+function preparation(
+  prepared = false,
+  executed = false,
+  replay = false,
+): ExecutionPreparation {
+  const assignment = {
+    id: "assignment-1",
+    worker_id: "worker-1",
+    training_course_id: "international-travel-security",
+    source_execution_command_id: "command-1",
+    source_approved_action_id: "action-1",
+    assignment_status: "assigned" as const,
+    assigned_at: "2026-08-02T12:05:00Z",
+    created_at: "2026-08-02T12:05:00Z",
+  };
+  const executionResults = executed
+    ? [
+        {
+          id: "result-1",
+          execution_command_id: "command-1",
+          status: "succeeded" as const,
+          outcome_code: "training_assignment_created",
+          message: "The simulated learning system assigned the training item.",
+          command_idempotency_key: "abcdef0123456789abcdef0123456789",
+          attempted_by: "operator@example.com",
+          attempted_role: "admin" as const,
+          created_at: "2026-08-02T12:05:00Z",
+          learning_assignment: assignment,
+        },
+        ...(replay
+          ? [
+              {
+                id: "result-2",
+                execution_command_id: "command-1",
+                status: "already_applied" as const,
+                outcome_code: "training_assignment_already_applied",
+                message:
+                  "This command already created the simulated training assignment.",
+                command_idempotency_key: "abcdef0123456789abcdef0123456789",
+                attempted_by: "operator@example.com",
+                attempted_role: "admin" as const,
+                created_at: "2026-08-02T12:06:00Z",
+                learning_assignment: assignment,
+              },
+            ]
+          : []),
+      ]
+    : [];
   return {
     approval_run_id: "run-1",
     approved_action_count: 2,
@@ -117,7 +164,13 @@ function preparation(prepared = false): ExecutionPreparation {
       ? [
           {
             id: "command-1",
+            approval_run_id: "run-1",
+            action_review_id: "review-1",
+            action_review_decision_id: "decision-1",
+            proposed_action_id: "action-1",
+            assessment_id: "assessment-1",
             sequence: 0,
+            schema_version: "execution-command-v1",
             system: "learning",
             operation: "assign_training",
             target_type: "worker",
@@ -133,8 +186,11 @@ function preparation(prepared = false): ExecutionPreparation {
             idempotency_key: "abcdef0123456789abcdef0123456789",
             status: "pending_execution",
             prepared_by: "operator@example.com",
+            prepared_role: "admin",
             created_at: "2026-08-02T12:00:00Z",
-            execution_performed: false,
+            execution_state: executed ? "executed" : "pending_execution",
+            execution_results: executionResults,
+            execution_performed: executed,
           },
         ]
       : [],
@@ -150,7 +206,7 @@ function preparation(prepared = false): ExecutionPreparation {
         reason: "Action type 'review_team_travel' has no execution mapping.",
       },
     ],
-    execution_performed: false,
+    execution_performed: executed,
   };
 }
 
@@ -236,7 +292,7 @@ describe("approval workbench", () => {
     expect(summary).not.toBeNull();
     expect(within(summary!).getByText("Training is required.")).toBeInTheDocument();
     expect(within(summary!).getByText("Assign revised training.")).toBeInTheDocument();
-    expect(screen.getByText("Review is complete. Approved actions remain unexecuted.")).toBeInTheDocument();
+    expect(screen.getByText("Review is complete. Approval alone did not execute any action.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Record terminal decision" })).not.toBeInTheDocument();
   });
 
@@ -282,9 +338,6 @@ describe("approval workbench", () => {
     expect(screen.getByText("Preparable").nextElementSibling).toHaveTextContent("1");
     expect(screen.getByText("Unsupported approved actions")).toBeInTheDocument();
     expect(screen.getByText("Review team travel")).toBeInTheDocument();
-    expect(
-      screen.getByText(/Pending execution — no enterprise system called\./),
-    ).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Execute/ })).not.toBeInTheDocument();
   });
 
@@ -313,7 +366,7 @@ describe("approval workbench", () => {
     expect(refresh).toHaveBeenCalled();
   });
 
-  it("shows prepared command details without execution controls", () => {
+  it("shows prepared command details and an explicit supported execution control", () => {
     render(
       <WorkbenchView
         initialWorkbench={workbench("approved")}
@@ -325,10 +378,69 @@ describe("approval workbench", () => {
     expect(screen.getByText("Learning · Assign training")).toBeInTheDocument();
     expect(screen.getByText("Assign revised training.", { selector: ".command-card p" })).toBeInTheDocument();
     expect(screen.getByText(/abcdef012345…/)).toBeInTheDocument();
+    expect(screen.getByText("Pending execution", { selector: "span" })).toBeInTheDocument();
     expect(
-      screen.getByText("Pending execution — no enterprise system called", { selector: "span" }),
+      screen.getByRole("button", { name: "Execute training assignment" }),
     ).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^Execute/ })).not.toBeInTheDocument();
+    expect(screen.getByText("international-travel-security")).toBeInTheDocument();
+    const unsupported = screen
+      .getByText("Unsupported approved actions")
+      .closest(".unsupported-list");
+    expect(unsupported).not.toBeNull();
+    expect(within(unsupported as HTMLElement).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("executes a supported command and reloads authoritative result state", async () => {
+    const user = userEvent.setup();
+    const execution = preparation(true, true).commands[0].execution_results[0];
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(execution), { status: 201 }),
+    );
+    render(
+      <WorkbenchView
+        initialWorkbench={workbench("approved")}
+        initialPreparation={preparation(true)}
+      />,
+    );
+
+    await user.click(
+      screen.getByRole("button", { name: "Execute training assignment" }),
+    );
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+    expect(fetchMock.mock.calls[0]).toEqual([
+      "/api/v1/execution-commands/command-1/execute",
+      {
+        method: "POST",
+        headers: {
+          "X-ChangeOps-Actor": "reviewer@example.com",
+          "X-ChangeOps-Role": "admin",
+        },
+      },
+    ]);
+    expect(await screen.findByText(/Execution succeeded/)).toBeInTheDocument();
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it("displays the durable assignment and makes replay safety explicit", () => {
+    render(
+      <WorkbenchView
+        initialWorkbench={workbench("approved")}
+        initialPreparation={preparation(true, true, true)}
+      />,
+    );
+
+    expect(screen.getByText("Execution attempted", { selector: "span" })).toBeInTheDocument();
+    expect(screen.getByText("Executed", { selector: "span" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Execute again safely" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Succeeded")).toBeInTheDocument();
+    expect(screen.getByText("Already applied")).toBeInTheDocument();
+    expect(screen.getAllByText(/assignment-1/)).toHaveLength(2);
+    expect(
+      screen.getByText(/already created the simulated training assignment/),
+    ).toBeInTheDocument();
   });
 
   it("reconciles an ambiguous preparation response by refreshing", async () => {

@@ -482,3 +482,55 @@ a generic command bus, adapter registry, or preparation workflow.
 - Unsupported recommendations stay visible instead of being silently skipped or falsely treated
   as executable.
 - No MCP tool, simulated system, or external service is called in this slice.
+
+# ADR-0014 — Validate the Command Boundary with One In-Process Learning Adapter
+
+## Status
+
+Accepted
+
+## Context
+
+The immutable execution-command boundary must be proven by a real consumer before ChangeOps adds
+MCP or generalized connector infrastructure. The seeded training command already contains an
+approved worker, fixed course identifier, closed operation and system, canonical idempotency key,
+and complete assessment and approval lineage. Execution additionally needs durable side-effect
+state and immutable attempt metadata, but those are not command concerns.
+
+## Decision
+
+ChangeOps executes only `learning.assign_training` through one explicit synchronous
+`SimulatedLearningAdapter` inside the modular monolith.
+
+- Execution requires an explicit authorized `admin` request.
+- The application service row-locks the command and revalidates persisted approval lineage and
+  exact command semantics.
+- The adapter validates a closed payload and verifies the worker and active course.
+- One `SimulatedLearningAssignment` records durable simulated enterprise state.
+- Every adapter attempt records a separate immutable `ExecutionResult`.
+- Assignment and success result commit in one PostgreSQL transaction.
+- One assignment per source command is enforced by a database uniqueness constraint.
+- Repeated requests append `already_applied` results referencing the original assignment.
+- Commands, proposed actions, and approval records remain unchanged.
+
+No adapter registry, generic connector interface, command bus, queue, retry framework, background
+worker, or workflow engine is introduced.
+
+## Consequences
+
+- The existing command contract is validated without modification.
+- Approval remains necessary but is not inferred by the adapter.
+- Concurrent duplicate requests cannot create duplicate assignments.
+- Enterprise state and execution audit history have distinct persistence models.
+- Unsupported commands and malformed payloads have explicit deterministic outcomes.
+- The slice remains synchronous and intentionally supports only one operation.
+- A later MCP decision can be based on demonstrated transport or process-boundary needs rather
+  than anticipated abstraction.
+
+## Why MCP is not introduced
+
+MCP would add protocol, tool-hosting, and process-boundary concerns without improving this first
+consumer's product behavior. The architectural question is whether an immutable command can safely
+drive an approved, idempotent side effect. An in-process adapter answers that question directly.
+MCP remains a possible later transport when multiple external tool providers or a genuine
+cross-process integration boundary makes it useful.

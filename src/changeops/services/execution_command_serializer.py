@@ -1,6 +1,9 @@
+from changeops.db.models import ExecutionResult, SimulatedLearningAssignment
 from changeops.schemas.execution_commands import (
     ExecutionCommandPreparationResponse,
     ExecutionCommandResponse,
+    ExecutionResultResponse,
+    SimulatedLearningAssignmentResponse,
     UnsupportedExecutionActionResponse,
 )
 from changeops.services.execution_command_service import (
@@ -32,7 +35,7 @@ def serialize_execution_command_preparation(
             )
             for item in result.unsupported_items
         ],
-        execution_performed=False,
+        execution_performed=any(item.command.execution_results for item in result.commands),
     )
 
 
@@ -40,6 +43,16 @@ def serialize_execution_command(
     item: PreparedCommandItem,
 ) -> ExecutionCommandResponse:
     command = item.command
+    execution_succeeded = any(
+        result.status in {"succeeded", "already_applied"} for result in command.execution_results
+    )
+    execution_state = (
+        "executed"
+        if execution_succeeded
+        else "execution_failed"
+        if command.execution_results
+        else "pending_execution"
+    )
     return ExecutionCommandResponse(
         id=command.id,
         approval_run_id=command.approval_run_id,
@@ -60,5 +73,43 @@ def serialize_execution_command(
         prepared_by=command.prepared_by,
         prepared_role=command.prepared_role,
         created_at=command.created_at,
-        execution_performed=False,
+        execution_state=execution_state,
+        execution_results=[
+            serialize_execution_result(result) for result in command.execution_results
+        ],
+        execution_performed=bool(command.execution_results),
+    )
+
+
+def serialize_execution_result(result: ExecutionResult) -> ExecutionResultResponse:
+    return ExecutionResultResponse(
+        id=result.id,
+        execution_command_id=result.execution_command_id,
+        status=result.status,
+        outcome_code=result.outcome_code,
+        message=result.message,
+        command_idempotency_key=result.command_idempotency_key,
+        attempted_by=result.attempted_by,
+        attempted_role=result.attempted_role,
+        created_at=result.created_at,
+        learning_assignment=(
+            serialize_learning_assignment(result.learning_assignment)
+            if result.learning_assignment is not None
+            else None
+        ),
+    )
+
+
+def serialize_learning_assignment(
+    assignment: SimulatedLearningAssignment,
+) -> SimulatedLearningAssignmentResponse:
+    return SimulatedLearningAssignmentResponse(
+        id=assignment.id,
+        worker_id=assignment.worker_id,
+        training_course_id=assignment.training_course_id,
+        source_execution_command_id=assignment.source_execution_command_id,
+        source_approved_action_id=assignment.source_approved_action_id,
+        assignment_status=assignment.assignment_status,
+        assigned_at=assignment.assigned_at,
+        created_at=assignment.created_at,
     )

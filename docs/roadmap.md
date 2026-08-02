@@ -311,13 +311,14 @@ Exit criteria
 
 Milestone 4 — Controlled Enterprise Execution
 
-Status: Slice 1 complete. Immutable execution commands can be prepared from approved reviews, but
-simulated execution and MCP remain deferred to later Milestone 4 slices.
+Status: Slices 1 and 2 complete. Immutable execution commands can be prepared from approved
+reviews, and `learning.assign_training` can be executed explicitly against one durable simulated
+learning system. MCP and all other integrations remain deferred.
 
 Product capability
 
-Prepare exact authorized command contracts, then execute them against simulated enterprise systems
-in later slices and record results as part of the audit trail.
+Prepare exact authorized command contracts, execute the one proven training-assignment mapping
+against simulated enterprise state, and record immutable results as part of the audit trail.
 
 Proves
 
@@ -328,20 +329,21 @@ Proves
 * tool inputs and outputs can be audited;
 * execution remains subordinate to approval and permissions.
 
-Technologies added in Slice 1
+Technologies added through Slice 2
 
 * immutable connector-neutral command records;
 * canonical semantic idempotency keys;
 * deterministic execution mapping;
 * focused post-approval workbench projection.
+* one deterministic in-process learning adapter;
+* durable simulated training assignments;
+* append-only execution results and database-backed replay safety.
 
 Deferred technologies
 
 * MCP;
-* simulated enterprise-system APIs;
-* execution adapters and attempts;
 * retry and failure handling;
-* execution audit events.
+* additional execution adapters and simulated systems.
 
 Simulated systems
 
@@ -363,12 +365,12 @@ Expected execution flow
 2. derive exact effective approved values;
 3. deterministically prepare or reuse an immutable command;
 4. expose unsupported approved actions;
-5. in a later slice, validate current simulated-system state;
-6. call the appropriate MCP tool;
-7. capture the request and response;
-8. update execution status;
-9. record audit events;
-10. surface partial or failed execution for review.
+5. explicitly execute only a supported command;
+6. revalidate persisted approval lineage and required identifiers;
+7. call the in-process simulated learning adapter;
+8. commit the training assignment and immutable result together;
+9. reuse the assignment and append an idempotent replay result on repetition;
+10. surface the result in the approval workbench.
 
 Exit criteria
 

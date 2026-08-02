@@ -4,13 +4,14 @@ ChangeOps analyzes operational and policy changes, identifies affected people an
 
 ## Current milestone
 
-Milestone 4, Slice 1: Execution Command Preparation.
+Milestone 4, Slice 2: First Executable Integration.
 
-Milestones 0–3 are complete. The current slice deterministically materializes immutable,
-connector-neutral execution commands from approved reviews after an approval run completes. Only
-the seeded training-assignment mapping is executable; every other approved recommendation is
-reported explicitly as unsupported. Commands remain `pending_execution`, proposed actions remain
-`not_executed`, and no MCP tool or enterprise system is called.
+Milestones 0–3 and Milestone 4 command preparation are complete. The current slice explicitly
+executes only `learning.assign_training` against a durable simulated learning system. It creates one
+training assignment and an immutable execution result in a single PostgreSQL transaction.
+Repeated or concurrent execution appends an `already_applied` result and reuses the assignment.
+Every other approved recommendation remains visible and unsupported. No MCP tool or external
+enterprise system is called.
 
 Milestone 0 is complete and preserved by the `v0.0.1-milestone-0` tag.
 
@@ -124,7 +125,7 @@ reviewers and admins can use the idempotent explicit resume endpoint to reconcil
 Completed runs and no-op waiting resumes remain unchanged. Nothing executes, including approved
 actions.
 
-## Execution command preparation
+## Controlled training execution
 
 An authorized demonstration `admin` can prepare commands after an approval run completes.
 Preparation considers approved reviews only, reuses the existing effective-action overlay, and
@@ -143,8 +144,22 @@ snapshots. A SHA-256 idempotency key covers the approval decision and canonical 
 Row locking and PostgreSQL uniqueness make repeated and concurrent preparation safe.
 
 Every command is linked to its approval run, review, approval decision, proposed action, and
-assessment. Its only status is `pending_execution`. Preparation performs no current-state check,
-tool invocation, or external write.
+assessment. Commands remain immutable `pending_execution` authorization artifacts even after an
+attempt; execution history is stored separately.
+
+An authorized demonstration `admin` may explicitly execute a prepared command:
+
+```text
+POST /api/v1/execution-commands/{command_id}/execute
+```
+
+The synchronous execution service locks the command, reconstructs and verifies its authoritative
+approval lineage, validates its closed payload, and calls one explicit in-process simulated
+learning adapter. A successful transaction commits both `simulated_learning_assignments` and
+`execution_results`. A unique command ownership constraint prevents duplicate assignments; each
+replay gets its own immutable `already_applied` result referencing the original assignment.
+The workbench shows the worker, course, approval lineage, execution control, assignment, and audit
+history. Proposed actions and approval history remain unchanged.
 
 ## Requirements
 

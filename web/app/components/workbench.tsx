@@ -26,6 +26,11 @@ const labels: Record<string, string> = {
   pending_execution: "Pending execution",
   unsupported_action_type: "Unsupported action type",
   unsupported_target_type: "Unsupported target type",
+  executed: "Executed",
+  execution_failed: "Execution failed",
+  succeeded: "Succeeded",
+  already_applied: "Already applied",
+  execution_attempted: "Execution attempted",
 };
 
 function humanize(value: string) {
@@ -104,7 +109,7 @@ export function WorkbenchView({
 
       {run.status === "completed" && (
         <p className="completion-notice">
-          Review is complete. Approved actions remain unexecuted.
+          Review is complete. Approval alone did not execute any action.
         </p>
       )}
 
@@ -165,7 +170,7 @@ export function WorkbenchView({
       {message && (
         <p
           className={
-            /^(Approval reconciliation|Decision recorded|Another committed|Execution commands|Preparation)/.test(
+            /^(Approval reconciliation|Decision recorded|Another committed|Execution|Preparation)/.test(
               message,
             )
               ? "status-message"
@@ -244,6 +249,7 @@ function ExecutionPreparationPanel({
 }) {
   const router = useRouter();
   const [preparing, setPreparing] = useState(false);
+  const [executingCommandId, setExecutingCommandId] = useState<string | null>(null);
 
   async function prepare() {
     setPreparing(true);
@@ -283,6 +289,40 @@ function ExecutionPreparationPanel({
     }
   }
 
+  async function execute(commandId: string) {
+    setExecutingCommandId(commandId);
+    onStatus("");
+    try {
+      const response = await fetch(`/api/v1/execution-commands/${commandId}/execute`, {
+        method: "POST",
+        headers: {
+          "X-ChangeOps-Actor": actor,
+          "X-ChangeOps-Role": "admin",
+        },
+      });
+      if (!response.ok) {
+        const error = await parseApiError(response);
+        onStatus(error.message);
+        router.refresh();
+        return;
+      }
+      const result = (await response.json()) as { status: string };
+      onStatus(
+        result.status === "already_applied"
+          ? "Execution was already applied. The original assignment was reused; no duplicate was created."
+          : "Execution succeeded. The simulated learning assignment and audit result were committed together.",
+      );
+      router.refresh();
+    } catch {
+      onStatus(
+        "Execution response was ambiguous. Reloaded authoritative assignment and audit state for reconciliation.",
+      );
+      router.refresh();
+    } finally {
+      setExecutingCommandId(null);
+    }
+  }
+
   return (
     <section className="preparation-panel" aria-labelledby="preparation-heading">
       <div className="section-heading">
@@ -290,11 +330,14 @@ function ExecutionPreparationPanel({
           <p className="eyebrow">Deterministic execution boundary</p>
           <h2 id="preparation-heading">Execution Preparation</h2>
         </div>
-        <ProvenanceLabel kind="not_executed" />
+        <ProvenanceLabel
+          kind={preparation.execution_performed ? "execution_attempted" : "not_executed"}
+        />
       </div>
       <p>
-        Approval is complete. ChangeOps can materialize the exact authorized command contract,
-        but no enterprise system has been called.
+        {preparation.execution_performed
+          ? "Approval is complete. Durable simulated assignments and immutable attempt history are shown below."
+          : "Approval is complete. ChangeOps can materialize the exact authorized command contract; execution still requires an explicit action."}
       </p>
       <dl className="preparation-counts">
         <div>
@@ -327,16 +370,54 @@ function ExecutionPreparationPanel({
                 <strong>
                   {humanize(command.system)} · {humanize(command.operation)}
                 </strong>
-                <span className="badge execution">Pending execution — no enterprise system called</span>
+                <span className="badge execution">{humanize(command.execution_state)}</span>
               </div>
               <p>
                 {humanize(command.target_type)}: {command.target_identifier}
               </p>
               <p>{command.effective_action.description}</p>
+              <p>
+                Training:{" "}
+                <code>{String(command.parameters.course_identifier ?? "invalid command")}</code>
+              </p>
               <small>
                 Due {command.effective_action.due_date ?? "none"} · Idempotency{" "}
                 <code>{command.idempotency_key.slice(0, 12)}…</code>
               </small>
+              <small className="command-lineage">
+                Approval decision <code>{command.action_review_decision_id}</code> · Action{" "}
+                <code>{command.proposed_action_id}</code>
+              </small>
+              <button
+                type="button"
+                onClick={() => execute(command.id)}
+                disabled={executingCommandId !== null || !actor.trim()}
+              >
+                {executingCommandId === command.id
+                  ? "Executing…"
+                  : command.execution_state === "executed"
+                    ? "Execute again safely"
+                    : "Execute training assignment"}
+              </button>
+              {command.execution_results.length > 0 && (
+                <div className="execution-history">
+                  <h4>Immutable execution results</h4>
+                  {command.execution_results.map((result) => (
+                    <div key={result.id}>
+                      <strong>{humanize(result.status)}</strong>
+                      <p>{result.message}</p>
+                      {result.learning_assignment && (
+                        <p>
+                          Assignment <code>{result.learning_assignment.id}</code>:{" "}
+                          {result.learning_assignment.worker_id} →{" "}
+                          {result.learning_assignment.training_course_id} (
+                          {humanize(result.learning_assignment.assignment_status)})
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </article>
           ))}
         </div>
@@ -359,8 +440,8 @@ function ExecutionPreparationPanel({
         </div>
       )}
       <p className="execution-inline">
-        <strong>Pending execution — no enterprise system called.</strong> This panel contains no
-        execution controls.
+        <strong>Execution is always explicit.</strong> Only supported prepared training commands
+        expose a control; unsupported approved actions remain visible and inactive.
       </p>
     </section>
   );

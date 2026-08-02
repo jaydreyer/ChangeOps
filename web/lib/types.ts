@@ -127,7 +127,13 @@ export interface Workbench {
 
 export interface ExecutionCommand {
   id: string;
+  approval_run_id: string;
+  action_review_id: string;
+  action_review_decision_id: string;
+  proposed_action_id: string;
+  assessment_id: string;
   sequence: number;
+  schema_version: "execution-command-v1";
   system: "learning";
   operation: "assign_training";
   target_type: string;
@@ -137,8 +143,35 @@ export interface ExecutionCommand {
   idempotency_key: string;
   status: "pending_execution";
   prepared_by: string;
+  prepared_role: "admin";
   created_at: string;
-  execution_performed: false;
+  execution_state: "pending_execution" | "executed" | "execution_failed";
+  execution_results: ExecutionResult[];
+  execution_performed: boolean;
+}
+
+export interface SimulatedLearningAssignment {
+  id: string;
+  worker_id: string;
+  training_course_id: string;
+  source_execution_command_id: string;
+  source_approved_action_id: string;
+  assignment_status: "assigned";
+  assigned_at: string;
+  created_at: string;
+}
+
+export interface ExecutionResult {
+  id: string;
+  execution_command_id: string;
+  status: "succeeded" | "already_applied" | "rejected_unsupported" | "failed_validation";
+  outcome_code: string;
+  message: string;
+  command_idempotency_key: string;
+  attempted_by: string;
+  attempted_role: "admin";
+  created_at: string;
+  learning_assignment: SimulatedLearningAssignment | null;
 }
 
 export interface ExecutionPreparation {
@@ -158,7 +191,7 @@ export interface ExecutionPreparation {
     reason_code: "unsupported_action_type" | "unsupported_target_type";
     reason: string;
   }[];
-  execution_performed: false;
+  execution_performed: boolean;
 }
 
 export interface ApiError {

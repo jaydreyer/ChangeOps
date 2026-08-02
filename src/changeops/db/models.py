@@ -1038,6 +1038,83 @@ class ExecutionCommand(Base):
     prepared_role: Mapped[str] = mapped_column(String(30))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
+    execution_results: Mapped[list["ExecutionResult"]] = relationship(
+        order_by="ExecutionResult.created_at",
+    )
+
+
+class SimulatedLearningAssignment(Base):
+    __tablename__ = "simulated_learning_assignments"
+    __table_args__ = (
+        CheckConstraint(
+            "assignment_status = 'assigned'",
+            name="ck_simulated_learning_assignments_status",
+        ),
+        UniqueConstraint(
+            "source_execution_command_id",
+            name="uq_simulated_learning_assignments_command",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    worker_id: Mapped[str] = mapped_column(ForeignKey("workers.id"), index=True)
+    training_course_id: Mapped[str] = mapped_column(
+        ForeignKey("training_courses.id"),
+        index=True,
+    )
+    source_execution_command_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("execution_commands.id"),
+        index=True,
+    )
+    source_approved_action_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("proposed_actions.id"),
+        index=True,
+    )
+    assignment_status: Mapped[str] = mapped_column(String(30))
+    assigned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class ExecutionResult(Base):
+    __tablename__ = "execution_results"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN "
+            "('succeeded', 'already_applied', 'rejected_unsupported', 'failed_validation')",
+            name="ck_execution_results_status",
+        ),
+        CheckConstraint(
+            "(status IN ('succeeded', 'already_applied') "
+            "AND simulated_learning_assignment_id IS NOT NULL) "
+            "OR (status IN ('rejected_unsupported', 'failed_validation') "
+            "AND simulated_learning_assignment_id IS NULL)",
+            name="ck_execution_results_assignment_outcome",
+        ),
+        CheckConstraint(
+            "attempted_role = 'admin' AND length(btrim(attempted_by)) > 0",
+            name="ck_execution_results_attempted_role",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    execution_command_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("execution_commands.id"),
+        index=True,
+    )
+    simulated_learning_assignment_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("simulated_learning_assignments.id"),
+        index=True,
+    )
+    status: Mapped[str] = mapped_column(String(30))
+    outcome_code: Mapped[str] = mapped_column(String(100))
+    message: Mapped[str] = mapped_column(Text)
+    command_idempotency_key: Mapped[str] = mapped_column(String(64))
+    attempted_by: Mapped[str] = mapped_column(String(200))
+    attempted_role: Mapped[str] = mapped_column(String(30))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    learning_assignment: Mapped[SimulatedLearningAssignment | None] = relationship()
+
 
 class ActionApprovalRunTransition(Base):
     __tablename__ = "action_approval_run_transitions"

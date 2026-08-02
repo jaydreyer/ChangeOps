@@ -7,7 +7,9 @@ Milestone 2 backend complete.
 The API workflow, deterministic validation and analysis, durable clarification, grounded
 interpretation, offline evaluations, automated merge gates, and manual live-provider smoke path
 are complete. Milestones 3 and 4 subsequently added the focused approval workbench and one
-controlled simulated execution path. Broader policy-analysis screens remain deferred.
+controlled simulated execution path. The Milestone 5 local product journey now exposes the
+extraction, authoritative clarification lineage, assessment, and grounded change plan together;
+the eight legacy assessment fixture questions are not presented as AI-derived uncertainty.
 
 Milestone 1 is complete and merged into `main`.
 

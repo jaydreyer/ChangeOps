@@ -359,3 +359,17 @@ Human reviewers remain responsible for:
 * approving consequential actions;
 * rejecting inappropriate recommendations;
 * accepting accountability for final decisions.
+
+⸻
+
+Product-facing golden journey
+
+The local portfolio application exposes the international-travel scenario from policy selection
+through extraction, deterministic validation, authoritative clarification, immutable assessment,
+enterprise coverage, grounded interpretation, human approval, and controlled execution.
+
+The analysis journey distinguishes AI-proposed extraction and interpretation from deterministic
+worker classification, enterprise impacts, evidence, and grounding validation. It derives
+considered, affected, and cleared enterprise-object coverage without persisting empty impact rows.
+Legacy schema-v1 assessment questions remain historical fixtures and are not presented as
+model-discovered uncertainty.

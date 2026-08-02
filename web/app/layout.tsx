@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ChangeOps Approval Workbench",
-  description: "Human review of proposed ChangeOps actions",
+  title: "ChangeOps Policy Analysis",
+  description: "Governed policy analysis from source language to controlled action",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

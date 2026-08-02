@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import { PolicyAnalysisJourneyView } from "./policy-analysis-journey";
 import type { PolicyAnalysisJourney } from "@/lib/types";
@@ -221,6 +221,12 @@ describe("policy analysis journey", () => {
     expect(screen.getByText("Acme Expense")).toBeInTheDocument();
     expect(screen.getByText("Review scope definition")).toBeInTheDocument();
     expect(screen.getByText(/system:system-1/)).toBeInTheDocument();
+    const proposedActions = screen.getByRole("heading", { name: "Proposed actions" }).closest(
+      "section",
+    );
+    expect(proposedActions).not.toBeNull();
+    expect(within(proposedActions!).getByText("Deterministic proposal")).toBeInTheDocument();
+    expect(within(proposedActions!).queryByText("AI proposal")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Create approval run" })).toBeEnabled();
   });
 

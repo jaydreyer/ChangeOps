@@ -584,7 +584,7 @@ function AssessmentSection({
             <p className="eyebrow">Not yet human reviewed</p>
             <h2 id="actions-heading">Proposed actions</h2>
           </div>
-          <span className="badge ai_proposal">Proposals for approval</span>
+          <span className="badge deterministic">Deterministic proposal</span>
         </div>
         <ul className="proposed-action-list">
           {assessment.proposed_actions.map((action) => (

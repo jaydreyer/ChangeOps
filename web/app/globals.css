@@ -288,6 +288,34 @@ dd {
   margin: 0.45rem 0;
 }
 
+.command-card > button {
+  margin-top: 0.8rem;
+}
+
+.command-lineage {
+  display: block;
+  margin-top: 0.35rem;
+  overflow-wrap: anywhere;
+}
+
+.execution-history {
+  display: grid;
+  gap: 0.6rem;
+  border-top: 1px solid #cbd4ce;
+  margin-top: 1rem;
+  padding-top: 0.8rem;
+}
+
+.execution-history h4 {
+  margin: 0;
+}
+
+.execution-history > div {
+  border-left: 3px solid #2d6a4f;
+  background: white;
+  padding: 0.6rem 0.75rem;
+}
+
 .unsupported-list article {
   border-left-color: #98754a;
 }

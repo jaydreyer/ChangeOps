@@ -1,8 +1,8 @@
 # ChangeOps Architecture
 
-This document describes the current implementation through Milestone 4, Slice 1: the completed
+This document describes the current implementation through Milestone 4, Slice 2: the completed
 policy-analysis and approval lifecycles, the integrated focused Next.js workbench, and
-deterministic preparation of immutable execution commands. No command executes.
+deterministic preparation and explicit execution of one learning-assignment command.
 
 ## High-level architecture
 
@@ -38,6 +38,8 @@ flowchart LR
         WorkbenchProjection["Focused approval<br/>workbench projection"]
         CommandPreparation["Execution command<br/>preparation service"]
         CommandMapping["Pure supported-action<br/>command mapping"]
+        ExecutionService["Deterministic execution<br/>and lineage validation"]
+        LearningAdapter["Simulated learning adapter"]
         ORM["SQLAlchemy models and sessions"]
     end
 
@@ -74,6 +76,10 @@ flowchart LR
     CommandPreparation --> Review
     CommandPreparation --> CommandMapping
     CommandPreparation --> ORM
+    Routes --> ExecutionService
+    ExecutionService --> CommandMapping
+    ExecutionService --> LearningAdapter
+    LearningAdapter --> ORM
     ORM --> DB
     Migrate --> DB
     Seed --> DB
@@ -81,9 +87,10 @@ flowchart LR
 
 ChangeOps remains a synchronous modular monolith. The HTTP, application, domain, serialization, and
 persistence code run in one Python process. PostgreSQL stores source, extraction, workflow,
-assessment, interpretation, review, approval-run, and execution-command data. The Next.js runtime
-provides the focused local workbench. A configured chat-model provider is the only external
-service used by extraction and interpretation; command preparation has no external dependency.
+assessment, interpretation, review, approval-run, command, simulated learning-assignment, and
+execution-result data. The Next.js runtime provides the focused local workbench. A configured
+chat-model provider is the only external service used by extraction and interpretation; command
+preparation and simulated execution have no external dependency.
 
 ## Major runtime components
 
@@ -115,6 +122,7 @@ The FastAPI application exposes:
 - `POST /api/v1/action-approval-runs/{run_id}/execution-commands`
 - `GET /api/v1/action-approval-runs/{run_id}/execution-commands`
 - `GET /api/v1/execution-commands/{command_id}`
+- `POST /api/v1/execution-commands/{command_id}/execute`
 
 The create response adds an input fingerprint, enterprise-impact summary, and categorized
 enterprise impacts. Existing worker results, findings, evidence, proposed actions, and unresolved
@@ -221,6 +229,48 @@ Database triggers require a completed run and approved review decision, validate
 identity, reject update and delete, and constrain status to `pending_execution`. Preparation never
 changes `proposed_actions.execution_status`, calls an enterprise system, checks mutable enterprise
 state, or creates an execution attempt.
+
+### Simulated learning execution
+
+The execution endpoint requires the same trusted local demonstration `admin` boundary used for
+preparation. The service loads and row-locks the immutable command, then reconstructs authoritative
+run membership, review, approval decision, effective approved action, deterministic mapping,
+command snapshot, and idempotency key. A submitted command ID is therefore not sufficient by
+itself. The persisted lineage must still prove a completed run and exact approval.
+
+The command contract required no change. It already contains the worker and course identifiers,
+operation and system, effective-action and parameter snapshots, idempotency identity, assessment,
+proposed action, review, decision, run, preparer, and timestamp. The assessment reference also
+allows an optional change plan to be resolved without making that later AI artifact authoritative
+for deterministic actions.
+
+```mermaid
+flowchart TD
+    Review["Approved Action Review"]
+    Command["Immutable Execution Command"]
+    Service["Deterministic Execution Service"]
+    Adapter["Simulated Learning Adapter"]
+    Assignment["Durable Learning Assignment"]
+    Result["Immutable Execution Result"]
+
+    Review --> Command --> Service --> Adapter
+    Adapter --> Assignment
+    Adapter --> Result
+```
+
+`learning.assign_training` is the only dispatch path. The adapter validates a closed payload,
+requires a real worker and active course, and performs no AI call. PostgreSQL commits the assignment
+and successful result in one transaction. A row lock serializes requests for one command, while a
+unique `source_execution_command_id` constraint is the durable backstop. The first attempt appends
+`succeeded`; later attempts append `already_applied` results referencing the same assignment.
+Unsupported and malformed adapter attempts have explicit immutable result statuses, although
+normal preparation cannot create such commands because its mapping and database constraints are
+closed.
+
+Commands remain immutable and `pending_execution`; they represent authorization, not mutable
+connector state. Simulated learning assignments represent enterprise state. Execution results
+represent append-only attempt history. Proposed actions remain immutable `not_executed` assessment
+artifacts, so execution never rewrites historical analysis or approval.
 
 ### Policy extraction service
 
@@ -570,6 +620,18 @@ Command snapshots remain meaningful even if a later mapping version changes. Uns
 eligibility is derived rather than persisted because all inputs are immutable and no preparation
 workflow state is required.
 
+### Simulated learning state and execution history
+
+`simulated_learning_assignments` stores the one enterprise side effect supported by this slice:
+worker, course, assignment status and time, source command, and source approved action. One command
+can own at most one assignment. Insert validation checks that assignment values exactly match the
+command; mutation is rejected for the current narrow assignment lifecycle.
+
+`execution_results` is append-only and stores the command, optional assignment, outcome, stable
+code and explanation, command idempotency key, execution actor, role, and timestamp. PostgreSQL
+checks outcome/assignment consistency and rejects update or delete. Replays add history without
+duplicating simulated enterprise state.
+
 ## Seeded demonstration
 
 The idempotent seed contains:
@@ -609,9 +671,10 @@ mutates domain records nor persists a screen snapshot.
 
 After completion, the page separately loads the focused execution-command projection. The panel
 shows approved, eligible, unsupported, and prepared counts; prepared command target and operation;
-effective approved values; pending status; and a shortened idempotency key. POST preparation uses
-the same local actor field with the `admin` demonstration role, then refreshes authoritative server
-state. There is no execute, retry, or bulk-execution control.
+effective approved values; approval lineage; execution state and results; and a shortened
+idempotency key. POST preparation and explicit supported-command execution use the same local actor
+field with the `admin` demonstration role, then refresh authoritative server state. There is no
+automatic, retry-orchestrated, or bulk execution.
 
 ## External dependencies and boundaries
 
@@ -625,7 +688,7 @@ There are no:
 - MCP or live enterprise integrations;
 - graph databases;
 - background workers or message queues;
-- action execution;
+- execution beyond the single simulated learning assignment;
 - production authentication or user-administration components.
 
 ## Quality and provider verification boundaries

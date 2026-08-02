@@ -5,6 +5,39 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict
 
 
+class SimulatedLearningAssignmentResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    id: uuid.UUID
+    worker_id: str
+    training_course_id: str
+    source_execution_command_id: uuid.UUID
+    source_approved_action_id: uuid.UUID
+    assignment_status: Literal["assigned"]
+    assigned_at: datetime
+    created_at: datetime
+
+
+class ExecutionResultResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    id: uuid.UUID
+    execution_command_id: uuid.UUID
+    status: Literal[
+        "succeeded",
+        "already_applied",
+        "rejected_unsupported",
+        "failed_validation",
+    ]
+    outcome_code: str
+    message: str
+    command_idempotency_key: str
+    attempted_by: str
+    attempted_role: Literal["admin"]
+    created_at: datetime
+    learning_assignment: SimulatedLearningAssignmentResponse | None
+
+
 class ExecutionCommandResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -27,7 +60,9 @@ class ExecutionCommandResponse(BaseModel):
     prepared_by: str
     prepared_role: Literal["admin"]
     created_at: datetime
-    execution_performed: Literal[False] = False
+    execution_state: Literal["pending_execution", "executed", "execution_failed"]
+    execution_results: list[ExecutionResultResponse]
+    execution_performed: bool
 
 
 class UnsupportedExecutionActionResponse(BaseModel):
@@ -53,4 +88,4 @@ class ExecutionCommandPreparationResponse(BaseModel):
     unsupported_approved_action_count: int
     commands: list[ExecutionCommandResponse]
     unsupported_items: list[UnsupportedExecutionActionResponse]
-    execution_performed: Literal[False] = False
+    execution_performed: bool

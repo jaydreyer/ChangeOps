@@ -10,6 +10,7 @@ from changeops.db.models import (
     ActionApprovalRunItem,
     ActionReview,
     ExecutionCommand,
+    ExecutionResult,
 )
 from changeops.domain.action_review import (
     EditedActionSnapshot,
@@ -90,7 +91,13 @@ def prepare_execution_commands(
         existing_by_review = {
             command.action_review_id: command
             for command in session.scalars(
-                select(ExecutionCommand).where(ExecutionCommand.approval_run_id == run_id)
+                select(ExecutionCommand)
+                .where(ExecutionCommand.approval_run_id == run_id)
+                .options(
+                    selectinload(ExecutionCommand.execution_results).selectinload(
+                        ExecutionResult.learning_assignment
+                    )
+                )
             )
         }
         for item in membership:
@@ -159,7 +166,13 @@ def get_execution_command_preparation(
     commands_by_review = {
         command.action_review_id: command
         for command in session.scalars(
-            select(ExecutionCommand).where(ExecutionCommand.approval_run_id == run_id)
+            select(ExecutionCommand)
+            .where(ExecutionCommand.approval_run_id == run_id)
+            .options(
+                selectinload(ExecutionCommand.execution_results).selectinload(
+                    ExecutionResult.learning_assignment
+                )
+            )
         )
     }
     commands: list[PreparedCommandItem] = []
@@ -211,7 +224,15 @@ def get_execution_command(
     session: Session,
     command_id: uuid.UUID,
 ) -> PreparedCommandItem:
-    command = session.get(ExecutionCommand, command_id)
+    command = session.scalar(
+        select(ExecutionCommand)
+        .where(ExecutionCommand.id == command_id)
+        .options(
+            selectinload(ExecutionCommand.execution_results).selectinload(
+                ExecutionResult.learning_assignment
+            )
+        )
+    )
     if command is None:
         raise ExecutionCommandNotFoundError(str(command_id))
     sequence = session.scalar(

@@ -1,5 +1,10 @@
 ChangeOps: Initial Product Brief
 
+Document status
+
+This document preserves the product vision and Version 0.1 baseline. The README and roadmap are
+authoritative for delivered milestone status.
+
 Product vision
 
 ChangeOps helps organizations understand and safely act on policy and operational changes that affect people, teams, documentation, training, customer commitments, and enterprise systems.
@@ -256,7 +261,7 @@ This layer determines what is factually affected.
 
 AI-assisted interpretation and planning
 
-A later release will accept unstructured policy text and use AI to:
+Milestone 2 accepts unstructured policy text and uses AI to:
 
 * extract a typed policy representation;
 * identify ambiguity;
@@ -268,7 +273,7 @@ The deterministic impact engine remains authoritative for known rules and enterp
 
 Human review and approval
 
-Reviewers will be able to:
+Milestone 3 allows reviewers to:
 
 * inspect evidence;
 * edit recommendations;
@@ -279,7 +284,8 @@ Reviewers will be able to:
 
 Governed execution
 
-Approved actions will execute against simulated enterprise systems through controlled, idempotent interfaces.
+Milestone 4 explicitly executes only the supported training-assignment command against a simulated
+Learning System. Approval alone never executes an action; unsupported approvals remain visible.
 
 Portfolio-grade operation
 
@@ -296,22 +302,14 @@ The final public application will add:
 
 ⸻
 
-Future capabilities
+Capstone and possible expansion capabilities
 
 Later releases may add:
 
-* unstructured policy ingestion;
-* structured LLM extraction;
-* LangChain;
-* LangGraph workflows;
-* durable workflow state;
-* clarification and resume;
-* evidence-backed AI recommendations;
-* human approval;
 * simulated HR, CRM, learning, work-management, and knowledge-system MCP servers;
-* idempotent action execution;
+* additional justified execution operations and enterprise adapters;
 * role-based permissions;
-* evaluation datasets;
+* live model-quality datasets and reporting;
 * adversarial tests;
 * AWS deployment;
 * Terraform infrastructure;

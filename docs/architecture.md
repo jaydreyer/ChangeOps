@@ -338,9 +338,15 @@ stateDiagram-v2
     failed --> [*]
 ```
 
-PostgreSQL is authoritative. Starting or resuming reconstructs routing from the run, latest
-attempt, and clarification rows; no in-memory workflow object or opaque graph checkpoint is needed.
-Terminal runs do not execute again.
+LangGraph owns declarative workflow topology, typed orchestration state, conditional routing, and
+explicit node and transition boundaries. PostgreSQL owns authoritative durable state, workflow
+lifecycle status, clarification state, persisted artifacts, auditability, and recovery across
+processes and restarts.
+
+Both graphs are compiled without a checkpointer. Policy analysis does not call LangGraph
+`interrupt()` or resume a checkpoint thread. Starting or resuming creates a fresh graph invocation
+whose route is derived from the run, latest attempt, and clarification rows. No in-memory workflow
+object or opaque graph checkpoint is needed, and terminal runs do not execute again.
 
 The deterministic materiality gate asks only
 `booking_before_effective_date_exemption` in schema v1. Because the existing deterministic rule
@@ -612,6 +618,29 @@ Assessment immutability is an application invariant:
 - the API exposes no assessment mutation;
 - all aggregate rows commit atomically.
 
+### Uncertainty records and current projection gap
+
+ChangeOps currently has two uncertainty representations with different lineage:
+
+- extraction-attempt findings record model-proposed ambiguity and validation observations;
+- `policy_analysis_clarifications` records the bounded human-resolution workflow and is
+  authoritative for whether a policy-analysis run pauses, what was answered, by whom, and when;
+- `policy_change_questions` contains eight seeded Milestone 0 scenario questions, which the
+  assessment service copies verbatim into `assessment_unresolved_questions`.
+
+The copied assessment questions are immutable historical fixture data. They do not drive
+extraction validation, clarification routing, impact analysis, approval, command preparation, or
+execution. They do participate in the assessment input fingerprint and are exposed by the
+assessment API and interpretation input. Because the current response calls them
+`unresolved_questions` without their seed provenance, a client can incorrectly infer that they
+were detected by the model that produced a policy-analysis assessment.
+
+The authoritative current uncertainty workflow is the extraction finding followed, when the
+deterministic materiality gate requires it, by the persisted clarification record. The assessment
+projection does not yet expose that clarification history. Existing immutable assessments and the
+schema-v1 response are left unchanged in this cleanup; ADR-0015 records the compatibility decision
+needed before replacing the legacy field.
+
 ### Immutable execution commands
 
 `execution_commands` is the audit boundary between human approval and future tool invocation.
@@ -700,11 +729,18 @@ fixture-backed tests cannot inherit a live provider secret. The `migration` job 
 PostgreSQL database and verifies the current Alembic head can upgrade, downgrade one revision, and
 upgrade again.
 
+The four required evaluations are deterministic contract evaluations over fixed fixtures. They
+protect structured-output handling, validation, routing, lifecycle calculations, grounding,
+provenance, and fail-closed behavior. They do not invoke a provider and do not measure live model
+accuracy.
+
 A separate dispatch-only workflow starts an isolated Compose stack with a repository provider
 secret and runs the canonical extraction, workflow, assessment, and interpretation path. Its
 Python runner asserts typed acceptance, deterministic assessment counts, grounded plan
 acceptance, retrieval, idempotency, and assessment immutability. It emits only configuration
-names, elapsed time, lifecycle identifiers, terminal outcome, and a stable failure code.
+names, elapsed time, lifecycle identifiers, terminal outcome, and a stable failure code. This
+manual smoke checks provider compatibility and one live end-to-end path. It is non-gating and is
+not a comprehensive model-quality benchmark.
 
 ## Technology stack
 

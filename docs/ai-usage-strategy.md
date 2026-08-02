@@ -2,7 +2,8 @@
 
 ## Status
 
-Proposal for discussion. Not yet an accepted decision. Revised following review.
+Historical Milestone 2 design proposal. ADR-0009 is the accepted decision. Implementation notes in
+this document have been corrected where the delivered architecture differs from the proposal.
 
 This document exists to settle two questions before `docs/milestone-2.md` is written:
 
@@ -28,8 +29,9 @@ rather than debatable.
    passes schema, enum, and referential validation.
 3. **Every AI claim cites something that already exists.** Evidence keys, impact records, and source
    text spans are referenced, never minted.
-4. **Every AI step has a test that can fail.** Grounding is asserted, extraction is measured against
-   a golden dataset, and interpretation quality is judged. See [Evaluation](#evaluation).
+4. **Every AI boundary has a test or evaluation that can fail.** Grounding, routing, and
+   fail-closed contracts are asserted against deterministic fixtures. Live provider behavior is
+   checked separately. See [Evaluation](#evaluation).
 
 ---
 
@@ -119,6 +121,8 @@ Three properties of this process matter architecturally.
 later in a different process cannot hold state in memory or in a request. Milestone 2's exit criteria
 already require this — "ambiguous policy text pauses the workflow" and "approved clarification
 resumes the same persisted workflow" — and Milestone 3 escalates it to surviving process restart.
+The delivered implementation satisfies that requirement with PostgreSQL records and a fresh graph
+invocation.
 
 **A run and an assessment have different lifecycles.** The interrupt sits *before* the deterministic
 engine, so a workflow run can exist for days with no assessment attached, and some runs end without
@@ -140,18 +144,17 @@ human input."
 problem that requires it, and specifically warns against building graphs around deterministic
 functions. That rule deserves an honest answer rather than a list of desirable properties.
 
-> LangGraph is introduced because the workflow must pause for human clarification and resume later,
-> in a different process, without recomputing prior steps or losing state. If clarification and
-> resume were removed from Milestone 2, sequential Python functions over a persisted state row would
-> be sufficient and LangGraph would not be justified.
+The delivered design uses LangGraph for declarative topology, typed orchestration state,
+conditional routing, and explicit node and transition boundaries. Nodes are invoked in an order
+the code determines. The model is a node; it is never the router.
 
-That claim is falsifiable, which is the point. It also sets the honest scope: the graph is a durable
-state machine with checkpoints and typed transitions, not an agent loop. Nodes are invoked in an
-order the code determines. The model is a node; it is never the router.
+PostgreSQL, not LangGraph, owns durable lifecycle, pause-and-resume, clarification, artifact, and
+audit state. The graphs are compiled without a checkpointer, and the policy-analysis graph does
+not call `interrupt()`. Resume is a fresh invocation whose route is derived from persisted records.
 
-The secondary benefit — inspectable state, retries, and visible transitions across a workflow that
-mixes deterministic and probabilistic steps — is real and is listed in the Milestone 2 exit criteria,
-but it is not what forces the choice. The interrupt is.
+Sequential Python over those same records remains a viable implementation. LangGraph is retained
+because the explicit topology improves inspection, explainability, and maintainable extension,
+not because it is necessary for durability.
 
 ---
 
@@ -310,27 +313,24 @@ Evaluation is a pillar of this milestone, not a closing consequence of it. The b
 makes it tractable: because no conclusion is jointly owned, each layer can be measured on its own
 terms.
 
-Three layers, with deliberately different rigor.
+The delivered repository has two verification categories with deliberately different guarantees.
 
 **Grounding is an assertion, not an evaluation.** "Every evidence key and impact reference in an AI
 output resolves against the persisted assessment" is deterministic and belongs in pytest as a hard
 gate. Calling it an eval would make the rigorous half of the story look soft.
 
-**Extraction is a golden dataset, gating on merge.** Policy text in, expected typed rules out, plus
-negative cases that must fail closed. The first case already exists in the repository:
-`seed_service.py:28` holds `POLICY_TEXT` and line 466 holds the hand-verified `STRUCTURED_RULES` for
-the same policy, and `demo-scenario.md` is already written as executable specification. A regression
-should block a merge, not appear in a report.
+**Deterministic CI contract evaluations gate merge.** They replay fixed model outputs, proposals,
+and workflow cases. They protect schemas, typed-rule validation, provenance, routing, grounding,
+and fail-closed behavior. They do not call a provider and do not measure live model accuracy.
 
-**Interpretation quality is judged.** Coverage and usefulness need a rubric and a judge. This is the
-softest layer and should be tracked rather than gating, at least initially — claiming otherwise would
-overstate what a rubric score means.
+**Live provider verification is manual and non-gating.** The dispatch-only AI smoke invokes the
+configured provider on the canonical path and checks end-to-end compatibility and deterministic
+invariants. Cost, provider availability, and nondeterministic output make it unsuitable for every
+pull request. It is not a comprehensive quality benchmark.
 
-`docs/roadmap.md` sets "deterministic and AI evaluations run automatically" as a Milestone 5 exit
-criterion. That is only reachable if the two never share responsibility for the same conclusion,
-which is what this boundary buys.
-
-Dataset format, rubric design, thresholds, and CI wiring belong in `docs/milestone-2.md`.
+A broader live-output quality program for extraction usefulness, ambiguity detection, and
+interpretation relevance remains future work; this cleanup does not add an LLM judge or evaluation
+platform.
 
 ---
 
@@ -349,29 +349,30 @@ re-runnable against a fixed assessment, which is what makes judged evaluation re
 
 ---
 
-## Open questions for the discussion
+## Design questions and delivered resolution
 
 1. **Does extraction stay pinned to `international_travel`, or does the schema generalize in
-   Milestone 2?** Recommendation: stay pinned. "This policy is outside the supported family" is a
-   stronger demonstration than a schema loose enough to absorb anything.
+   Milestone 2?** It remains pinned; unsupported policy families fail closed.
 2. **Do the AI-generated unresolved questions replace the seeded eight, or supplement them?**
-   Replacing is the honest answer; it will change the golden scenario, which per `CONTRIBUTING.md`
-   requires approval.
+   Still unresolved. The delivered workflow made clarification records authoritative but continued
+   copying the seeded eight into assessments. ADR-0015 classifies the assessment field as a legacy
+   fixture and defers replacement until API compatibility and historical projection semantics are
+   explicit.
 3. **What is the clarification gate's trigger?** Any question at all, only questions touching fields
-   that change the impact set, or a confidence threshold? This is now the most consequential open
-   question, because the interrupt is what justifies durable orchestration. The second option is the
-   most defensible and the hardest to implement.
+   that change the impact set, or a confidence threshold? The delivered schema-v1 gate pauses only
+   for the bounded material booking-exception conflict.
 4. **How is a run that never produces an assessment represented?** Unsupported policy, abandoned
-   clarification, and extraction failure all need a terminal state that today's schema cannot express.
+   clarification, and extraction failure need explicit lifecycle state. The delivered run model
+   supports `awaiting_clarification`, `unsupported`, and `failed`; abandonment remains outside the
+   narrow lifecycle.
 5. **Is human clarification captured as evidence with its own type, and does it enter the
-   fingerprint?** It changes the extracted rules, so it changes the result; the traceability contract
-   in `product-brief.md` already implies it must be recorded.
+   fingerprint?** It is captured as its own durable clarification record and accepted-rule
+   provenance. The resulting validated rules enter the assessment fingerprint; the clarification
+   record is not duplicated as assessment evidence.
 6. **Is interpretation separately invocable against an existing assessment, or only reachable inside
-   a run?** Separately invocable is better for evaluation and for re-running after the deterministic
-   engine changes.
+   a run?** It is separately invocable against a completed policy-analysis assessment.
 7. **Which of the three interpretation capabilities ship in Milestone 2?** Recommendation: coverage
-   gaps first, since it is the only one with no deterministic equivalent. Two done well beats three
-   thinly.
+   gaps first. The delivered interpreter is limited to grounded coverage-gap findings.
 
 ---
 

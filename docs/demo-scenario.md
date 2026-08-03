@@ -871,6 +871,10 @@ detail groups. Worker, finding, and enterprise-impact records are collapsed inde
 default. Their summaries retain classification, business title, reason code, and side status;
 opening one record reveals full persisted explanations, evidence, relationship paths, stable
 identity, and source-record lineage. Worker totals are explicitly labeled as worker-trip outcomes.
+The comparison uses the same quiet surfaces, authority language, and technical disclosures as the
+guided analysis and approval experiences. Accepted semantic values and materiality remain visible;
+rule identity, provenance, source spans, and aggregate lineage begin collapsed without being
+discarded.
 
 The proposed assessment deterministically classifies all six travelers as unaffected:
 

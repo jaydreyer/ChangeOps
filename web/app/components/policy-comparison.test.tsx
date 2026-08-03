@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { PolicyComparisonView } from "./policy-comparison";
@@ -161,6 +161,16 @@ describe("policy comparison", () => {
   it("prioritizes policy changes before the response-derived operational story", () => {
     const { container } = render(<PolicyComparisonView comparison={comparison} />);
 
+    expect(
+      screen.getByRole("link", { name: "← All policy analyses and comparisons" }),
+    ).toHaveAttribute("href", "/");
+    expect(screen.getByText("ChangeOps")).toBeInTheDocument();
+    expect(screen.getByText("Authoritative comparison")).toBeInTheDocument();
+    expect(screen.getByText("Immutable persisted record")).toBeInTheDocument();
+    expect(screen.getByText("Initiated by reviewer@example.test")).toBeInTheDocument();
+    expect(screen.getByText("View comparison identity").closest("details")).not.toHaveAttribute(
+      "open",
+    );
     expect(screen.getByText("Current Travel Policy")).toBeInTheDocument();
     expect(screen.getByText("Proposed Travel Revision")).toBeInTheDocument();
     expect(screen.getByText("contractor")).toBeInTheDocument();
@@ -200,6 +210,14 @@ describe("policy comparison", () => {
     expect(screen.getByText("Enterprise impact differences").closest("li")).toHaveTextContent(
       "1 removed",
     );
+    const ruleEvidence = screen
+      .getByText("View accepted rule evidence and identity")
+      .closest("details");
+    expect(ruleEvidence).not.toHaveAttribute("open");
+    expect(within(ruleEvidence as HTMLElement).getByText("WORKER_TYPE_REMOVED")).toBeInTheDocument();
+    expect(
+      within(ruleEvidence as HTMLElement).getByText("employees and contractors"),
+    ).toBeInTheDocument();
   });
 
   it("keeps causal scope visible and audit details collapsed until independently opened", async () => {
@@ -207,7 +225,7 @@ describe("policy comparison", () => {
     render(<PolicyComparisonView comparison={comparison} />);
 
     expect(
-      screen.getByRole("heading", { name: "What this comparison proves" }),
+      screen.getByRole("heading", { name: "What this comparison can establish" }),
     ).toBeInTheDocument();
     expect(
       screen.getByText(

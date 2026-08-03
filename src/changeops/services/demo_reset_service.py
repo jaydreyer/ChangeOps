@@ -22,6 +22,8 @@ LOCAL_DATABASE_HOSTS = {"db", "localhost", "127.0.0.1", "::1"}
 LOCAL_DATABASE_NAMES = {"changeops"}
 
 WORKFLOW_TABLES = (
+    "policy_comparison_impact_delta_items",
+    "policy_comparison_impact_deltas",
     "policy_comparison_differences",
     "policy_comparisons",
     "execution_results",

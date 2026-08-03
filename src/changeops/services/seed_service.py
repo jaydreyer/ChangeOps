@@ -552,6 +552,12 @@ def seed_database(session: Session) -> None:
                 **dependency,
             )
         )
+        session.merge(
+            PolicySystemDependency(
+                policy_change_id=PROPOSED_POLICY_CHANGE_ID,
+                **{**dependency, "id": f"{dependency['id']}-proposed"},
+            )
+        )
     for dependency in DOCUMENT_DEPENDENCIES:
         session.merge(
             PolicyDocumentDependency(
@@ -559,10 +565,26 @@ def seed_database(session: Session) -> None:
                 **dependency,
             )
         )
+        session.merge(
+            PolicyDocumentDependency(
+                policy_change_id=PROPOSED_POLICY_CHANGE_ID,
+                **{**dependency, "id": f"{dependency['id']}-proposed"},
+            )
+        )
     session.merge(
         PolicyTrainingDependency(
             id="dependency-policy-security-course",
             policy_change_id=POLICY_CHANGE_ID,
+            rule_code="TRAINING_REQUIRED",
+            course_id=COURSE_IDENTIFIER,
+            relationship_type="requires_course",
+            explanation="The policy requires the International Travel Security course.",
+        )
+    )
+    session.merge(
+        PolicyTrainingDependency(
+            id="dependency-policy-security-course-proposed",
+            policy_change_id=PROPOSED_POLICY_CHANGE_ID,
             rule_code="TRAINING_REQUIRED",
             course_id=COURSE_IDENTIFIER,
             relationship_type="requires_course",

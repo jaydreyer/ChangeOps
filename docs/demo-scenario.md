@@ -842,3 +842,59 @@ product explicitly labels enterprise impact delta as not yet calculated.
 
 `make demo-reset` removes generated comparisons and all existing workflow history while preserving
 both policy sources and the rest of the fictional catalog.
+
+## Milestone 5B Enterprise Impact Delta Extension
+
+Both policy sources own business-equivalent seeded dependencies to the two active supporting
+systems, three relevant documents, and the International Travel Security course. The dependency
+rows have source-specific record identifiers, but the deterministic impact comparator never uses
+those identifiers as enterprise-impact identity.
+
+The demonstration executes both assessments against the same enterprise catalog state. Shared
+worker, team, membership, trip, system, document, course, training, commitment, and assignment
+facts remain unchanged between executions, and the source-specific policy dependency sets are
+business-equivalent after excluding row and policy identifiers. An integration test enforces this
+fixture invariant.
+
+The resulting delta compares two authoritative persisted assessment outcomes. In a non-controlled
+scenario where enterprise source facts changed between assessment executions, the delta would not
+prove that policy changes alone caused every observed difference. Milestone 5B deliberately does
+not generalize the demo invariant into enterprise catalog snapshot versioning.
+
+The proposed assessment deterministically classifies all six travelers as unaffected:
+
+- Sarah Johnson is no longer affected because September 15 is before the proposed October 1
+  effective date;
+- Marcus Lee is no longer affected because contractor coverage was removed;
+- David Miller is no longer affected because September 10 is before the proposed effective date;
+- Elena García remains outside the U.S. worker-location scope;
+- Priya Shah remains excluded because her destination is Canada;
+- Thomas Green remains unaffected, with Mexico now explicitly excluded by the proposed policy.
+
+No proposed worker finding is produced because no traveler is affected. The proposed assessment
+retains four policy-level enterprise impacts: the three relevant document impacts and the required
+International Travel Security course impact.
+
+Creating the policy comparison also creates exactly one immutable enterprise impact delta with:
+
+- 0 workers became affected;
+- 3 workers no longer affected: David Miller, Marcus Lee, and Sarah Johnson, in stable identity
+  order;
+- 0 workers remained affected;
+- 0 findings introduced;
+- 6 findings disappeared;
+- 0 enterprise impacts introduced;
+- 14 enterprise impacts removed: 6 people, 3 teams, 2 systems, 2 worker-training requirements,
+  and 1 customer commitment.
+
+The three unchanged document impacts and unchanged course impact do not produce delta items.
+Unaffected-to-unaffected worker results likewise do not produce items. Each worker item contains
+both persisted assessment explanations and reason codes. Each finding or impact item contains the
+applicable persisted explanation, reason code, evidence snapshots, and impact relationship path;
+the absent side remains explicitly absent.
+
+The delta fingerprint excludes comparison, assessment, finding, impact, and evidence UUIDs.
+Repeated creation reuses both the semantic comparison and its one-to-one delta. Database triggers
+reject delta or item update/delete and validate that every lineage record belongs to the correct
+assessment side. `make demo-reset` removes both delta tables before comparisons while preserving
+the two source policies and their dependency catalog.

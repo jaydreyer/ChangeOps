@@ -5,24 +5,100 @@ from datetime import UTC, datetime
 import pytest
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import DatabaseError
+from sqlalchemy.orm import Session
 
 from changeops.api.policy_extractions import extraction_model_dependency
 from changeops.db.models import (
+    CommitmentAssignment,
+    CustomerCommitment,
+    EnterpriseDocument,
+    EnterpriseSystem,
     Organization,
     PolicyAnalysisClarification,
     PolicyAnalysisRun,
     PolicyChange,
     PolicyComparison,
     PolicyComparisonDifference,
+    PolicyComparisonImpactDelta,
+    PolicyComparisonImpactDeltaItem,
+    PolicyDocumentDependency,
     PolicyExtractionAttempt,
+    PolicySystemDependency,
+    PolicyTrainingDependency,
+    Team,
+    TrainingCourse,
+    TrainingRecord,
+    Trip,
+    Worker,
+    WorkerTeamMembership,
 )
 from changeops.db.session import SessionLocal
+from changeops.services import policy_comparison_service
 from changeops.services.demo_reset_service import reset_demo_workflows
+from changeops.services.enterprise_impact_delta_service import EnterpriseImpactDeltaIntegrityError
 from changeops.services.seed_service import POLICY_CHANGE_ID, PROPOSED_POLICY_CHANGE_ID
 from tests.integration.test_policy_extraction_api import configured_fixture_model
 from tests.policy_extraction_fixtures import accepted_model_response, proposed_revision_payload
 
 ACTOR_HEADERS = {"X-ChangeOps-Actor": "portfolio-reviewer"}
+
+ENTERPRISE_CATALOG_MODELS = (
+    Worker,
+    Team,
+    WorkerTeamMembership,
+    Trip,
+    EnterpriseSystem,
+    EnterpriseDocument,
+    TrainingCourse,
+    TrainingRecord,
+    CustomerCommitment,
+    CommitmentAssignment,
+)
+
+
+def _shared_enterprise_catalog_state(
+    session: Session,
+) -> dict[str, tuple[tuple[object, ...], ...]]:
+    state = {}
+    for model in ENTERPRISE_CATALOG_MODELS:
+        table = model.__table__
+        rows = session.execute(select(*table.columns).order_by(*table.primary_key.columns)).all()
+        state[table.name] = tuple(tuple(row) for row in rows)
+    return state
+
+
+def _policy_dependency_business_state(
+    session: Session,
+    policy_change_id: str,
+) -> dict[str, tuple[tuple[object, ...], ...]]:
+    dependency_contracts = (
+        (
+            PolicySystemDependency,
+            ("rule_code", "system_id", "relationship_type", "explanation"),
+        ),
+        (
+            PolicyDocumentDependency,
+            (
+                "rule_code",
+                "document_id",
+                "relationship_type",
+                "impact_classification",
+                "explanation",
+            ),
+        ),
+        (
+            PolicyTrainingDependency,
+            ("rule_code", "course_id", "relationship_type", "explanation"),
+        ),
+    )
+    state = {}
+    for model, field_names in dependency_contracts:
+        fields = tuple(getattr(model, field_name) for field_name in field_names)
+        rows = session.execute(
+            select(*fields).where(model.policy_change_id == policy_change_id).order_by(*fields)
+        ).all()
+        state[model.__tablename__] = tuple(tuple(row) for row in rows)
+    return state
 
 
 def _complete_both_policy_analyses(client) -> tuple[dict, dict]:
@@ -44,6 +120,43 @@ def _complete_both_policy_analyses(client) -> tuple[dict, dict]:
     )
     assert proposed.status_code == 201
     return baseline.json(), proposed.json()
+
+
+def test_seeded_comparison_uses_same_enterprise_catalog_state_for_both_assessments(
+    client,
+) -> None:
+    with SessionLocal() as session:
+        initial_catalog = _shared_enterprise_catalog_state(session)
+        assert _policy_dependency_business_state(
+            session, POLICY_CHANGE_ID
+        ) == _policy_dependency_business_state(session, PROPOSED_POLICY_CHANGE_ID)
+
+    client.app.dependency_overrides[extraction_model_dependency] = lambda: (
+        configured_fixture_model()
+    )
+    baseline = client.post(
+        "/api/v1/policy-analysis-runs",
+        json={"policy_change_id": POLICY_CHANGE_ID},
+    )
+    assert baseline.status_code == 201
+    with SessionLocal() as session:
+        after_baseline = _shared_enterprise_catalog_state(session)
+
+    client.app.dependency_overrides[extraction_model_dependency] = lambda: configured_fixture_model(
+        accepted_model_response(proposed_revision_payload())
+    )
+    proposed = client.post(
+        "/api/v1/policy-analysis-runs",
+        json={"policy_change_id": PROPOSED_POLICY_CHANGE_ID},
+    )
+    assert proposed.status_code == 201
+    with SessionLocal() as session:
+        after_proposed = _shared_enterprise_catalog_state(session)
+        assert _policy_dependency_business_state(
+            session, POLICY_CHANGE_ID
+        ) == _policy_dependency_business_state(session, PROPOSED_POLICY_CHANGE_ID)
+
+    assert initial_catalog == after_baseline == after_proposed
 
 
 def _create_comparison(client):
@@ -90,9 +203,75 @@ def test_create_retrieve_and_idempotently_reuse_policy_comparison(client) -> Non
     assert body["differences"][1]["proposed_provenance"] is None
     assert body["differences"][2]["baseline_provenance"] is None
     assert all(item["material"] is True for item in body["differences"])
+    impact_delta = body["impact_delta"]
+    assert impact_delta["summary"] == {
+        "workers_became_affected": 0,
+        "workers_no_longer_affected": 3,
+        "workers_remained_affected": 0,
+        "findings_introduced": 0,
+        "findings_disappeared": 6,
+        "enterprise_impacts_introduced": 0,
+        "enterprise_impacts_removed": 14,
+    }
+    assert [item["baseline"]["display_name"] for item in impact_delta["worker_deltas"]] == [
+        "David Miller",
+        "Marcus Lee",
+        "Sarah Johnson",
+    ]
+    assert all(
+        item["change_type"] == "no_longer_affected" for item in impact_delta["worker_deltas"]
+    )
+    assert all(item["baseline"]["evidence"] for item in impact_delta["worker_deltas"])
+    assert all(item["change_type"] == "disappeared" for item in impact_delta["finding_deltas"])
+    assert all(
+        item["change_type"] == "removed" for item in impact_delta["enterprise_impact_deltas"]
+    )
+    assert all(
+        item["baseline"]["evidence"] and item["baseline"]["relationship_path"]
+        for item in impact_delta["enterprise_impact_deltas"]
+    )
+    retained_source_keys = {
+        "document-international-travel-policy",
+        "kb-international-travel-booking",
+        "document-manager-travel-approval-guide",
+        "international-travel-security",
+    }
+    assert retained_source_keys.isdisjoint(
+        {item["baseline"]["source_key"] for item in impact_delta["enterprise_impact_deltas"]}
+    )
     with SessionLocal() as session:
         assert session.scalar(select(func.count()).select_from(PolicyComparison)) == 1
         assert session.scalar(select(func.count()).select_from(PolicyComparisonDifference)) == 3
+        assert session.scalar(select(func.count()).select_from(PolicyComparisonImpactDelta)) == 1
+        assert (
+            session.scalar(select(func.count()).select_from(PolicyComparisonImpactDeltaItem)) == 23
+        )
+
+
+def test_impact_delta_failure_rolls_back_the_complete_comparison(
+    client,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _complete_both_policy_analyses(client)
+
+    def fail_delta(*args, **kwargs):
+        raise EnterpriseImpactDeltaIntegrityError("simulated delta failure")
+
+    monkeypatch.setattr(
+        policy_comparison_service,
+        "create_policy_comparison_impact_delta",
+        fail_delta,
+    )
+
+    response = _create_comparison(client)
+
+    assert response.status_code == 409
+    assert response.json()["detail"]["code"] == (
+        "policy_comparison_impact_delta_lineage_inconsistent"
+    )
+    with SessionLocal() as session:
+        assert session.scalar(select(func.count()).select_from(PolicyComparison)) == 0
+        assert session.scalar(select(func.count()).select_from(PolicyComparisonImpactDelta)) == 0
 
 
 @pytest.mark.parametrize(
@@ -294,6 +473,7 @@ def test_request_cannot_inject_authoritative_comparison_values(client) -> None:
             "baseline_policy_change_id": POLICY_CHANGE_ID,
             "proposed_policy_change_id": PROPOSED_POLICY_CHANGE_ID,
             "differences": [],
+            "impact_delta": {"worker_deltas": []},
             "comparison_fingerprint": "attacker-controlled",
         },
     )
@@ -337,6 +517,7 @@ def test_comparison_is_historical_and_database_immutable(client) -> None:
     assert after["differences"] == before["differences"]
     assert after["comparison_fingerprint"] == before["comparison_fingerprint"]
     assert after["proposed"] == before["proposed"]
+    assert after["impact_delta"] == before["impact_delta"]
 
     with SessionLocal() as session:
         with pytest.raises(DatabaseError, match="policy comparisons are immutable"):
@@ -345,6 +526,42 @@ def test_comparison_is_historical_and_database_immutable(client) -> None:
                     "UPDATE policy_comparisons SET created_by = 'mutated' WHERE id = :comparison_id"
                 ),
                 {"comparison_id": comparison_id},
+            )
+            session.commit()
+        session.rollback()
+        impact_delta_id = session.scalar(
+            select(PolicyComparisonImpactDelta.id).where(
+                PolicyComparisonImpactDelta.policy_comparison_id == comparison_id
+            )
+        )
+        with pytest.raises(
+            DatabaseError,
+            match="policy comparison impact deltas are immutable",
+        ):
+            session.execute(
+                text(
+                    "UPDATE policy_comparison_impact_deltas SET created_by = 'mutated' "
+                    "WHERE id = :impact_delta_id"
+                ),
+                {"impact_delta_id": impact_delta_id},
+            )
+            session.commit()
+        session.rollback()
+        impact_delta_item_id = session.scalar(
+            select(PolicyComparisonImpactDeltaItem.id).where(
+                PolicyComparisonImpactDeltaItem.impact_delta_id == impact_delta_id
+            )
+        )
+        with pytest.raises(
+            DatabaseError,
+            match="policy comparison impact deltas are immutable",
+        ):
+            session.execute(
+                text(
+                    "DELETE FROM policy_comparison_impact_delta_items "
+                    "WHERE id = :impact_delta_item_id"
+                ),
+                {"impact_delta_item_id": impact_delta_item_id},
             )
             session.commit()
         session.rollback()
@@ -371,5 +588,6 @@ def test_demo_reset_removes_comparisons_and_preserves_both_sources(client) -> No
 
     assert summary.policy_comparisons == 0
     with SessionLocal() as session:
+        assert session.scalar(select(func.count()).select_from(PolicyComparisonImpactDelta)) == 0
         source_ids = set(session.scalars(select(text("id")).select_from(text("policy_changes"))))
     assert {POLICY_CHANGE_ID, PROPOSED_POLICY_CHANGE_ID} <= source_ids

@@ -675,3 +675,78 @@ and records bounded human clarification. That is the narrowest trustworthy compa
 - The domain and persistence models are intentionally specific to one typed policy family.
 - Reviewers must analyze both policy sources before comparison becomes available.
 - The product does not yet identify newly affected or no-longer-affected enterprise objects.
+
+# ADR-0018 — Persist Enterprise Impact Delta as a Separate Immutable Aggregate
+
+## Status
+
+Accepted
+
+## Context
+
+Milestone 5A preserves immutable semantic differences between two accepted typed policy sources.
+Each completed policy analysis separately owns an immutable assessment containing worker results,
+findings, enterprise impacts, evidence, relationship paths, and proposed actions. ChangeOps now
+needs to explain which operational consequences differ between those two persisted outcomes. The
+comparison can establish outcome differences, but it cannot prove that policy semantics were the
+sole cause if enterprise source facts differed between assessment executions.
+
+Three designs were considered. Recomputing a read projection would reuse authoritative assessment
+rows but would not persist the selected assessment pairing, idempotency identity, or historical
+delta artifact. Adding operational children directly to the Milestone 5A aggregate would combine
+accepted-rule and assessment lifecycles and weaken that aggregate's deliberately narrow immutable
+boundary. A separate one-to-one aggregate can retain the policy comparison while owning the
+assessment-specific identity, evidence, and persistence contract.
+
+Database UUIDs cannot define equality because a regenerated assessment may receive new row IDs
+without changing business meaning. Conversely, persisted record IDs remain useful lineage after
+matching is complete.
+
+## Decision
+
+- Persist one `PolicyComparisonImpactDelta` per `PolicyComparison`, with ordered closed-kind child
+  items for workers, findings, and enterprise impacts.
+- Anchor the delta to the exact completed baseline and proposed assessments whose runs own the
+  comparison's accepted extraction attempts.
+- Match workers by worker and trip identity; findings by worker, trip, finding type, severity, and
+  rule code; and enterprise impacts by domain, object type, stable source key, classification, and
+  reason code.
+- Never compare database UUIDs. Retain assessment record and evidence UUIDs only as lineage in
+  persisted side snapshots and API responses.
+- Fingerprint the delta contract, stable source identities, ordered delta classifications, and
+  semantic side values. Exclude database UUIDs, display text, and explanation prose from equality.
+- Classify workers as `became_affected`, `no_longer_affected`, or `remained_affected`; findings as
+  `introduced` or `disappeared`; and enterprise impacts as `introduced` or `removed`.
+- Omit unaffected-to-unaffected workers and unchanged findings or impacts from persisted items.
+- Copy applicable explanations, reason codes, evidence records, and relationship paths verbatim
+  from the two persisted assessment aggregates. Do not invent missing-side facts or causal claims.
+- Describe the result as a comparison of two authoritative persisted assessment outcomes. Do not
+  claim sole policy causation when enterprise source facts may differ.
+- Keep generalized enterprise catalog snapshot versioning and catalog-state comparison outside
+  this aggregate and milestone.
+- Create or reuse the impact delta in the same transaction as policy-comparison creation/reuse.
+- Use PostgreSQL constraints and insert triggers to validate comparison, assessment, and child
+  ownership. Reject parent and child updates and deletes.
+- Keep the Milestone 5A comparison aggregate unchanged and expose the nested delta through its
+  existing create/retrieve API response.
+- Keep the operation synchronous and deterministic. Do not introduce AI or LangGraph.
+- Do not compare proposed actions in this slice. Do not change plans, review, approval, command,
+  or execution artifacts.
+
+## Consequences
+
+- A historical semantic comparison and its historical operational delta have distinct, auditable
+  persistence boundaries.
+- Regenerated database rows with unchanged business meaning produce the same semantic delta
+  fingerprint even though their lineage UUIDs differ.
+- Every displayed why/evidence statement resolves to a snapshot copied from an authoritative
+  completed assessment; absence remains explicit rather than inferred.
+- The seeded demonstration tests that both assessments read the same unchanged shared enterprise
+  catalog and business-equivalent policy dependencies, making policy-rule changes the controlled
+  scenario variable without creating a generalized snapshot-version contract.
+- Repeated comparison requests reuse both aggregates, and partial delta failure rolls back a new
+  comparison.
+- The generic-looking child table remains a closed three-kind contract, not a generalized diff
+  engine or policy-family registry.
+- AI explanation of the completed delta remains possible later but cannot become authoritative.
+- Governed immutable change-plan revision is the recommended next product slice.

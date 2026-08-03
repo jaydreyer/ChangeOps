@@ -1,10 +1,18 @@
 from sqlalchemy.orm import Session
 
-from changeops.db.models import PolicyChange, PolicyComparison
+from changeops.db.models import PolicyChange, PolicyComparison, PolicyComparisonImpactDelta
 from changeops.schemas.policy_comparisons import (
+    EnterpriseImpactDeltaResponse,
+    EnterpriseImpactDeltaSideResponse,
+    FindingDeltaResponse,
+    FindingDeltaSideResponse,
+    ImpactDeltaSummaryResponse,
     PolicyComparisonDifferenceResponse,
+    PolicyComparisonImpactDeltaResponse,
     PolicyComparisonResponse,
     PolicyComparisonSourceResponse,
+    WorkerDeltaResponse,
+    WorkerDeltaSideResponse,
 )
 from changeops.services.policy_comparison_service import PolicyComparisonCreateError
 
@@ -70,6 +78,11 @@ def serialize_policy_comparison(
             )
             for item in differences
         ],
+        impact_delta=(
+            _serialize_impact_delta(comparison.impact_delta)
+            if comparison.impact_delta is not None
+            else None
+        ),
         created_by=comparison.created_by,
         created_at=comparison.created_at,
     )
@@ -87,3 +100,104 @@ def _validated_policy_snapshot(snapshot: dict, policy: PolicyChange) -> dict:
             "The persisted comparison policy snapshot is inconsistent.",
         )
     return snapshot
+
+
+def _serialize_impact_delta(
+    delta: PolicyComparisonImpactDelta,
+) -> PolicyComparisonImpactDeltaResponse:
+    items = sorted(delta.items, key=lambda item: item.sequence)
+    worker_items = [item for item in items if item.item_kind == "worker"]
+    finding_items = [item for item in items if item.item_kind == "finding"]
+    impact_items = [item for item in items if item.item_kind == "enterprise_impact"]
+    return PolicyComparisonImpactDeltaResponse(
+        id=delta.id,
+        baseline_assessment_id=delta.baseline_assessment_id,
+        proposed_assessment_id=delta.proposed_assessment_id,
+        impact_delta_contract_version=delta.impact_delta_contract_version,
+        impact_delta_fingerprint=delta.impact_delta_fingerprint,
+        summary=ImpactDeltaSummaryResponse(
+            workers_became_affected=sum(
+                item.change_type == "became_affected" for item in worker_items
+            ),
+            workers_no_longer_affected=sum(
+                item.change_type == "no_longer_affected" for item in worker_items
+            ),
+            workers_remained_affected=sum(
+                item.change_type == "remained_affected" for item in worker_items
+            ),
+            findings_introduced=sum(item.change_type == "introduced" for item in finding_items),
+            findings_disappeared=sum(item.change_type == "disappeared" for item in finding_items),
+            enterprise_impacts_introduced=sum(
+                item.change_type == "introduced" for item in impact_items
+            ),
+            enterprise_impacts_removed=sum(item.change_type == "removed" for item in impact_items),
+        ),
+        worker_deltas=[
+            WorkerDeltaResponse(
+                id=item.id,
+                sequence=item.sequence,
+                stable_identity=item.stable_identity,
+                change_type=item.change_type,
+                delta_reason_code=item.delta_reason_code,
+                baseline_record_id=item.baseline_record_id,
+                proposed_record_id=item.proposed_record_id,
+                baseline=(
+                    WorkerDeltaSideResponse.model_validate(item.baseline_snapshot)
+                    if item.baseline_snapshot is not None
+                    else None
+                ),
+                proposed=(
+                    WorkerDeltaSideResponse.model_validate(item.proposed_snapshot)
+                    if item.proposed_snapshot is not None
+                    else None
+                ),
+            )
+            for item in worker_items
+        ],
+        finding_deltas=[
+            FindingDeltaResponse(
+                id=item.id,
+                sequence=item.sequence,
+                stable_identity=item.stable_identity,
+                change_type=item.change_type,
+                delta_reason_code=item.delta_reason_code,
+                baseline_record_id=item.baseline_record_id,
+                proposed_record_id=item.proposed_record_id,
+                baseline=(
+                    FindingDeltaSideResponse.model_validate(item.baseline_snapshot)
+                    if item.baseline_snapshot is not None
+                    else None
+                ),
+                proposed=(
+                    FindingDeltaSideResponse.model_validate(item.proposed_snapshot)
+                    if item.proposed_snapshot is not None
+                    else None
+                ),
+            )
+            for item in finding_items
+        ],
+        enterprise_impact_deltas=[
+            EnterpriseImpactDeltaResponse(
+                id=item.id,
+                sequence=item.sequence,
+                stable_identity=item.stable_identity,
+                change_type=item.change_type,
+                delta_reason_code=item.delta_reason_code,
+                baseline_record_id=item.baseline_record_id,
+                proposed_record_id=item.proposed_record_id,
+                baseline=(
+                    EnterpriseImpactDeltaSideResponse.model_validate(item.baseline_snapshot)
+                    if item.baseline_snapshot is not None
+                    else None
+                ),
+                proposed=(
+                    EnterpriseImpactDeltaSideResponse.model_validate(item.proposed_snapshot)
+                    if item.proposed_snapshot is not None
+                    else None
+                ),
+            )
+            for item in impact_items
+        ],
+        created_by=delta.created_by,
+        created_at=delta.created_at,
+    )

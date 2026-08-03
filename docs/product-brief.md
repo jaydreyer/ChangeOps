@@ -373,3 +373,13 @@ worker classification, enterprise impacts, evidence, and grounding validation. I
 considered, affected, and cleared enterprise-object coverage without persisting empty impact rows.
 Legacy schema-v1 assessment questions remain historical fixtures and are not presented as
 model-discovered uncertainty.
+
+After both source policies complete that journey, the reviewer can compare their accepted typed
+semantics and the operational consequences in their immutable assessments. Deterministic code
+identifies changed worker status, introduced or disappeared findings, and introduced or removed
+enterprise impacts using stable business identity. The product presents persisted reasons,
+evidence, and relationship paths without asking AI to calculate or classify the delta. It labels
+the impact delta as a comparison of two authoritative persisted assessment outcomes, not proof
+that policy changes alone caused every difference if enterprise source facts changed between
+assessment runs. The seeded demonstration holds the enterprise catalog constant across both
+assessments; generalized enterprise snapshot versioning is not part of this slice.

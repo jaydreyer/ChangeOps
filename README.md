@@ -4,14 +4,15 @@ ChangeOps analyzes operational and policy changes, identifies affected people an
 
 ## Current milestone
 
-Milestone 5A, deterministic policy comparison.
+Milestone 5B, Enterprise Impact Delta.
 
 The local application now starts with a baseline international-travel policy and one proposed
 revision. A reviewer analyzes both through the existing governed journey, then creates or retrieves
-an immutable deterministic comparison of their accepted typed rules. The comparison shows stable
-added, removed, and modified obligations with values, materiality, reason codes, and lineage to
-both accepted extraction attempts. Enterprise impact delta remains deferred. Milestones 0–5 and
-the controlled execution workbench remain intact.
+an immutable deterministic comparison of their accepted typed rules and immutable assessments.
+The comparison shows stable added, removed, and modified obligations plus the workers, findings,
+and enterprise impacts whose operational status changed. Every delta item retains applicable
+assessment lineage, deterministic reasons, evidence snapshots, and relationship paths. Milestones
+0–5 and the controlled execution workbench remain intact.
 
 Milestone 0 is complete and preserved by the `v0.0.1-milestone-0` tag.
 
@@ -24,6 +25,7 @@ See:
 - `docs/milestone-3.md`
 - `docs/milestone-4.md`
 - `docs/milestone-5a-policy-comparison.md`
+- `docs/milestone-5b-enterprise-impact-delta.md`
 - `docs/demo-scenario.md`
 - `docs/decisions.md`
 - [Contributing and engineering standards](CONTRIBUTING.md)
@@ -205,6 +207,26 @@ The seeded proposed revision changes the effective date, removes contractor cove
 Mexico to excluded destinations. Wording or source-span changes with identical accepted semantics
 produce no rule difference.
 
+## Enterprise Impact Delta
+
+Every newly created or idempotently reused policy comparison owns one separate immutable
+enterprise impact delta between the two completed policy-analysis assessments. Pure domain code
+matches stable worker-and-trip, finding, and enterprise-impact business identities. Database UUIDs
+are retained only for lineage and never participate in matching or fingerprinting.
+
+The delta compares two authoritative persisted assessment outcomes. It does not prove that policy
+changes were the sole cause of every outcome difference if enterprise source facts differed
+between the assessment runs. ChangeOps exposes the persisted evidence on each side but does not
+infer causation beyond those records. The seeded demonstration deliberately runs both assessments
+against the same enterprise catalog state; Milestone 5B does not add generalized enterprise
+snapshot versioning or catalog-state comparison.
+
+The delta classifies workers as became affected, no longer affected, or remained affected;
+findings as introduced or disappeared; and enterprise impacts as introduced or removed. Each side
+snapshots the authoritative assessment explanation, reason codes, evidence, and relationship path.
+PostgreSQL constrains comparison-to-assessment lineage, makes creation idempotent, and rejects
+delta or delta-item updates and deletes. AI and LangGraph do not participate.
+
 ## Requirements
 
 - Docker Desktop or another Docker Engine with Docker Compose
@@ -279,7 +301,12 @@ Configure `OPENAI_API_KEY` in `.env`, then use this repeatable golden path:
     proposed records under **Compare accepted policy rules**.
 12. Create the comparison. Confirm three ordered semantic differences—effective date modified,
     contractor coverage removed, and Mexico exclusion added—with accepted provenance on every
-    applicable side. Confirm the page states that enterprise impact delta has not been calculated.
+    applicable side.
+13. Inspect the immutable enterprise impact delta. The golden revision shows three workers no
+    longer affected, six findings disappeared, and fourteen enterprise impacts removed. No worker,
+    finding, or enterprise impact is introduced, and no worker remains affected. The three
+    document impacts and policy-required course impact are unchanged and omitted from the delta.
+    Expand an item to inspect authoritative before/after reasons, evidence, and relationship paths.
 
 The eight legacy assessment questions remain only in the historical schema-v1 assessment response.
 They are seeded scenario fixtures and are not displayed as AI-derived uncertainty in the journey.
@@ -386,7 +413,8 @@ make demo-reset
 ```
 
 This command preserves the fictional organization, people, trips, systems, documents, training,
-commitments, both policy sources, and the dependency catalog. It removes comparisons, analysis
+commitments, both policy sources, and the dependency catalog. It removes comparisons and their
+enterprise impact deltas, analysis
 runs, extraction attempts, clarifications, assessments, findings, evidence, impacts, proposed
 actions, interpretation attempts and plans, reviews, approval runs, commands, assignments, and
 execution results.
@@ -463,9 +491,11 @@ Retrieve the immutable comparison:
 GET /api/v1/policy-comparisons/{comparison_id}
 ```
 
-A new comparison returns `201`; an equivalent repeat returns `200`. Both include `Location`.
-The client cannot supply attempts, rules, differences, provenance, materiality, reason codes,
-ordering, or fingerprints.
+A new comparison and impact delta return `201`; an equivalent repeat returns `200`. Both include
+`Location`. The response includes the immutable assessment pairing, summary, ordered worker,
+finding, and enterprise-impact deltas, and authoritative side evidence. The client cannot supply
+attempts, assessments, rules, differences, delta items, provenance, materiality, reason codes,
+ordering, evidence, or fingerprints.
 
 Answer the pending typed clarification and resume:
 

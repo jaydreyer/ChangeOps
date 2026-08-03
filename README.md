@@ -110,6 +110,12 @@ impact rows. The journey can submit the existing typed clarification, create or 
 grounded interpretation, and create or open the existing approval workbench without duplicating
 those workflows.
 
+The landing and analysis pages present that lifecycle as a guided reviewer experience. Plain-language
+questions lead with the persisted policy, accepted extraction, deterministic assessment, proposed
+actions, and backend-reported workflow state. Source spans, identifiers, reason codes, relationship
+paths, and lineage remain available in native disclosures. This presentation does not derive
+eligibility, translate reason codes, or maintain a separate frontend next-action model.
+
 ## Grounded coverage-gap interpretation
 
 The third Milestone 2 slice interprets only the persisted artifacts of a completed policy-analysis

@@ -253,8 +253,24 @@ describe("policy analysis journey", () => {
   it("renders AI proposals, deterministic results, coverage, and grounded citations separately", () => {
     render(<PolicyAnalysisJourneyView initialJourney={journey} />);
 
-    expect(screen.getAllByText("AI-proposed values").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Deterministic conclusion").length).toBeGreaterThan(0);
+    expect(screen.getByText("AI suggested rules")).toBeInTheDocument();
+    expect(screen.getAllByText("System-calculated").length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole("heading", { name: "What did this analysis establish?" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "What policy are we evaluating?" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "What rules did ChangeOps identify?" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Who and what is affected?" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "What enterprise records were evaluated?" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Why are they affected?" })).toBeInTheDocument();
     expect(screen.getByText("Sarah Johnson")).toBeInTheDocument();
     expect(screen.getByText("Priya Shah")).toBeInTheDocument();
     expect(screen.getByText("Acme Expense")).toBeInTheDocument();
@@ -265,12 +281,21 @@ describe("policy analysis journey", () => {
     expect(screen.getByText(/Validated against the policy snapshot/)).toBeInTheDocument();
     expect(screen.getByTitle("impact-1")).toHaveTextContent("impact-1");
     expect(screen.getByText("No clarification required")).toBeInTheDocument();
-    const proposedActions = screen.getByRole("heading", { name: "Proposed actions" }).closest(
+    const proposedActions = screen.getByRole("heading", { name: "What should change?" }).closest(
       "section",
     );
     expect(proposedActions).not.toBeNull();
-    expect(within(proposedActions!).getByText("Deterministic proposal")).toBeInTheDocument();
+    expect(within(proposedActions!).getByText("System-proposed")).toBeInTheDocument();
     expect(within(proposedActions!).queryByText("AI proposal")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("View exact policy provenance (1 records)").closest("details"),
+    ).not.toHaveAttribute("open");
+    expect(
+      screen.getByText("View persisted grounding and lineage").closest("details"),
+    ).not.toHaveAttribute("open");
+    expect(
+      screen.getAllByText("View deterministic reason codes")[0].closest("details"),
+    ).not.toHaveAttribute("open");
     expect(screen.getByRole("button", { name: "Create approval run" })).toBeEnabled();
   });
 
@@ -331,7 +356,12 @@ describe("policy analysis journey", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("[true]")).toBeInTheDocument();
     expect(screen.getByText("Clarification required")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Confirm true and resume" })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Confirm and resume analysis" }),
+    ).toBeEnabled();
+    expect(screen.getByText("View clarification contract").closest("details")).not.toHaveAttribute(
+      "open",
+    );
   });
 
   it("shows a terminal unsupported run without enabling approval", () => {
@@ -363,12 +393,85 @@ describe("policy analysis journey", () => {
 
     render(<PolicyAnalysisJourneyView initialJourney={unsupported} />);
 
-    expect(screen.getByText("Analysis did not complete")).toBeInTheDocument();
+    expect(screen.getByText("Analysis could not complete")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "The persisted workflow stopped before an impact assessment was created. No proposed actions were created.",
+      ),
+    ).toBeInTheDocument();
     expect(screen.getAllByText("Unsupported", { selector: ".badge" })).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Create approval run" })).toBeDisabled();
     const workflow = screen.getByRole("navigation", { name: "ChangeOps workflow" });
     expect(within(workflow).getByText("Analysis").closest("li")).toHaveClass("failed");
     expect(within(workflow).getByText("Assessment").closest("li")).toHaveClass("unavailable");
+  });
+
+  it("explains validation failure plainly and keeps internal records collapsed", () => {
+    const failed: PolicyAnalysisJourney = {
+      ...journey,
+      run: {
+        ...journey.run,
+        status: "failed",
+        assessment_id: null,
+        failure_code: "extraction_validation_failed",
+        failure_detail: "duplicate_provenance",
+      },
+      extraction: {
+        ...journey.extraction!,
+        validation_outcome: "validation_failed",
+        accepted_rules: null,
+        validation_errors: [
+          {
+            code: "duplicate_provenance",
+            message: "Each material field must have exactly one provenance span.",
+            field_path:
+              "candidate_rules.manager_approval.booking_before_effective_date_is_exempt",
+          },
+        ],
+      },
+      assessment: null,
+      enterprise_coverage: [],
+      interpretation: {
+        status: "not_available",
+        failure_code: null,
+        change_plan: null,
+        resolved_references: [],
+      },
+      approval_run: null,
+    };
+
+    render(<PolicyAnalysisJourneyView initialJourney={failed} />);
+
+    expect(
+      screen.getByText(
+        "ChangeOps identified proposed policy rules, but their supporting policy evidence did not pass deterministic validation. No impact assessment or proposed actions were created.",
+      ),
+    ).toBeInTheDocument();
+    const validationMessages = screen.getAllByText(
+      "Each material field must have exactly one provenance span.",
+    );
+    expect(validationMessages).toHaveLength(2);
+    expect(validationMessages[0]).toBeVisible();
+    expect(validationMessages[1].closest("details")).not.toHaveAttribute("open");
+    expect(
+      screen.queryByText(
+        "These values come directly from the accepted extraction and immutable assessment. Use the sections below to inspect their supporting explanations and evidence.",
+      ),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "No immutable assessment was created. The persisted rule-validation result and unavailable downstream outcomes are shown below.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("View technical failure details").closest("details")).not.toHaveAttribute(
+      "open",
+    );
+    expect(
+      screen.getByText("View deterministic validation records").closest("details"),
+    ).not.toHaveAttribute("open");
+    for (const code of screen.getAllByText("duplicate_provenance")) {
+      expect(code.closest("details")).not.toHaveAttribute("open");
+    }
   });
 
   it("does not conflate completed approval, prepared commands, and execution", () => {

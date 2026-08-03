@@ -22,7 +22,7 @@ export function ClarificationSection({
       <div className="section-heading">
         <div>
           <p className="eyebrow">Authoritative uncertainty</p>
-          <h2 id="clarification-heading">Clarification</h2>
+          <h2 id="clarification-heading">What needs human clarification?</h2>
         </div>
         <span className={`badge ${clarifications.length ? "human_input" : "not_required"}`}>
           {label}
@@ -51,14 +51,9 @@ export function ClarificationSection({
                   {humanize(clarification.status)}
                 </span>
               </div>
-              <p>
-                Affected field: <code>{clarification.affected_fields.join(", ")}</code>
-              </p>
-              <p>
-                Allowed response:{" "}
-                <code>
-                  {JSON.stringify(clarification.expected_answer_contract.allowed_values ?? [])}
-                </code>
+              <p className="section-intro">
+                This response is persisted with the reviewer identity before the same analysis run
+                resumes.
               </p>
               {clarification.status === "pending" ? (
                 <div className="clarification-action">
@@ -75,7 +70,7 @@ export function ClarificationSection({
                     onClick={() => onAnswer(clarification)}
                     disabled={busy || !actor.trim()}
                   >
-                    {busy ? "Submitting…" : "Confirm true and resume"}
+                    {busy ? "Submitting…" : "Confirm and resume analysis"}
                   </button>
                 </div>
               ) : (
@@ -85,6 +80,20 @@ export function ClarificationSection({
                   {clarification.answered_at && formatDateTime(clarification.answered_at)}
                 </p>
               )}
+              <details className="technical-disclosure">
+                <summary>View clarification contract</summary>
+                <p>
+                  Affected field: <code>{clarification.affected_fields.join(", ")}</code>
+                </p>
+                <p>
+                  Allowed response:{" "}
+                  <code>
+                    {JSON.stringify(
+                      clarification.expected_answer_contract.allowed_values ?? [],
+                    )}
+                  </code>
+                </p>
+              </details>
             </article>
           ))}
         </>

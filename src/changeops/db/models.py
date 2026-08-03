@@ -422,6 +422,9 @@ class PolicyComparison(Base):
     differences: Mapped[list["PolicyComparisonDifference"]] = relationship(
         order_by="PolicyComparisonDifference.sequence",
     )
+    impact_delta: Mapped["PolicyComparisonImpactDelta | None"] = relationship(
+        uselist=False,
+    )
 
 
 class PolicyComparisonDifference(Base):
@@ -478,6 +481,120 @@ class PolicyComparisonDifference(Base):
     reason_code: Mapped[str] = mapped_column(String(100))
     baseline_provenance: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
     proposed_provenance: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
+
+
+class PolicyComparisonImpactDelta(Base):
+    __tablename__ = "policy_comparison_impact_deltas"
+    __table_args__ = (
+        CheckConstraint(
+            "impact_delta_contract_version = 'enterprise-impact-delta-v1'",
+            name="ck_policy_comparison_impact_deltas_contract_version",
+        ),
+        CheckConstraint(
+            "baseline_assessment_id <> proposed_assessment_id",
+            name="ck_policy_comparison_impact_deltas_distinct_assessments",
+        ),
+        CheckConstraint(
+            "length(impact_delta_fingerprint) = 64",
+            name="ck_policy_comparison_impact_deltas_fingerprint_length",
+        ),
+        CheckConstraint(
+            "length(btrim(created_by)) > 0",
+            name="ck_policy_comparison_impact_deltas_creator",
+        ),
+        UniqueConstraint(
+            "policy_comparison_id",
+            name="uq_policy_comparison_impact_deltas_comparison",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    policy_comparison_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("policy_comparisons.id"),
+        index=True,
+    )
+    organization_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id"),
+        index=True,
+    )
+    baseline_assessment_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("impact_assessments.id"),
+        index=True,
+    )
+    proposed_assessment_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("impact_assessments.id"),
+        index=True,
+    )
+    impact_delta_contract_version: Mapped[str] = mapped_column(String(100))
+    impact_delta_fingerprint: Mapped[str] = mapped_column(String(64), index=True)
+    created_by: Mapped[str] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    items: Mapped[list["PolicyComparisonImpactDeltaItem"]] = relationship(
+        order_by="PolicyComparisonImpactDeltaItem.sequence",
+    )
+
+
+class PolicyComparisonImpactDeltaItem(Base):
+    __tablename__ = "policy_comparison_impact_delta_items"
+    __table_args__ = (
+        CheckConstraint(
+            "item_kind IN ('worker', 'finding', 'enterprise_impact')",
+            name="ck_policy_comparison_impact_delta_items_kind",
+        ),
+        CheckConstraint(
+            "(item_kind = 'worker' AND change_type IN "
+            "('became_affected', 'no_longer_affected', 'remained_affected')) "
+            "OR (item_kind = 'finding' AND change_type IN ('introduced', 'disappeared')) "
+            "OR (item_kind = 'enterprise_impact' AND change_type IN ('introduced', 'removed'))",
+            name="ck_policy_comparison_impact_delta_items_change_type",
+        ),
+        CheckConstraint(
+            "sequence > 0",
+            name="ck_policy_comparison_impact_delta_items_sequence",
+        ),
+        CheckConstraint(
+            "(baseline_record_id IS NULL) = (baseline_snapshot IS NULL) "
+            "AND (proposed_record_id IS NULL) = (proposed_snapshot IS NULL)",
+            name="ck_policy_comparison_impact_delta_items_snapshots",
+        ),
+        CheckConstraint(
+            "(change_type = 'introduced' AND baseline_record_id IS NULL "
+            "AND proposed_record_id IS NOT NULL) "
+            "OR (change_type IN ('disappeared', 'removed') "
+            "AND baseline_record_id IS NOT NULL AND proposed_record_id IS NULL) "
+            "OR (change_type = 'became_affected' AND proposed_record_id IS NOT NULL) "
+            "OR (change_type = 'no_longer_affected' AND baseline_record_id IS NOT NULL) "
+            "OR (change_type = 'remained_affected' AND baseline_record_id IS NOT NULL "
+            "AND proposed_record_id IS NOT NULL)",
+            name="ck_policy_comparison_impact_delta_items_sides",
+        ),
+        UniqueConstraint(
+            "impact_delta_id",
+            "sequence",
+            name="uq_policy_comparison_impact_delta_items_sequence",
+        ),
+        UniqueConstraint(
+            "impact_delta_id",
+            "stable_identity",
+            name="uq_policy_comparison_impact_delta_items_identity",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    impact_delta_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("policy_comparison_impact_deltas.id"),
+        index=True,
+    )
+    sequence: Mapped[int] = mapped_column(Integer)
+    item_kind: Mapped[str] = mapped_column(String(30))
+    change_type: Mapped[str] = mapped_column(String(40))
+    stable_identity: Mapped[str] = mapped_column(String(700))
+    delta_reason_code: Mapped[str] = mapped_column(String(120))
+    baseline_record_id: Mapped[uuid.UUID | None] = mapped_column()
+    proposed_record_id: Mapped[uuid.UUID | None] = mapped_column()
+    baseline_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
+    proposed_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
 
 
 class PolicyChangeQuestion(Base):

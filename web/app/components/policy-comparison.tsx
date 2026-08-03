@@ -1,5 +1,12 @@
 import Link from "next/link";
-import type { PolicyComparison } from "@/lib/types";
+import type { ReactNode } from "react";
+import type {
+  EnterpriseImpactDelta,
+  FindingImpactDelta,
+  ImpactDeltaEvidence,
+  PolicyComparison,
+  WorkerImpactDelta,
+} from "@/lib/types";
 
 export function PolicyComparisonView({ comparison }: { comparison: PolicyComparison }) {
   return (
@@ -80,16 +87,276 @@ export function PolicyComparisonView({ comparison }: { comparison: PolicyCompari
         )}
       </section>
 
+      {comparison.impact_delta ? (
+        <ImpactDeltaView delta={comparison.impact_delta} />
+      ) : (
+        <section className="impact-delta-notice">
+          <p className="eyebrow">Historical comparison</p>
+          <h2>Enterprise impact delta is unavailable</h2>
+          <p>This comparison predates the immutable enterprise impact delta contract.</p>
+        </section>
+      )}
       <section className="impact-delta-notice">
         <p className="eyebrow">Deliberate boundary</p>
-        <h2>Enterprise impact delta has not been calculated</h2>
+        <h2>AI explanation remains deferred</h2>
         <p>
-          This artifact compares policy obligations only. It does not identify newly affected or
-          no-longer-affected workers, systems, documents, training, commitments, or actions.
+          Deterministic code calculated and persisted every delta below from the two immutable
+          assessments. No model classified workers, findings, impacts, reasons, or evidence.
         </p>
       </section>
       <Link href="/">Return to policy analysis and comparison</Link>
     </main>
+  );
+}
+
+function ImpactDeltaView({
+  delta,
+}: {
+  delta: NonNullable<PolicyComparison["impact_delta"]>;
+}) {
+  const summary = delta.summary;
+  return (
+    <section className="journey-card impact-delta-results">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Immutable enterprise impact delta</p>
+          <h2>What operational consequences changed?</h2>
+        </div>
+        <span>Deterministic · {formatDateTime(delta.created_at)}</span>
+      </div>
+
+      <div className="delta-summary" aria-label="Enterprise impact delta summary">
+        <SummaryCount label="Workers became affected" value={summary.workers_became_affected} />
+        <SummaryCount
+          label="Workers no longer affected"
+          value={summary.workers_no_longer_affected}
+        />
+        <SummaryCount label="Workers remain affected" value={summary.workers_remained_affected} />
+        <SummaryCount label="Findings introduced" value={summary.findings_introduced} />
+        <SummaryCount label="Findings disappeared" value={summary.findings_disappeared} />
+        <SummaryCount
+          label="Enterprise impacts introduced"
+          value={summary.enterprise_impacts_introduced}
+        />
+        <SummaryCount label="Enterprise impacts removed" value={summary.enterprise_impacts_removed} />
+      </div>
+
+      <DeltaSection title="Worker impact changes" empty={delta.worker_deltas.length === 0}>
+        {delta.worker_deltas.map((item) => (
+          <WorkerDeltaCard key={item.id} item={item} />
+        ))}
+      </DeltaSection>
+      <DeltaSection title="Finding changes" empty={delta.finding_deltas.length === 0}>
+        {delta.finding_deltas.map((item) => (
+          <FindingDeltaCard key={item.id} item={item} />
+        ))}
+      </DeltaSection>
+      <DeltaSection
+        title="Enterprise impact changes"
+        empty={delta.enterprise_impact_deltas.length === 0}
+      >
+        {delta.enterprise_impact_deltas.map((item) => (
+          <EnterpriseImpactDeltaCard key={item.id} item={item} />
+        ))}
+      </DeltaSection>
+
+      <dl className="comparison delta-lineage">
+        <div>
+          <dt>Baseline assessment</dt>
+          <dd>{delta.baseline_assessment_id}</dd>
+        </div>
+        <div>
+          <dt>Proposed assessment</dt>
+          <dd>{delta.proposed_assessment_id}</dd>
+        </div>
+        <div>
+          <dt>Delta fingerprint</dt>
+          <dd>{delta.impact_delta_fingerprint}</dd>
+        </div>
+      </dl>
+    </section>
+  );
+}
+
+function SummaryCount({ label, value }: { label: string; value: number }) {
+  return (
+    <div>
+      <strong>{value}</strong>
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function DeltaSection({
+  title,
+  empty,
+  children,
+}: {
+  title: string;
+  empty: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <section className="delta-section">
+      <h3>{title}</h3>
+      {empty ? <p className="empty-panel">No changes in this category.</p> : <ol>{children}</ol>}
+    </section>
+  );
+}
+
+function WorkerDeltaCard({ item }: { item: WorkerImpactDelta }) {
+  const display = item.proposed?.display_name ?? item.baseline?.display_name ?? item.stable_identity;
+  return (
+    <li className="difference-card">
+      <DeltaHeading changeType={item.change_type} title={display} reason={item.delta_reason_code} />
+      <div className="delta-sides">
+        <WorkerSide label="Baseline assessment" value={item.baseline} />
+        <WorkerSide label="Proposed assessment" value={item.proposed} />
+      </div>
+    </li>
+  );
+}
+
+function WorkerSide({
+  label,
+  value,
+}: {
+  label: string;
+  value: WorkerImpactDelta["baseline"];
+}) {
+  if (!value) return <MissingSide label={label} />;
+  return (
+    <article className="delta-side">
+      <h4>{label}</h4>
+      <p className="side-classification">{humanize(value.classification)}</p>
+      <p>{value.explanation}</p>
+      <p className="identifiers">{value.reason_codes.join(" · ")}</p>
+      <EvidenceList evidence={value.evidence} />
+    </article>
+  );
+}
+
+function FindingDeltaCard({ item }: { item: FindingImpactDelta }) {
+  const side = item.proposed ?? item.baseline;
+  return (
+    <li className="difference-card">
+      <DeltaHeading
+        changeType={item.change_type}
+        title={humanize(side?.finding_type ?? item.stable_identity)}
+        reason={item.delta_reason_code}
+      />
+      <div className="delta-sides">
+        <FindingSide label="Baseline finding" value={item.baseline} />
+        <FindingSide label="Proposed finding" value={item.proposed} />
+      </div>
+    </li>
+  );
+}
+
+function FindingSide({
+  label,
+  value,
+}: {
+  label: string;
+  value: FindingImpactDelta["baseline"];
+}) {
+  if (!value) return <MissingSide label={label} />;
+  return (
+    <article className="delta-side">
+      <h4>{label}</h4>
+      <p>{value.explanation}</p>
+      <p className="identifiers">
+        {value.rule_code} · {humanize(value.severity)} · {value.worker_id}
+      </p>
+      <EvidenceList evidence={value.evidence} />
+    </article>
+  );
+}
+
+function EnterpriseImpactDeltaCard({ item }: { item: EnterpriseImpactDelta }) {
+  const side = item.proposed ?? item.baseline;
+  return (
+    <li className="difference-card">
+      <DeltaHeading
+        changeType={item.change_type}
+        title={side?.display_name ?? item.stable_identity}
+        reason={item.delta_reason_code}
+      />
+      <div className="delta-sides">
+        <EnterpriseImpactSide label="Baseline impact" value={item.baseline} />
+        <EnterpriseImpactSide label="Proposed impact" value={item.proposed} />
+      </div>
+    </li>
+  );
+}
+
+function EnterpriseImpactSide({
+  label,
+  value,
+}: {
+  label: string;
+  value: EnterpriseImpactDelta["baseline"];
+}) {
+  if (!value) return <MissingSide label={label} />;
+  return (
+    <article className="delta-side">
+      <h4>{label}</h4>
+      <p>{value.explanation}</p>
+      <p className="identifiers">
+        {value.reason_code} · {humanize(value.domain)} · {humanize(value.classification)}
+      </p>
+      <p className="relationship-path">
+        {value.relationship_path.map((element) => element.display_label).join(" → ")}
+      </p>
+      <EvidenceList evidence={value.evidence} />
+    </article>
+  );
+}
+
+function DeltaHeading({
+  changeType,
+  title,
+  reason,
+}: {
+  changeType: string;
+  title: string;
+  reason: string;
+}) {
+  return (
+    <div className="difference-heading">
+      <div>
+        <span className={`badge ${changeType}`}>{humanize(changeType)}</span>
+        <h3>{title}</h3>
+      </div>
+      <span className="identifiers">{reason}</span>
+    </div>
+  );
+}
+
+function MissingSide({ label }: { label: string }) {
+  return (
+    <article className="delta-side missing-side">
+      <h4>{label}</h4>
+      <p>No matching persisted record exists on this side.</p>
+    </article>
+  );
+}
+
+function EvidenceList({ evidence }: { evidence: ImpactDeltaEvidence[] }) {
+  return (
+    <details className="delta-evidence">
+      <summary>{evidence.length} authoritative evidence records</summary>
+      <ul>
+        {evidence.map((item) => (
+          <li key={item.record_id}>
+            <strong>{item.label}</strong>
+            <span>
+              {item.source_type} · {item.source_id} · {item.evidence_key}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 

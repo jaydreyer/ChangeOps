@@ -9,11 +9,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from changeops.db.models import (
+    ImpactAssessment,
     PolicyAnalysisClarification,
     PolicyAnalysisRun,
     PolicyChange,
     PolicyComparison,
     PolicyComparisonDifference,
+    PolicyComparisonImpactDelta,
     PolicyExtractionAttempt,
 )
 from changeops.domain.policy_comparison import (
@@ -24,6 +26,14 @@ from changeops.domain.policy_comparison import (
 )
 from changeops.domain.policy_extraction import MATERIAL_FIELD_PATHS
 from changeops.domain.types import InternationalTravelPolicyRules
+from changeops.services.assessment_service import (
+    ImpactAssessmentNotFoundError,
+    get_impact_assessment,
+)
+from changeops.services.enterprise_impact_delta_service import (
+    EnterpriseImpactDeltaIntegrityError,
+    create_policy_comparison_impact_delta,
+)
 
 ComparisonSide = Literal["baseline", "proposed"]
 
@@ -51,6 +61,7 @@ class PolicyComparisonReadiness:
 class _ResolvedSource:
     run: PolicyAnalysisRun
     attempt: PolicyExtractionAttempt
+    assessment: ImpactAssessment
     provenance: dict[str, dict[str, Any]]
 
 
@@ -117,6 +128,19 @@ def create_policy_comparison(
             )
             if existing_id is not None:
                 comparison_id = existing_id
+                comparison = session.get(PolicyComparison, comparison_id)
+                if comparison is None:
+                    raise PolicyComparisonCreateError(
+                        "policy_comparison_lineage_inconsistent",
+                        "The persisted policy comparison is unavailable.",
+                    )
+                create_policy_comparison_impact_delta(
+                    session,
+                    comparison=comparison,
+                    baseline_assessment=baseline.assessment,
+                    proposed_assessment=proposed.assessment,
+                    created_by=creator,
+                )
                 created = False
             else:
                 comparison = PolicyComparison(
@@ -151,8 +175,20 @@ def create_policy_comparison(
                         )
                     )
                 session.flush()
+                create_policy_comparison_impact_delta(
+                    session,
+                    comparison=comparison,
+                    baseline_assessment=baseline.assessment,
+                    proposed_assessment=proposed.assessment,
+                    created_by=creator,
+                )
                 comparison_id = comparison.id
                 created = True
+    except EnterpriseImpactDeltaIntegrityError as error:
+        raise PolicyComparisonCreateError(
+            "policy_comparison_impact_delta_lineage_inconsistent",
+            "The persisted assessment lineage cannot support an enterprise impact delta.",
+        ) from error
     except IntegrityError:
         session.rollback()
         if fingerprint is None:
@@ -162,7 +198,16 @@ def create_policy_comparison(
                 PolicyComparison.comparison_fingerprint == fingerprint
             )
         )
-        if existing_id is None:
+        existing_delta_id = (
+            session.scalar(
+                select(PolicyComparisonImpactDelta.id).where(
+                    PolicyComparisonImpactDelta.policy_comparison_id == existing_id
+                )
+            )
+            if existing_id is not None
+            else None
+        )
+        if existing_id is None or existing_delta_id is None:
             raise
         comparison_id = existing_id
         created = False
@@ -176,7 +221,12 @@ def get_policy_comparison(
     comparison = session.scalar(
         select(PolicyComparison)
         .where(PolicyComparison.id == comparison_id)
-        .options(selectinload(PolicyComparison.differences))
+        .options(
+            selectinload(PolicyComparison.differences),
+            selectinload(PolicyComparison.impact_delta).selectinload(
+                PolicyComparisonImpactDelta.items
+            ),
+        )
     )
     if comparison is None:
         raise PolicyComparisonNotFoundError(str(comparison_id))
@@ -275,8 +325,31 @@ def _resolve_source(
             "policy_comparison_lineage_inconsistent",
             "The accepted extraction effective date does not match its policy source.",
         )
+    if run.assessment_id is None:
+        raise _not_ready(side, f"The {side} policy has no completed impact assessment.")
+    try:
+        assessment = get_impact_assessment(session, run.assessment_id)
+    except ImpactAssessmentNotFoundError as error:
+        raise PolicyComparisonCreateError(
+            "policy_comparison_lineage_inconsistent",
+            "The completed policy analysis assessment is unavailable.",
+        ) from error
+    if (
+        assessment.status != "completed"
+        or assessment.policy_analysis_run_id != run.id
+        or assessment.policy_change_id != policy.id
+    ):
+        raise PolicyComparisonCreateError(
+            "policy_comparison_lineage_inconsistent",
+            "The policy analysis assessment lineage is inconsistent.",
+        )
     provenance = _validated_provenance(run, attempt)
-    return _ResolvedSource(run=run, attempt=attempt, provenance=provenance)
+    return _ResolvedSource(
+        run=run,
+        attempt=attempt,
+        assessment=assessment,
+        provenance=provenance,
+    )
 
 
 def _typed_source(

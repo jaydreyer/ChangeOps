@@ -273,8 +273,113 @@ export interface PolicyComparison {
     baseline_provenance: Record<string, unknown> | null;
     proposed_provenance: Record<string, unknown> | null;
   }[];
+  impact_delta: {
+    id: string;
+    baseline_assessment_id: string;
+    proposed_assessment_id: string;
+    impact_delta_contract_version: "enterprise-impact-delta-v1";
+    impact_delta_fingerprint: string;
+    summary: {
+      workers_became_affected: number;
+      workers_no_longer_affected: number;
+      workers_remained_affected: number;
+      findings_introduced: number;
+      findings_disappeared: number;
+      enterprise_impacts_introduced: number;
+      enterprise_impacts_removed: number;
+    };
+    worker_deltas: WorkerImpactDelta[];
+    finding_deltas: FindingImpactDelta[];
+    enterprise_impact_deltas: EnterpriseImpactDelta[];
+    created_by: string;
+    created_at: string;
+  } | null;
   created_by: string;
   created_at: string;
+}
+
+export interface ImpactDeltaEvidence {
+  record_id: string;
+  evidence_key: string;
+  evidence_type: string;
+  source_type: string;
+  source_id: string;
+  label: string;
+  snapshot: Record<string, unknown>;
+}
+
+export interface WorkerImpactDeltaSide {
+  worker_id: string;
+  display_name: string;
+  trip_id: string;
+  classification: "affected" | "unaffected";
+  explanation: string;
+  reason_codes: string[];
+  evidence: ImpactDeltaEvidence[];
+}
+
+export interface WorkerImpactDelta {
+  id: string;
+  sequence: number;
+  stable_identity: string;
+  change_type: "became_affected" | "no_longer_affected" | "remained_affected";
+  delta_reason_code: string;
+  baseline_record_id: string | null;
+  proposed_record_id: string | null;
+  baseline: WorkerImpactDeltaSide | null;
+  proposed: WorkerImpactDeltaSide | null;
+}
+
+export interface FindingImpactDeltaSide {
+  worker_id: string;
+  trip_id: string;
+  finding_type: string;
+  severity: string;
+  rule_code: string;
+  explanation: string;
+  evidence: ImpactDeltaEvidence[];
+}
+
+export interface FindingImpactDelta {
+  id: string;
+  sequence: number;
+  stable_identity: string;
+  change_type: "introduced" | "disappeared";
+  delta_reason_code: string;
+  baseline_record_id: string | null;
+  proposed_record_id: string | null;
+  baseline: FindingImpactDeltaSide | null;
+  proposed: FindingImpactDeltaSide | null;
+}
+
+export interface EnterpriseImpactDeltaSide {
+  domain: string;
+  object_type: string;
+  source_key: string;
+  display_name: string;
+  classification: string;
+  explanation: string;
+  reason_code: string;
+  evidence: ImpactDeltaEvidence[];
+  relationship_path: {
+    sequence: number;
+    object_type: string;
+    stable_key: string;
+    display_label: string;
+    relationship_to_next: string | null;
+  }[];
+}
+
+export interface EnterpriseImpactDelta {
+  id: string;
+  sequence: number;
+  stable_identity: string;
+  change_type: "introduced" | "removed";
+  delta_reason_code: string;
+  baseline_record_id: string | null;
+  proposed_record_id: string | null;
+  baseline: EnterpriseImpactDeltaSide | null;
+  proposed: EnterpriseImpactDeltaSide | null;
 }
 
 export interface AnalysisClarification {

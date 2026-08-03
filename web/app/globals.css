@@ -198,6 +198,126 @@ dd,
   padding: 1.25rem;
 }
 
+.impact-delta-results {
+  margin-top: 1.5rem;
+  border-top: 5px solid #234a3b;
+}
+
+.delta-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.65rem;
+  margin: 1.25rem 0 2rem;
+}
+
+.delta-summary div {
+  display: grid;
+  gap: 0.25rem;
+  border: 1px solid #d6ddd8;
+  background: #f6f8f6;
+  padding: 0.8rem;
+}
+
+.delta-summary strong {
+  font-size: 1.6rem;
+}
+
+.delta-summary span {
+  color: #52615b;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.delta-section {
+  margin-top: 2rem;
+}
+
+.delta-section > ol {
+  display: grid;
+  gap: 0.8rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.delta-sides {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.delta-side {
+  border: 1px solid #d8dfda;
+  background: #f7f9f7;
+  padding: 0.9rem;
+}
+
+.delta-side h4,
+.delta-side p:last-of-type {
+  margin-bottom: 0.5rem;
+}
+
+.missing-side {
+  border-style: dashed;
+  color: #66776f;
+}
+
+.side-classification {
+  color: #234a3b;
+  font-weight: 800;
+}
+
+.relationship-path {
+  color: #52615b;
+  font-size: 0.85rem;
+}
+
+.delta-evidence {
+  margin-top: 0.8rem;
+  border-top: 1px solid #d1d9d4;
+  padding-top: 0.65rem;
+}
+
+.delta-evidence summary {
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.delta-evidence ul {
+  display: grid;
+  gap: 0.45rem;
+  margin-bottom: 0;
+  padding-left: 1.2rem;
+}
+
+.delta-evidence li span {
+  display: block;
+  overflow-wrap: anywhere;
+  color: #596a63;
+  font-size: 0.75rem;
+}
+
+.delta-lineage {
+  margin-top: 2rem;
+}
+
+.badge.became_affected,
+.badge.introduced {
+  background: #dff2e7;
+  color: #164f32;
+}
+
+.badge.no_longer_affected,
+.badge.disappeared {
+  background: #f8e6df;
+  color: #7a2f1a;
+}
+
+.badge.remained_affected {
+  background: #e5ebf7;
+  color: #294d79;
+}
+
 .eyebrow {
   margin: 0 0 0.55rem;
   color: #52655d;
@@ -1284,6 +1404,17 @@ dd {
 
   .clarification-action {
     grid-template-columns: 1fr;
+  }
+
+  .comparison-source-grid,
+  .semantic-values,
+  .provenance-grid,
+  .delta-sides {
+    grid-template-columns: 1fr;
+  }
+
+  .delta-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .input-row {

@@ -1,9 +1,10 @@
 # ChangeOps Architecture
 
-This document describes the current implementation through Milestone 5A: the completed
+This document describes the current implementation through Milestone 5B: the completed
 policy-analysis and approval lifecycles, the integrated Next.js journey and workbench,
 deterministic preparation and explicit execution of one learning-assignment command, and immutable
-deterministic comparison of two accepted international-travel policy rulesets.
+deterministic comparison of two accepted international-travel policy rulesets and their immutable
+enterprise impact assessments.
 
 ## High-level architecture
 
@@ -43,6 +44,8 @@ flowchart LR
         LearningAdapter["Simulated learning adapter"]
         Comparison["Policy comparison service"]
         Comparator["Pure typed semantic comparator"]
+        ImpactDelta["Enterprise impact delta service"]
+        DeltaComparator["Pure stable-identity delta comparator"]
         ORM["SQLAlchemy models and sessions"]
     end
 
@@ -82,6 +85,9 @@ flowchart LR
     Routes --> ExecutionService
     Routes --> Comparison
     Comparison --> Comparator
+    Comparison --> ImpactDelta
+    ImpactDelta --> DeltaComparator
+    ImpactDelta --> ORM
     Comparison --> ORM
     ExecutionService --> CommandMapping
     ExecutionService --> LearningAdapter
@@ -165,11 +171,26 @@ fingerprint uniqueness constraint makes repeated and concurrent equivalent creat
 PostgreSQL composite foreign keys bind organization/policy and attempt/policy ownership, checks
 constrain classifications and side values, and triggers reject parent or child mutation.
 
-The comparison UI is enabled only when both entry policies resolve as ready. It shows both sources,
-accepted attempts, ordered values, provenance, materiality, and reason codes, while explicitly
-stating that enterprise impact delta has not been calculated. AI can independently propose each
-source extraction but is not invoked by comparison. LangGraph is likewise absent because the
-operation has no pause, retry, or branching lifecycle.
+The same transaction anchors the two completed `ImpactAssessment` records in a separate one-to-one
+`PolicyComparisonImpactDelta`. A second pure comparator matches worker results by worker and trip;
+findings by worker, trip, type, severity, and rule code; and enterprise impacts by domain, object
+type, stable source key, classification, and reason code. Database UUIDs are carried only as
+lineage references. They are excluded from matching and from the delta fingerprint, so regenerated
+assessment rows compare equally when their persisted business meaning is unchanged.
+
+Worker items are classified as `became_affected`, `no_longer_affected`, or `remained_affected`.
+Finding items are `introduced` or `disappeared`; enterprise-impact items are `introduced` or
+`removed`. Unchanged findings and impacts and unaffected-to-unaffected worker results are omitted.
+Each applicable side snapshots the persisted deterministic explanation, reason codes, evidence
+records, and relationship path. The service never queries mutable source rows to explain a delta
+and never invents a missing-side explanation.
+
+The comparison UI is enabled only when both entry policies resolve as ready, including completed
+assessment ownership. It shows both sources, accepted attempts, ordered semantic values,
+provenance, materiality, and reason codes, followed by grouped worker, finding, and enterprise
+impact deltas with side-specific authoritative evidence. AI can independently propose each source
+extraction but is not invoked by comparison or impact delta. LangGraph is likewise absent because
+the operation has no pause, retry, or branching lifecycle.
 
 ### Action review and decision service
 
@@ -616,6 +637,15 @@ validated side-specific provenance snapshots. This is a bounded aggregate for
 `international_travel / schema_version 1`; it is not policy version management, a generic schema
 registry, event sourcing, or a generic JSON diff.
 
+`policy_comparison_impact_deltas` separately anchors the comparison, organization, baseline and
+proposed assessments, delta contract, UUID-free semantic fingerprint, creator, and creation time.
+`policy_comparison_impact_delta_items` stores one stable global sequence, a closed worker/finding/
+enterprise-impact kind, a closed change classification, stable business identity, deterministic
+delta reason code, applicable source-record lineage IDs, and side-specific authoritative snapshots.
+One delta is allowed per policy comparison. Insert triggers validate that assessments resolve to
+the comparison's policies and accepted attempts and that every child record belongs to the correct
+assessment side. Update/delete triggers make both tables immutable.
+
 ### Durable workflow records
 
 `policy_analysis_runs` stores the immutable policy snapshot, closed status and step, latest
@@ -730,7 +760,8 @@ The idempotent seed contains:
 - four documents, one unaffected;
 - one explicit International Travel Security course;
 - six completion records;
-- typed policy dependencies for two systems, three documents, and the course;
+- business-equivalent policy dependencies for two systems, three documents, and the course on
+  both policy sources;
 - two customer commitments and assignments, one affected by date overlap.
 
 The completed golden assessment returns:
@@ -742,13 +773,17 @@ The completed golden assessment returns:
 - eight copied unresolved questions.
 
 The proposed source naturally changes the accepted effective date, worker-type coverage, and
-destination exclusions. The normal Compose seed persists no accepted attempt, completed analysis,
-or completed comparison for either source. The historical
+destination exclusions. Its completed assessment contains no affected worker and retains only the
+three document impacts and policy-required course impact. Comparing the golden assessments yields
+three workers no longer affected, six disappeared findings, and fourteen removed enterprise
+impacts; no worker remains or becomes affected, and no finding or impact is introduced. The normal
+Compose seed persists no accepted attempt, completed analysis, comparison, or impact delta for
+either source. The historical
 provider-free assessment seed remains available to focused integration tests, but it is not loaded
 into the reviewer application because a pre-completed run obscures the start of the golden path.
 
 `make demo-reset` applies migrations, runs the idempotent catalog seed, then truncates the explicit
-set of comparison- and workflow-owned tables in one transaction. It preserves both policy sources
+set of delta-, comparison-, and workflow-owned tables in one transaction. It preserves both policy sources
 and other catalog tables and requires an exact
 confirmation value, recognized local PostgreSQL host and database name, and the seeded organization
 marker. No database or volume is dropped.

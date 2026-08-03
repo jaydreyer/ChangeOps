@@ -17,6 +17,9 @@ These capabilities will likely be implemented through **four vertical slices**:
 
 The capability count and implementation-slice count are intentionally different. Policy comparison requires a trusted semantic-comparison foundation before enterprise impact delta can build on it.
 
+Status: slices 1 and 2 are complete. The next recommended implementation is slice 3,
+change-plan revision.
+
 Treat a Jira-style execution action as **optional** and probably defer it until after the first AWS deployment.
 
 Do **not** add MCP before AWS.
@@ -609,6 +612,11 @@ Extend the trusted policy comparison into before-and-after enterprise consequenc
 
 This is where the product becomes recognizably ChangeOps: it can explain not only what policy semantics changed, but what operational consequences changed because of them.
 
+**Status: complete.** The comparison now owns a separate immutable, assessment-anchored delta.
+Stable business identity—not database UUID—matches worker results, findings, and enterprise
+impacts. Persisted side snapshots retain deterministic explanations, reason codes, evidence, and
+relationship paths. AI explanation remains deferred.
+
 ## Capability 2 — Governed plan revision
 
 ### Slice 3 — Change-plan revision
@@ -641,22 +649,22 @@ The local trusted-header boundary must be replaced for public deployment, but th
 
 ## Recommended next slice
 
-**Calculate enterprise impact delta from two immutable policy assessments.**
+**Close the governed change-plan revision loop with immutable plan versions.**
 
-The trustworthy immutable semantic comparison aggregate now exists. The next slice should derive
-before-and-after enterprise consequences without changing the completed policy comparison or
-allowing AI to author authoritative delta.
+The trustworthy semantic comparison and enterprise impact delta aggregates now exist. The next
+slice should let a human request a bounded revision to an AI-authored plan without overwriting the
+accepted historical plan or making approval lineage ambiguous.
 
 ## User-visible outcome
 
-A reviewer should be able to see which workers and enterprise objects became affected, remained
-affected, or were cleared, with deterministic evidence explaining every delta.
+A reviewer should be able to request a grounded plan revision, inspect the newly validated
+immutable artifact, and know exactly which plan version a later approval governs.
 
 ## Why this is the right first slice
 
-It builds directly on the completed semantic comparison while keeping assessment snapshots and
-enterprise facts authoritative. It is the next point where ChangeOps can answer not only what
-policy obligations changed, but what operational consequences changed.
+It closes the existing `revision_requested` state instead of adding another disconnected feature.
+Assessment snapshots, semantic comparison, and enterprise impact delta remain unchanged and
+authoritative while AI remains limited to a separately validated planning artifact.
 
 ---
 

@@ -606,4 +606,52 @@ Not included
 
 Next vertical slice
 
-Enterprise impact delta from two immutable policy assessments remains the next planned capability.
+Enterprise impact delta from two immutable policy assessments was delivered in Milestone 5B.
+
+⸻
+
+Milestone 5B — Enterprise Impact Delta
+
+Status: complete.
+
+Product capability
+
+Extend one immutable policy comparison with a separate immutable operational delta between the
+baseline and proposed assessments.
+
+Delivered behavior
+
+* comparison readiness now requires completed assessment lineage on both sides;
+* pure deterministic code matches stable worker, finding, and enterprise-impact business identity;
+* database UUIDs are preserved only as lineage and excluded from matching and fingerprinting;
+* workers are classified as became affected, no longer affected, or remained affected;
+* findings are classified as introduced or disappeared;
+* enterprise impacts are classified as introduced or removed;
+* every applicable side snapshots persisted assessment explanations, reason codes, evidence, and
+  relationship paths;
+* PostgreSQL owns one immutable delta per comparison, validates assessment and item ownership, and
+  rejects update/delete;
+* the comparison create/retrieve response and focused Next.js view expose the complete delta;
+* guarded demo reset removes impact deltas while preserving both sources and their dependency
+  catalog.
+
+Architectural boundary
+
+The Milestone 5A semantic comparison remains unchanged. Enterprise Impact Delta is a separate
+one-to-one aggregate because it has different authoritative inputs, identity, evidence, and
+fingerprinting. AI and LangGraph do not participate. Proposed actions are inspected as assessment
+artifacts but are not compared in this slice.
+
+Not included
+
+* AI explanation of impact delta;
+* change-plan revision or approval changes;
+* proposed-action delta;
+* generalized policy comparison or additional policy families;
+* Jira, MCP, AWS, or Terraform.
+
+Next vertical slice
+
+Governed immutable change-plan revision is the recommended next product slice. AI explanation of
+the completed delta may be paired with that work only if a narrower milestone explicitly approves
+the explanation contract and keeps deterministic delta authoritative.

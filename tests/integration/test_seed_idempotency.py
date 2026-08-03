@@ -80,9 +80,9 @@ def test_seed_is_repeatable_without_duplicates() -> None:
             "enterprise_documents": 4,
             "training_courses": 1,
             "training_records": 6,
-            "policy_system_dependencies": 2,
-            "policy_document_dependencies": 3,
-            "policy_training_dependencies": 1,
+            "policy_system_dependencies": 4,
+            "policy_document_dependencies": 6,
+            "policy_training_dependencies": 2,
             "customer_commitments": 2,
             "commitment_assignments": 2,
         }

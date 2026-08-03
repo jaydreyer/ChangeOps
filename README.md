@@ -204,7 +204,10 @@ explicit boundary that a decision does not execute an action. Each item presents
 persisted deterministic explanation, evidence, and human decision separately; evidence, reason
 codes, identifiers, and lineage remain available in disclosures. After approval completes,
 execution appears as a distinct section that renders authoritative preparation, command, result,
-unsupported-action, and replay fields without deriving eligibility or transitions in the frontend.
+manual-follow-up, and replay fields without deriving eligibility or transitions in the frontend.
+Approved actions without an automated execution mapping are described as requiring manual
+follow-up, while their authoritative unsupported classification and persisted reason remain
+available in technical details.
 
 ## Deterministic policy comparison
 

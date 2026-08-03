@@ -398,7 +398,12 @@ describe("approval workbench", () => {
     );
     expect(screen.getByText("Carry out approved actions")).toBeInTheDocument();
     expect(screen.getByText("Preparable").nextElementSibling).toHaveTextContent("1");
-    expect(screen.getByText("Unsupported approved actions")).toBeInTheDocument();
+    expect(screen.getByText("Approved actions requiring manual follow-up")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "Automated execution is not available for these action types. Their approved records remain visible for follow-up outside ChangeOps.",
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByText("Review team travel")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Execute/ })).not.toBeInTheDocument();
   });
@@ -472,9 +477,24 @@ describe("approval workbench", () => {
       "open",
     );
     const unsupported = screen
-      .getByText("Unsupported approved actions")
+      .getByText("Approved actions requiring manual follow-up")
       .closest(".unsupported-list");
     expect(unsupported).not.toBeNull();
+    expect(
+      within(unsupported as HTMLElement).getByText(
+        "Manual follow-up required. No automated execution is available.",
+      ),
+    ).toBeInTheDocument();
+    const limitation = within(unsupported as HTMLElement)
+      .getByText("View execution limitation details")
+      .closest("details");
+    expect(limitation).not.toHaveAttribute("open");
+    expect(within(limitation as HTMLElement).getByText("Unsupported action type")).toBeInTheDocument();
+    expect(
+      within(limitation as HTMLElement).getByText(
+        "Action type 'review_team_travel' has no execution mapping.",
+      ),
+    ).toBeInTheDocument();
     expect(within(unsupported as HTMLElement).queryByRole("button")).not.toBeInTheDocument();
   });
 

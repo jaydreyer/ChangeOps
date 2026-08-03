@@ -396,7 +396,7 @@ function ExecutionPreparationPanel({
           <dd>{preparation.eligible_action_count}</dd>
         </div>
         <div>
-          <dt>Unsupported</dt>
+          <dt>Manual follow-up</dt>
           <dd>{preparation.unsupported_approved_action_count}</dd>
         </div>
         <div>
@@ -550,10 +550,17 @@ function ExecutionPreparationPanel({
         <div className="unsupported-list">
           <div className="execution-group-heading">
             <div>
-              <p className="eyebrow">No command mapping</p>
-              <h3>Unsupported approved actions</h3>
+              <p className="eyebrow">Manual completion required</p>
+              <h3>Approved actions requiring manual follow-up</h3>
+              <p>
+                Automated execution is not available for these action types. Their approved
+                records remain visible for follow-up outside ChangeOps.
+              </p>
             </div>
-            <span>{preparation.unsupported_approved_action_count} actions</span>
+            <span>
+              {preparation.unsupported_approved_action_count}{" "}
+              {preparation.unsupported_approved_action_count === 1 ? "action" : "actions"}
+            </span>
           </div>
           {preparation.unsupported_items.map((item) => (
             <article key={item.action_review_id}>
@@ -561,12 +568,18 @@ function ExecutionPreparationPanel({
               <p>
                 {humanize(item.target_type)}: {item.target_identifier}
               </p>
-              <small>
-                {humanize(item.reason_code)} — {item.reason}
-              </small>
+              <small>Manual follow-up required. No automated execution is available.</small>
               <details className="technical-disclosure inline-technical">
-                <summary>View unsupported action identity</summary>
+                <summary>View execution limitation details</summary>
                 <dl className="identifiers">
+                  <div>
+                    <dt>Authoritative classification</dt>
+                    <dd>{humanize(item.reason_code)}</dd>
+                  </div>
+                  <div>
+                    <dt>Persisted reason</dt>
+                    <dd>{item.reason}</dd>
+                  </div>
                   <div>
                     <dt>Action review</dt>
                     <dd>
@@ -587,7 +600,8 @@ function ExecutionPreparationPanel({
       )}
       <p className="execution-inline">
         <strong>Execution is always explicit.</strong> Only supported prepared training commands
-        expose a control; unsupported approved actions remain visible and inactive.
+        expose a control; approved actions without an automated mapping remain visible and
+        inactive.
       </p>
     </section>
   );

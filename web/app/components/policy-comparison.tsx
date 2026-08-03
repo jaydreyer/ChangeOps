@@ -11,22 +11,45 @@ import type {
 export function PolicyComparisonView({ comparison }: { comparison: PolicyComparison }) {
   return (
     <main className="analysis-shell">
-      <header className="analysis-hero">
+      <header className="analysis-hero comparison-hero">
         <div>
-          <p className="eyebrow">Immutable policy comparison</p>
+          <Link href="/" className="back-link">
+            ← All policy analyses and comparisons
+          </Link>
+          <p className="product-mark">ChangeOps</p>
+          <p className="eyebrow">Policy comparison</p>
           <h1>Compare policy versions</h1>
           <p className="lede">
             See the accepted policy obligations first, then inspect how the two persisted
             operational outcomes differ.
           </p>
         </div>
-        <div className="boundary-legend" aria-label="Comparison ownership">
-          <span className="badge deterministic">Deterministic comparison</span>
-          <span className="badge human_input">Initiated by {comparison.created_by}</span>
+        <div className="analysis-status-panel comparison-status-panel">
+          <span className="badge deterministic">Deterministic result</span>
+          <strong>Authoritative comparison</strong>
+          <span>Immutable persisted record</span>
+          <span className="quiet-label">Initiated by {comparison.created_by}</span>
+          <details className="technical-disclosure">
+            <summary>View comparison identity</summary>
+            <dl className="identifiers">
+              <div>
+                <dt>Comparison</dt>
+                <dd>{comparison.id}</dd>
+              </div>
+              <div>
+                <dt>Created</dt>
+                <dd>
+                  <time dateTime={comparison.created_at}>
+                    {formatDateTime(comparison.created_at)}
+                  </time>
+                </dd>
+              </div>
+            </dl>
+          </details>
         </div>
       </header>
 
-      <section aria-labelledby="policies-compared-heading">
+      <section className="comparison-policy-section" aria-labelledby="policies-compared-heading">
         <div className="section-heading comparison-section-heading">
           <div>
             <p className="eyebrow">Policies being compared</p>
@@ -85,20 +108,23 @@ export function PolicyComparisonView({ comparison }: { comparison: PolicyCompari
                   <SemanticValue label="Baseline value" value={difference.baseline_value} />
                   <SemanticValue label="Proposed value" value={difference.proposed_value} />
                 </div>
-                <dl className="comparison">
-                  <div>
-                    <dt>Reason code</dt>
-                    <dd>{difference.reason_code}</dd>
+                <details className="technical-disclosure comparison-technical">
+                  <summary>View accepted rule evidence and identity</summary>
+                  <dl className="comparison">
+                    <div>
+                      <dt>Reason code</dt>
+                      <dd>{difference.reason_code}</dd>
+                    </div>
+                    <div>
+                      <dt>Rule identity</dt>
+                      <dd>{difference.rule_identity}</dd>
+                    </div>
+                  </dl>
+                  <div className="provenance-grid">
+                    <Provenance label="Baseline provenance" value={difference.baseline_provenance} />
+                    <Provenance label="Proposed provenance" value={difference.proposed_provenance} />
                   </div>
-                  <div>
-                    <dt>Rule identity</dt>
-                    <dd>{difference.rule_identity}</dd>
-                  </div>
-                </dl>
-                <div className="provenance-grid">
-                  <Provenance label="Baseline provenance" value={difference.baseline_provenance} />
-                  <Provenance label="Proposed provenance" value={difference.proposed_provenance} />
-                </div>
+                </details>
               </li>
             ))}
           </ol>
@@ -117,9 +143,12 @@ export function PolicyComparisonView({ comparison }: { comparison: PolicyCompari
           <p>This comparison predates the immutable enterprise impact delta contract.</p>
         </section>
       )}
-      <section className="impact-delta-notice technical-boundary">
+      <section
+        className="impact-delta-notice technical-boundary comparison-boundary-notice"
+        aria-labelledby="comparison-ai-boundary-heading"
+      >
         <p className="eyebrow">Deliberate boundary</p>
-        <h2>AI explanation remains deferred</h2>
+        <h2 id="comparison-ai-boundary-heading">AI explanation remains deferred</h2>
         <p>
           AI proposed each extraction. Deterministic validation accepted the rules, and
           deterministic code calculated and persisted every delta from the two immutable
@@ -127,7 +156,9 @@ export function PolicyComparisonView({ comparison }: { comparison: PolicyCompari
         </p>
       </section>
       <ComparisonLineage comparison={comparison} />
-      <Link href="/">Return to policy analysis and comparison</Link>
+      <Link href="/" className="back-link comparison-return-link">
+        ← Return to policy analysis and comparison
+      </Link>
     </main>
   );
 }
@@ -224,18 +255,22 @@ function ImpactDeltaView({
 }) {
   const summary = delta.summary;
   return (
-    <section className="journey-card impact-delta-results">
+    <section
+      className="journey-card impact-delta-results"
+      aria-labelledby="operational-impact-heading"
+    >
       <div className="section-heading">
         <div>
           <p className="eyebrow">Immutable enterprise impact delta</p>
-          <h2>Operational impact changes</h2>
+          <h2 id="operational-impact-heading">Operational impact changes</h2>
           <p>Comparison of two authoritative persisted assessment outcomes.</p>
         </div>
         <span className="badge deterministic">Deterministically calculated</span>
       </div>
 
       <aside className="impact-delta-scope" aria-label="Enterprise impact delta scope">
-        <h3>What this comparison proves</h3>
+        <span className="badge deterministic">Assessment outcome scope</span>
+        <h3>What this comparison can establish</h3>
         <p>
           ChangeOps compares two authoritative persisted assessment outcomes. It does not claim
           that policy changes were the sole cause when enterprise source facts differ between
@@ -575,7 +610,7 @@ function ComparisonLineage({ comparison }: { comparison: PolicyComparison }) {
     <section className="journey-card comparison-lineage" aria-labelledby="lineage-heading">
       <p className="eyebrow">Immutable lineage</p>
       <h2 id="lineage-heading">Evidence and technical identity</h2>
-      <details>
+      <details className="technical-disclosure">
         <summary>View comparison, extraction, assessment, and fingerprint lineage</summary>
         <div className="lineage-grid">
           <dl className="comparison">
@@ -662,9 +697,9 @@ function SourceCard({
   source: PolicyComparison["baseline"];
 }) {
   return (
-    <article className="journey-card">
+    <article className="journey-card comparison-source-card">
       <p className="eyebrow">{label}</p>
-      <h2>{source.title}</h2>
+      <h3>{source.title}</h3>
       <dl className="comparison">
         <div>
           <dt>Effective</dt>

@@ -248,6 +248,9 @@ change story and operational summary. Worker counts are labeled as worker-trip o
 the persisted comparison identity. Individual worker, finding, and enterprise-impact records are
 collapsed by default; each can be opened independently to inspect explanations, evidence,
 relationship paths, stable identity, and record lineage.
+The page uses the same calm reviewer hierarchy as analysis and approval: immutable authority and
+causal scope stay visible, business semantic values lead, and rule provenance, source spans,
+identifiers, fingerprints, and lineage remain available through native technical disclosures.
 
 ## Requirements
 

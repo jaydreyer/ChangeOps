@@ -589,3 +589,41 @@ system of record.
   assessment sub-projection and its uncertainty lineage is explicit.
 - Tests that assert eight questions remain regression tests for the legacy seeded scenario, not
   model-quality assertions.
+
+# ADR-0016 — Enrich the Existing Journey Read Model and Reset Workflow State In Place
+
+## Status
+
+Accepted
+
+## Context
+
+Immutable interpretation references are audit-friendly but raw UUIDs and evidence keys are not
+reviewer-friendly. The journey also needs accurate presentation of clarification, approval,
+command, execution, and replay state. A repeatable demo must remove generated history without
+destroying or duplicating the stable fictional enterprise catalog.
+
+## Decision
+
+- Resolve plan citations in the existing journey projection against the same persisted assessment
+  and policy snapshot; retain every original identifier and key.
+- Fail with a stable integrity response when an accepted reference is missing, cross-assessment, or
+  not owned by its cited impact or finding.
+- Derive the seven fixed frontend step states with one pure function rather than introducing a
+  workflow UI framework.
+- Derive execution summary values from persisted approval runs, commands, and results without
+  persisting UI state.
+- Reset an explicit list of workflow-owned tables transactionally, preserve the source catalog,
+  and require local-target, confirmation, and organization-marker safety guards.
+- Keep the provider-free historical assessment seed available to tests but remove it from ordinary
+  application startup so reviewers begin at the policy.
+
+## Consequences
+
+- Reviewers can understand lineage without sacrificing audit identifiers.
+- The projection performs stricter integrity checks but remains read-only.
+- Approval completion cannot be mistaken for command preparation or execution.
+- The reset is repeatable and safer than dropping the Compose volume, but it is intentionally
+  limited to the recognized local demo database.
+- No table, workflow engine, state library, scenario manager, adapter, or deployment technology is
+  introduced.

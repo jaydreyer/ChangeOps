@@ -206,8 +206,47 @@ const journey: PolicyAnalysisJourney = {
         ],
       },
     },
+    resolved_references: [
+      {
+        finding_key: "scope-gap",
+        impacts: [
+          {
+            impact_id: "impact-1",
+            display_name: "Acme Travel",
+            domain: "systems",
+            classification: "operationally_affected",
+            reason_code: "SYSTEM_SUPPORTS_CHANGED_APPROVAL_PROCESS",
+          },
+        ],
+        evidence: [
+          {
+            evidence_key: "system:system-1",
+            label: "Travel workflow",
+            evidence_type: "system",
+            source_type: "enterprise_system",
+            source_id: "system-1",
+          },
+        ],
+        policy_spans: [
+          {
+            policy_change_id: "policy-travel",
+            start: 0,
+            end: 10,
+            quote: "U.S.-based",
+            validated_against_policy_snapshot: true,
+          },
+        ],
+      },
+    ],
   },
   approval_run: null,
+  execution: {
+    status: "unavailable",
+    command_count: 0,
+    executed_command_count: 0,
+    result_count: 0,
+    replay_count: 0,
+  },
 };
 
 describe("policy analysis journey", () => {
@@ -221,6 +260,11 @@ describe("policy analysis journey", () => {
     expect(screen.getByText("Acme Expense")).toBeInTheDocument();
     expect(screen.getByText("Review scope definition")).toBeInTheDocument();
     expect(screen.getByText(/system:system-1/)).toBeInTheDocument();
+    expect(screen.getAllByText("Travel workflow").length).toBeGreaterThan(1);
+    expect(screen.getAllByText("Acme Travel").length).toBeGreaterThan(1);
+    expect(screen.getByText(/Validated against the policy snapshot/)).toBeInTheDocument();
+    expect(screen.getByTitle("impact-1")).toHaveTextContent("impact-1");
+    expect(screen.getByText("No clarification required")).toBeInTheDocument();
     const proposedActions = screen.getByRole("heading", { name: "Proposed actions" }).closest(
       "section",
     );
@@ -271,7 +315,12 @@ describe("policy analysis journey", () => {
       },
       assessment: null,
       enterprise_coverage: [],
-      interpretation: { status: "not_available", failure_code: null, change_plan: null },
+      interpretation: {
+        status: "not_available",
+        failure_code: null,
+        change_plan: null,
+        resolved_references: [],
+      },
       approval_run: null,
     };
 
@@ -281,6 +330,7 @@ describe("policy analysis journey", () => {
       screen.getByText("Confirm that pre-effective bookings are exempt."),
     ).toBeInTheDocument();
     expect(screen.getByText("[true]")).toBeInTheDocument();
+    expect(screen.getByText("Clarification required")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Confirm true and resume" })).toBeEnabled();
   });
 
@@ -302,7 +352,12 @@ describe("policy analysis journey", () => {
       },
       assessment: null,
       enterprise_coverage: [],
-      interpretation: { status: "not_available", failure_code: null, change_plan: null },
+      interpretation: {
+        status: "not_available",
+        failure_code: null,
+        change_plan: null,
+        resolved_references: [],
+      },
       approval_run: null,
     };
 
@@ -311,5 +366,29 @@ describe("policy analysis journey", () => {
     expect(screen.getByText("Analysis did not complete")).toBeInTheDocument();
     expect(screen.getAllByText("Unsupported", { selector: ".badge" })).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Create approval run" })).toBeDisabled();
+    const workflow = screen.getByRole("navigation", { name: "ChangeOps workflow" });
+    expect(within(workflow).getByText("Analysis").closest("li")).toHaveClass("failed");
+    expect(within(workflow).getByText("Assessment").closest("li")).toHaveClass("unavailable");
+  });
+
+  it("does not conflate completed approval, prepared commands, and execution", () => {
+    const prepared: PolicyAnalysisJourney = {
+      ...journey,
+      approval_run: { id: "approval-1", status: "completed" },
+      execution: {
+        status: "command_prepared",
+        command_count: 1,
+        executed_command_count: 0,
+        result_count: 0,
+        replay_count: 0,
+      },
+    };
+
+    render(<PolicyAnalysisJourneyView initialJourney={prepared} />);
+
+    expect(screen.getByText("Command prepared")).toBeInTheDocument();
+    const workflow = screen.getByRole("navigation", { name: "ChangeOps workflow" });
+    expect(within(workflow).getByText("Approval").closest("li")).toHaveClass("completed");
+    expect(within(workflow).getByText("Execution").closest("li")).toHaveClass("current");
   });
 });

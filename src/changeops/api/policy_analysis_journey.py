@@ -9,6 +9,7 @@ from changeops.schemas.policy_analysis_journey import (
     PolicyAnalysisJourneyResponse,
 )
 from changeops.services.policy_analysis_journey_service import (
+    PolicyAnalysisJourneyIntegrityError,
     PolicyAnalysisJourneyNotFoundError,
     get_policy_analysis_entry,
     get_policy_analysis_journey,
@@ -40,5 +41,13 @@ def retrieve_policy_analysis_journey(
             detail={
                 "code": "policy_analysis_journey_not_found",
                 "message": "Policy analysis journey was not found.",
+            },
+        ) from error
+    except PolicyAnalysisJourneyIntegrityError as error:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "code": "policy_analysis_journey_lineage_inconsistent",
+                "message": str(error),
             },
         ) from error

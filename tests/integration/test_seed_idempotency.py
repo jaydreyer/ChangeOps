@@ -26,6 +26,7 @@ from changeops.services.demo_assessment_seed_service import (
     DEMO_ASSESSMENT_ID,
     seed_demo_assessment,
 )
+from changeops.services.demo_reset_service import reset_demo_workflows
 from changeops.services.seed_service import seed_database
 
 
@@ -102,3 +103,24 @@ def test_provider_free_demo_assessment_seed_is_stable_and_idempotent() -> None:
         assert all(
             action.execution_status == "not_executed" for action in assessment.proposed_actions
         )
+
+
+def test_demo_reset_removes_workflow_history_preserves_catalog_and_is_repeatable() -> None:
+    with SessionLocal() as session:
+        seed_demo_assessment(session)
+
+    with SessionLocal.begin() as session:
+        first = reset_demo_workflows(session)
+    with SessionLocal.begin() as session:
+        second = reset_demo_workflows(session)
+
+    assert first == second
+    assert first.policy_analysis_runs == 0
+    assert first.impact_assessments == 0
+    assert first.approval_runs == 0
+    assert first.execution_commands == 0
+    assert first.execution_results == 0
+    assert first.learning_assignments == 0
+    with SessionLocal() as session:
+        assert session.get(Organization, "org-acme-global-manufacturing") is not None
+        assert session.get(PolicyChange, "policy-international-travel-2026-09") is not None

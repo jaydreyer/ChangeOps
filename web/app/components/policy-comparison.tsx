@@ -14,33 +14,48 @@ export function PolicyComparisonView({ comparison }: { comparison: PolicyCompari
       <header className="analysis-hero">
         <div>
           <p className="eyebrow">Immutable policy comparison</p>
-          <h1>What changed in the proposed policy?</h1>
+          <h1>Compare policy versions</h1>
           <p className="lede">
-            AI proposed each policy extraction. Deterministic validation accepted the typed rules,
-            and deterministic code calculated this comparison.
+            See the accepted policy obligations first, then inspect how the two persisted
+            operational outcomes differ.
           </p>
         </div>
-        <div className="boundary-legend">
+        <div className="boundary-legend" aria-label="Comparison ownership">
           <span className="badge deterministic">Deterministic comparison</span>
           <span className="badge human_input">Initiated by {comparison.created_by}</span>
         </div>
       </header>
 
-      <section className="comparison-source-grid">
-        <SourceCard label="Baseline policy" source={comparison.baseline} />
-        <SourceCard label="Proposed revision" source={comparison.proposed} />
+      <section aria-labelledby="policies-compared-heading">
+        <div className="section-heading comparison-section-heading">
+          <div>
+            <p className="eyebrow">Policies being compared</p>
+            <h2 id="policies-compared-heading">Current policy and proposed revision</h2>
+          </div>
+          <span>
+            <time dateTime={comparison.created_at}>{formatDateTime(comparison.created_at)}</time>
+          </span>
+        </div>
+        <div className="comparison-source-grid">
+          <SourceCard label="Baseline policy" source={comparison.baseline} />
+          <SourceCard label="Proposed revision" source={comparison.proposed} />
+        </div>
       </section>
 
-      <section className="journey-card comparison-results">
+      <section
+        className="journey-card comparison-results policy-change-results"
+        aria-labelledby="policy-changes-heading"
+      >
         <div className="section-heading">
           <div>
             <p className="eyebrow">Accepted typed semantics</p>
-            <h2>
-              {comparison.difference_count} semantic{" "}
+            <h2 id="policy-changes-heading">What policy obligations changed</h2>
+            <p>
+              {comparison.difference_count} deterministic semantic{" "}
               {comparison.difference_count === 1 ? "difference" : "differences"}
-            </h2>
+            </p>
           </div>
-          <span>Immutable · {formatDateTime(comparison.created_at)}</span>
+          <span className="badge deterministic">Immutable accepted rules</span>
         </div>
         {comparison.differences.length === 0 ? (
           <div className="empty-panel">
@@ -53,7 +68,10 @@ export function PolicyComparisonView({ comparison }: { comparison: PolicyCompari
         ) : (
           <ol className="difference-list">
             {comparison.differences.map((difference) => (
-              <li key={difference.id} className="difference-card">
+              <li
+                key={difference.id}
+                className={`difference-card difference-card-${difference.change_type}`}
+              >
                 <div className="difference-heading">
                   <div>
                     <span className={`badge ${difference.change_type}`}>
@@ -88,7 +106,10 @@ export function PolicyComparisonView({ comparison }: { comparison: PolicyCompari
       </section>
 
       {comparison.impact_delta ? (
-        <ImpactDeltaView delta={comparison.impact_delta} />
+        <>
+          <ChangeSummary comparison={comparison} delta={comparison.impact_delta} />
+          <ImpactDeltaView delta={comparison.impact_delta} />
+        </>
       ) : (
         <section className="impact-delta-notice">
           <p className="eyebrow">Historical comparison</p>
@@ -96,16 +117,103 @@ export function PolicyComparisonView({ comparison }: { comparison: PolicyCompari
           <p>This comparison predates the immutable enterprise impact delta contract.</p>
         </section>
       )}
-      <section className="impact-delta-notice">
+      <section className="impact-delta-notice technical-boundary">
         <p className="eyebrow">Deliberate boundary</p>
         <h2>AI explanation remains deferred</h2>
         <p>
-          Deterministic code calculated and persisted every delta below from the two immutable
+          AI proposed each extraction. Deterministic validation accepted the rules, and
+          deterministic code calculated and persisted every delta from the two immutable
           assessments. No model classified workers, findings, impacts, reasons, or evidence.
         </p>
       </section>
+      <ComparisonLineage comparison={comparison} />
       <Link href="/">Return to policy analysis and comparison</Link>
     </main>
+  );
+}
+
+function ChangeSummary({
+  comparison,
+  delta,
+}: {
+  comparison: PolicyComparison;
+  delta: NonNullable<PolicyComparison["impact_delta"]>;
+}) {
+  const policyCounts = countByChangeType(comparison.differences);
+  const workerTotal =
+    delta.summary.workers_became_affected +
+    delta.summary.workers_no_longer_affected +
+    delta.summary.workers_remained_affected;
+  const findingTotal =
+    delta.summary.findings_introduced + delta.summary.findings_disappeared;
+  const impactTotal =
+    delta.summary.enterprise_impacts_introduced + delta.summary.enterprise_impacts_removed;
+
+  return (
+    <section className="journey-card change-story" aria-labelledby="change-summary-heading">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Business story first</p>
+          <h2 id="change-summary-heading">Change summary</h2>
+          <p>Deterministic comparison of the two persisted policy and assessment outcomes.</p>
+        </div>
+        <span className="badge deterministic">No sole-cause claim</span>
+      </div>
+      <ol className="change-story-flow" aria-label="Policy and operational outcome summary">
+        <ChangeStoryStage
+          value={comparison.difference_count}
+          label="Policy obligations changed"
+          breakdown={[
+            `${policyCounts.added ?? 0} added`,
+            `${policyCounts.removed ?? 0} removed`,
+            `${policyCounts.modified ?? 0} modified`,
+          ]}
+        />
+        <ChangeStoryStage
+          value={workerTotal}
+          label="Worker-trip outcomes in the delta"
+          breakdown={[
+            `${delta.summary.workers_became_affected} became affected`,
+            `${delta.summary.workers_no_longer_affected} no longer affected`,
+            `${delta.summary.workers_remained_affected} remain affected`,
+          ]}
+        />
+        <ChangeStoryStage
+          value={findingTotal}
+          label="Finding differences"
+          breakdown={[
+            `${delta.summary.findings_introduced} introduced`,
+            `${delta.summary.findings_disappeared} disappeared`,
+          ]}
+        />
+        <ChangeStoryStage
+          value={impactTotal}
+          label="Enterprise impact differences"
+          breakdown={[
+            `${delta.summary.enterprise_impacts_introduced} introduced`,
+            `${delta.summary.enterprise_impacts_removed} removed`,
+          ]}
+        />
+      </ol>
+    </section>
+  );
+}
+
+function ChangeStoryStage({
+  value,
+  label,
+  breakdown,
+}: {
+  value: number;
+  label: string;
+  breakdown: string[];
+}) {
+  return (
+    <li>
+      <strong>{value}</strong>
+      <span>{label}</span>
+      <small>{breakdown.join(" · ")}</small>
+    </li>
   );
 }
 
@@ -120,31 +228,41 @@ function ImpactDeltaView({
       <div className="section-heading">
         <div>
           <p className="eyebrow">Immutable enterprise impact delta</p>
-          <h2>How did the persisted operational outcomes differ?</h2>
+          <h2>Operational impact changes</h2>
+          <p>Comparison of two authoritative persisted assessment outcomes.</p>
         </div>
-        <span>Deterministic · {formatDateTime(delta.created_at)}</span>
+        <span className="badge deterministic">Deterministically calculated</span>
       </div>
 
       <aside className="impact-delta-scope" aria-label="Enterprise impact delta scope">
-        <h3>Outcome comparison, not sole-cause proof</h3>
+        <h3>What this comparison proves</h3>
         <p>
-          This delta compares two authoritative persisted assessment outcomes. If enterprise
-          source facts differed between assessment runs, it does not prove that policy changes
-          alone caused every difference.
+          ChangeOps compares two authoritative persisted assessment outcomes. It does not claim
+          that policy changes were the sole cause when enterprise source facts differ between
+          runs.
         </p>
-        <p>
-          The seeded demonstration evaluates both assessments against the same enterprise catalog
-          state. This milestone does not version or compare generalized enterprise snapshots.
-        </p>
+        <details>
+          <summary>Seeded demonstration scope</summary>
+          <p>
+            Both assessments use the same fictional enterprise catalog state. This milestone does
+            not version or compare generalized enterprise snapshots.
+          </p>
+        </details>
       </aside>
 
       <div className="delta-summary" aria-label="Enterprise impact delta summary">
-        <SummaryCount label="Workers became affected" value={summary.workers_became_affected} />
         <SummaryCount
-          label="Workers no longer affected"
+          label="Worker-trip outcomes became affected"
+          value={summary.workers_became_affected}
+        />
+        <SummaryCount
+          label="Worker-trip outcomes no longer affected"
           value={summary.workers_no_longer_affected}
         />
-        <SummaryCount label="Workers remain affected" value={summary.workers_remained_affected} />
+        <SummaryCount
+          label="Worker-trip outcomes remain affected"
+          value={summary.workers_remained_affected}
+        />
         <SummaryCount label="Findings introduced" value={summary.findings_introduced} />
         <SummaryCount label="Findings disappeared" value={summary.findings_disappeared} />
         <SummaryCount
@@ -154,39 +272,43 @@ function ImpactDeltaView({
         <SummaryCount label="Enterprise impacts removed" value={summary.enterprise_impacts_removed} />
       </div>
 
-      <DeltaSection title="Worker impact changes" empty={delta.worker_deltas.length === 0}>
+      <DeltaSection
+        title="Worker impact changes"
+        count={delta.worker_deltas.length}
+        breakdown={[
+          `${summary.workers_became_affected} became affected`,
+          `${summary.workers_no_longer_affected} no longer affected`,
+          `${summary.workers_remained_affected} remain affected`,
+        ]}
+      >
         {delta.worker_deltas.map((item) => (
           <WorkerDeltaCard key={item.id} item={item} />
         ))}
       </DeltaSection>
-      <DeltaSection title="Finding changes" empty={delta.finding_deltas.length === 0}>
+      <DeltaSection
+        title="Finding changes"
+        count={delta.finding_deltas.length}
+        breakdown={[
+          `${summary.findings_introduced} introduced`,
+          `${summary.findings_disappeared} disappeared`,
+        ]}
+      >
         {delta.finding_deltas.map((item) => (
           <FindingDeltaCard key={item.id} item={item} />
         ))}
       </DeltaSection>
       <DeltaSection
         title="Enterprise impact changes"
-        empty={delta.enterprise_impact_deltas.length === 0}
+        count={delta.enterprise_impact_deltas.length}
+        breakdown={[
+          `${summary.enterprise_impacts_introduced} introduced`,
+          `${summary.enterprise_impacts_removed} removed`,
+        ]}
       >
         {delta.enterprise_impact_deltas.map((item) => (
           <EnterpriseImpactDeltaCard key={item.id} item={item} />
         ))}
       </DeltaSection>
-
-      <dl className="comparison delta-lineage">
-        <div>
-          <dt>Baseline assessment</dt>
-          <dd>{delta.baseline_assessment_id}</dd>
-        </div>
-        <div>
-          <dt>Proposed assessment</dt>
-          <dd>{delta.proposed_assessment_id}</dd>
-        </div>
-        <div>
-          <dt>Delta fingerprint</dt>
-          <dd>{delta.impact_delta_fingerprint}</dd>
-        </div>
-      </dl>
     </section>
   );
 }
@@ -202,30 +324,59 @@ function SummaryCount({ label, value }: { label: string; value: number }) {
 
 function DeltaSection({
   title,
-  empty,
+  count,
+  breakdown,
   children,
 }: {
   title: string;
-  empty: boolean;
+  count: number;
+  breakdown: string[];
   children: ReactNode;
 }) {
   return (
     <section className="delta-section">
-      <h3>{title}</h3>
-      {empty ? <p className="empty-panel">No changes in this category.</p> : <ol>{children}</ol>}
+      <div className="delta-group-heading">
+        <div>
+          <h3>{title}</h3>
+          <p>{count} persisted delta records</p>
+        </div>
+        <ul aria-label={`${title} classification counts`}>
+          {breakdown.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      </div>
+      {count === 0 ? (
+        <p className="empty-panel">No differences are recorded in this category.</p>
+      ) : (
+        <ol>{children}</ol>
+      )}
     </section>
   );
 }
 
 function WorkerDeltaCard({ item }: { item: WorkerImpactDelta }) {
   const display = item.proposed?.display_name ?? item.baseline?.display_name ?? item.stable_identity;
+  const tripId = item.proposed?.trip_id ?? item.baseline?.trip_id ?? "unknown trip";
   return (
-    <li className="difference-card">
-      <DeltaHeading changeType={item.change_type} title={display} reason={item.delta_reason_code} />
-      <div className="delta-sides">
-        <WorkerSide label="Baseline assessment" value={item.baseline} />
-        <WorkerSide label="Proposed assessment" value={item.proposed} />
-      </div>
+    <li>
+      <details className={`delta-item delta-item-${item.change_type}`}>
+        <summary>
+          <DeltaItemSummary
+            changeType={item.change_type}
+            title={display}
+            reason={item.delta_reason_code}
+            status={`${workerStatus(item.baseline)} → ${workerStatus(item.proposed)} · Trip ${tripId}`}
+          />
+        </summary>
+        <div className="delta-item-body">
+          <div className="delta-sides">
+            <WorkerSide label="Baseline assessment" value={item.baseline} />
+            <WorkerSide label="Proposed assessment" value={item.proposed} />
+          </div>
+          <DeltaItemLineage item={item} />
+        </div>
+      </details>
     </li>
   );
 }
@@ -252,16 +403,24 @@ function WorkerSide({
 function FindingDeltaCard({ item }: { item: FindingImpactDelta }) {
   const side = item.proposed ?? item.baseline;
   return (
-    <li className="difference-card">
-      <DeltaHeading
-        changeType={item.change_type}
-        title={humanize(side?.finding_type ?? item.stable_identity)}
-        reason={item.delta_reason_code}
-      />
-      <div className="delta-sides">
-        <FindingSide label="Baseline finding" value={item.baseline} />
-        <FindingSide label="Proposed finding" value={item.proposed} />
-      </div>
+    <li>
+      <details className={`delta-item delta-item-${item.change_type}`}>
+        <summary>
+          <DeltaItemSummary
+            changeType={item.change_type}
+            title={humanize(side?.finding_type ?? item.stable_identity)}
+            reason={item.delta_reason_code}
+            status={`${recordStatus(item.baseline)} → ${recordStatus(item.proposed)}`}
+          />
+        </summary>
+        <div className="delta-item-body">
+          <div className="delta-sides">
+            <FindingSide label="Baseline finding" value={item.baseline} />
+            <FindingSide label="Proposed finding" value={item.proposed} />
+          </div>
+          <DeltaItemLineage item={item} />
+        </div>
+      </details>
     </li>
   );
 }
@@ -289,16 +448,24 @@ function FindingSide({
 function EnterpriseImpactDeltaCard({ item }: { item: EnterpriseImpactDelta }) {
   const side = item.proposed ?? item.baseline;
   return (
-    <li className="difference-card">
-      <DeltaHeading
-        changeType={item.change_type}
-        title={side?.display_name ?? item.stable_identity}
-        reason={item.delta_reason_code}
-      />
-      <div className="delta-sides">
-        <EnterpriseImpactSide label="Baseline impact" value={item.baseline} />
-        <EnterpriseImpactSide label="Proposed impact" value={item.proposed} />
-      </div>
+    <li>
+      <details className={`delta-item delta-item-${item.change_type}`}>
+        <summary>
+          <DeltaItemSummary
+            changeType={item.change_type}
+            title={side?.display_name ?? item.stable_identity}
+            reason={item.delta_reason_code}
+            status={`${impactStatus(item.baseline)} → ${impactStatus(item.proposed)}`}
+          />
+        </summary>
+        <div className="delta-item-body">
+          <div className="delta-sides">
+            <EnterpriseImpactSide label="Baseline impact" value={item.baseline} />
+            <EnterpriseImpactSide label="Proposed impact" value={item.proposed} />
+          </div>
+          <DeltaItemLineage item={item} />
+        </div>
+      </details>
     </li>
   );
 }
@@ -326,23 +493,52 @@ function EnterpriseImpactSide({
   );
 }
 
-function DeltaHeading({
+function DeltaItemSummary({
   changeType,
   title,
   reason,
+  status,
 }: {
   changeType: string;
   title: string;
   reason: string;
+  status: string;
 }) {
   return (
-    <div className="difference-heading">
-      <div>
+    <span className="delta-item-summary">
+      <span className="change-symbol" aria-hidden="true">
+        {changeSymbol(changeType)}
+      </span>
+      <span className="delta-item-title">
         <span className={`badge ${changeType}`}>{humanize(changeType)}</span>
-        <h3>{title}</h3>
+        <strong>{title}</strong>
+        <small>{status}</small>
+      </span>
+      <code>{reason}</code>
+    </span>
+  );
+}
+
+function DeltaItemLineage({
+  item,
+}: {
+  item: WorkerImpactDelta | FindingImpactDelta | EnterpriseImpactDelta;
+}) {
+  return (
+    <dl className="comparison delta-item-lineage">
+      <div>
+        <dt>Stable business identity</dt>
+        <dd>{item.stable_identity}</dd>
       </div>
-      <span className="identifiers">{reason}</span>
-    </div>
+      <div>
+        <dt>Baseline record lineage</dt>
+        <dd>{item.baseline_record_id ?? "No matching record"}</dd>
+      </div>
+      <div>
+        <dt>Proposed record lineage</dt>
+        <dd>{item.proposed_record_id ?? "No matching record"}</dd>
+      </div>
+    </dl>
   );
 }
 
@@ -373,6 +569,91 @@ function EvidenceList({ evidence }: { evidence: ImpactDeltaEvidence[] }) {
   );
 }
 
+function ComparisonLineage({ comparison }: { comparison: PolicyComparison }) {
+  const delta = comparison.impact_delta;
+  return (
+    <section className="journey-card comparison-lineage" aria-labelledby="lineage-heading">
+      <p className="eyebrow">Immutable lineage</p>
+      <h2 id="lineage-heading">Evidence and technical identity</h2>
+      <details>
+        <summary>View comparison, extraction, assessment, and fingerprint lineage</summary>
+        <div className="lineage-grid">
+          <dl className="comparison">
+            <div>
+              <dt>Comparison ID</dt>
+              <dd>{comparison.id}</dd>
+            </div>
+            <div>
+              <dt>Comparison contract</dt>
+              <dd>{comparison.comparison_contract_version}</dd>
+            </div>
+            <div>
+              <dt>Comparison fingerprint</dt>
+              <dd>{comparison.comparison_fingerprint}</dd>
+            </div>
+            <div>
+              <dt>Created by</dt>
+              <dd>{comparison.created_by}</dd>
+            </div>
+            <div>
+              <dt>Created</dt>
+              <dd>
+                <time dateTime={comparison.created_at}>
+                  {formatDateTime(comparison.created_at)}
+                </time>
+              </dd>
+            </div>
+          </dl>
+          <dl className="comparison">
+            <div>
+              <dt>Baseline policy record</dt>
+              <dd>{comparison.baseline.policy_change_id}</dd>
+            </div>
+            <div>
+              <dt>Baseline accepted extraction</dt>
+              <dd>{comparison.baseline.accepted_extraction_attempt_id}</dd>
+            </div>
+            <div>
+              <dt>Proposed policy record</dt>
+              <dd>{comparison.proposed.policy_change_id}</dd>
+            </div>
+            <div>
+              <dt>Proposed accepted extraction</dt>
+              <dd>{comparison.proposed.accepted_extraction_attempt_id}</dd>
+            </div>
+          </dl>
+          {delta && (
+            <dl className="comparison">
+              <div>
+                <dt>Baseline assessment</dt>
+                <dd>{delta.baseline_assessment_id}</dd>
+              </div>
+              <div>
+                <dt>Proposed assessment</dt>
+                <dd>{delta.proposed_assessment_id}</dd>
+              </div>
+              <div>
+                <dt>Delta contract</dt>
+                <dd>{delta.impact_delta_contract_version}</dd>
+              </div>
+              <div>
+                <dt>Delta fingerprint</dt>
+                <dd>{delta.impact_delta_fingerprint}</dd>
+              </div>
+              <div>
+                <dt>Delta created</dt>
+                <dd>
+                  <time dateTime={delta.created_at}>{formatDateTime(delta.created_at)}</time>
+                </dd>
+              </div>
+            </dl>
+          )}
+        </div>
+      </details>
+    </section>
+  );
+}
+
 function SourceCard({
   label,
   source,
@@ -390,12 +671,8 @@ function SourceCard({
           <dd>{formatDate(source.effective_date)}</dd>
         </div>
         <div>
-          <dt>Source record</dt>
-          <dd>{source.policy_change_id}</dd>
-        </div>
-        <div>
-          <dt>Accepted extraction</dt>
-          <dd>{source.accepted_extraction_attempt_id}</dd>
+          <dt>Version</dt>
+          <dd>{source.version}</dd>
         </div>
       </dl>
     </article>
@@ -446,7 +723,33 @@ function Provenance({
 }
 
 function humanize(value: string) {
-  return value.replaceAll(".", " · ").replaceAll("_", " ");
+  const label = value.replaceAll(".", " · ").replaceAll("_", " ");
+  return label.replace(/^\w/, (letter) => letter.toUpperCase());
+}
+
+function countByChangeType(items: PolicyComparison["differences"]) {
+  return items.reduce<Record<string, number>>((counts, item) => {
+    counts[item.change_type] = (counts[item.change_type] ?? 0) + 1;
+    return counts;
+  }, {});
+}
+
+function workerStatus(value: WorkerImpactDelta["baseline"]) {
+  return value ? humanize(value.classification) : "No matching record";
+}
+
+function recordStatus(value: unknown) {
+  return value ? "Present" : "Not present";
+}
+
+function impactStatus(value: EnterpriseImpactDelta["baseline"]) {
+  return value ? humanize(value.classification) : "Not present";
+}
+
+function changeSymbol(changeType: string) {
+  if (["introduced", "became_affected", "added"].includes(changeType)) return "+";
+  if (["removed", "disappeared", "no_longer_affected"].includes(changeType)) return "−";
+  return "↔";
 }
 
 function formatDate(value: string) {
@@ -459,5 +762,6 @@ function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: "UTC",
   }).format(new Date(value));
 }

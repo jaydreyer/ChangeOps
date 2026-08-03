@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { PolicyComparisonView } from "./policy-comparison";
 import type { PolicyComparison } from "@/lib/types";
@@ -157,49 +158,141 @@ const comparison: PolicyComparison = {
 };
 
 describe("policy comparison", () => {
-  it("shows semantic differences and deterministic operational consequences", () => {
-    render(<PolicyComparisonView comparison={comparison} />);
+  it("prioritizes policy changes before the response-derived operational story", () => {
+    const { container } = render(<PolicyComparisonView comparison={comparison} />);
 
     expect(screen.getByText("Current Travel Policy")).toBeInTheDocument();
     expect(screen.getByText("Proposed Travel Revision")).toBeInTheDocument();
     expect(screen.getByText("contractor")).toBeInTheDocument();
-    expect(screen.getByText("Not present")).toBeInTheDocument();
     expect(screen.getByText("employees and contractors")).toBeInTheDocument();
     expect(screen.getByText("Operationally material")).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "How did the persisted operational outcomes differ?" }),
+      screen.getByRole("heading", { name: "What policy obligations changed" }),
     ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Change summary" })).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Outcome comparison, not sole-cause proof" }),
+      screen.getByRole("heading", { name: "Operational impact changes" }),
+    ).toBeInTheDocument();
+
+    const policyChanges = container.querySelector("#policy-changes-heading");
+    const changeSummary = container.querySelector("#change-summary-heading");
+    const operationalChanges = screen.getByRole("heading", { name: "Operational impact changes" });
+    expect(policyChanges).not.toBeNull();
+    expect(changeSummary).not.toBeNull();
+    expect(
+      policyChanges!.compareDocumentPosition(changeSummary!) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      changeSummary!.compareDocumentPosition(operationalChanges) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+
+    expect(screen.getByText("Policy obligations changed").closest("li")).toHaveTextContent(
+      "0 added · 1 removed · 0 modified",
+    );
+    expect(screen.getByText("Worker-trip outcomes in the delta").closest("li")).toHaveTextContent(
+      "1 no longer affected",
+    );
+    expect(screen.getByText("Finding differences").closest("li")).toHaveTextContent(
+      "1 disappeared",
+    );
+    expect(screen.getByText("Enterprise impact differences").closest("li")).toHaveTextContent(
+      "1 removed",
+    );
+  });
+
+  it("keeps causal scope visible and audit details collapsed until independently opened", async () => {
+    const user = userEvent.setup();
+    render(<PolicyComparisonView comparison={comparison} />);
+
+    expect(
+      screen.getByRole("heading", { name: "What this comparison proves" }),
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        /compares two authoritative persisted assessment outcomes.*does not prove that policy changes alone caused every difference/s,
+        /compares two authoritative persisted assessment outcomes.*does not claim that policy changes were the sole cause/s,
       ),
     ).toBeInTheDocument();
+    const seededScope = screen.getByText("Seeded demonstration scope").closest("details");
+    expect(seededScope).not.toHaveAttribute("open");
+
+    const workerItem = screen.getByText("Marcus Lee").closest("details");
+    const impactTitle = screen.getByText("Technology Operations", {
+      selector: ".delta-item-title > strong",
+    });
+    const impactItem = impactTitle.closest("details");
+    expect(workerItem).not.toHaveAttribute("open");
+    expect(impactItem).not.toHaveAttribute("open");
+    expect(screen.getByText("No longer affected")).toBeInTheDocument();
+    expect(screen.getByText("WORKER_NO_LONGER_AFFECTED")).toBeInTheDocument();
+    expect(screen.getByText("Affected → Unaffected · Trip trip-marcus")).toBeInTheDocument();
     expect(
-      screen.getByText(
-        /seeded demonstration evaluates both assessments against the same enterprise catalog state/,
-      ),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Marcus Lee")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Technology Operations" })).toBeInTheDocument();
-    expect(screen.getByText("Technology Operations team record")).toBeInTheDocument();
+      screen.getByLabelText("Worker impact changes classification counts"),
+    ).toHaveTextContent("0 became affected1 no longer affected0 remain affected");
+    expect(screen.getByLabelText("Finding changes classification counts")).toHaveTextContent(
+      "0 introduced1 disappeared",
+    );
+    expect(
+      screen.getByLabelText("Enterprise impact changes classification counts"),
+    ).toHaveTextContent("0 introduced1 removed");
+
+    await user.click(impactTitle.closest("summary") as HTMLElement);
+
+    expect(impactItem).toHaveAttribute("open");
+    expect(workerItem).not.toHaveAttribute("open");
+    expect(
+      screen.getByText("Technology Operations", { selector: ".relationship-path" }),
+    ).toBeVisible();
+    expect(
+      screen.getByText("enterprise_impact:teams:team:technology"),
+    ).toBeVisible();
+
+    await user.click(screen.getByText("1 authoritative evidence records"));
+    expect(screen.getByText("Technology Operations team record")).toBeVisible();
     expect(
       screen.getByRole("heading", { name: "AI explanation remains deferred" }),
     ).toBeInTheDocument();
   });
 
-  it("renders the empty semantic comparison state", () => {
+  it("renders accurate group totals and zero-count states", () => {
+    const emptyDelta = {
+      ...comparison.impact_delta!,
+      summary: {
+        workers_became_affected: 0,
+        workers_no_longer_affected: 0,
+        workers_remained_affected: 0,
+        findings_introduced: 0,
+        findings_disappeared: 0,
+        enterprise_impacts_introduced: 0,
+        enterprise_impacts_removed: 0,
+      },
+      worker_deltas: [],
+      finding_deltas: [],
+      enterprise_impact_deltas: [],
+    };
     render(
       <PolicyComparisonView
-        comparison={{ ...comparison, difference_count: 0, differences: [] }}
+        comparison={{
+          ...comparison,
+          difference_count: 0,
+          differences: [],
+          impact_delta: emptyDelta,
+        }}
       />,
     );
 
     expect(
       screen.getByRole("heading", { name: "No operational semantic differences" }),
     ).toBeInTheDocument();
+    expect(screen.getByText("Policy obligations changed").closest("li")).toHaveTextContent("0");
+    expect(screen.getByText("Worker-trip outcomes in the delta").closest("li")).toHaveTextContent(
+      "0 became affected · 0 no longer affected · 0 remain affected",
+    );
+    expect(screen.getByText("Worker impact changes")).toBeInTheDocument();
+    expect(screen.getByText("Finding changes")).toBeInTheDocument();
+    expect(screen.getByText("Enterprise impact changes")).toBeInTheDocument();
+    expect(screen.getAllByText("No differences are recorded in this category.")).toHaveLength(3);
   });
 
   it("renders a stable state for historical comparisons without a persisted delta", () => {
@@ -207,6 +300,9 @@ describe("policy comparison", () => {
 
     expect(
       screen.getByRole("heading", { name: "Enterprise impact delta is unavailable" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("View comparison, extraction, assessment, and fingerprint lineage"),
     ).toBeInTheDocument();
   });
 });

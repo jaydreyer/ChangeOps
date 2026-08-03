@@ -861,6 +861,13 @@ scenario where enterprise source facts changed between assessment executions, th
 prove that policy changes alone caused every observed difference. Milestone 5B deliberately does
 not generalize the demo invariant into enterprise catalog snapshot versioning.
 
+The product presents this result in progressive layers: policies compared, accepted semantic
+changes, a compact response-derived change summary, operational summary counts, and three visible
+detail groups. Worker, finding, and enterprise-impact records are collapsed independently by
+default. Their summaries retain classification, business title, reason code, and side status;
+opening one record reveals full persisted explanations, evidence, relationship paths, stable
+identity, and source-record lineage. Worker totals are explicitly labeled as worker-trip outcomes.
+
 The proposed assessment deterministically classifies all six travelers as unaffected:
 
 - Sarah Johnson is no longer affected because September 15 is before the proposed October 1
@@ -898,3 +905,9 @@ Repeated creation reuses both the semantic comparison and its one-to-one delta. 
 reject delta or item update/delete and validate that every lineage record belongs to the correct
 assessment side. `make demo-reset` removes both delta tables before comparisons while preserving
 the two source policies and their dependency catalog.
+
+The landing page labels the action **Compare policy versions** and explains that eligibility
+requires accepted validated rules and completed assessments on both sides. Analysis creation does
+not repeat its POST during recovery. UTC-stable client timestamps avoid server/browser hydration
+differences; an interrupted response is reconciled with one authoritative entry read, after which
+recovery controls only reopen the persisted run.

@@ -345,6 +345,8 @@ not a persistent scenario-management feature:
 
 - the landing page explains the governed journey before analysis begins, and the analysis page
   leads with reviewer questions while retaining authoritative technical detail in disclosures;
+- the approval workbench opens the next pending item in persisted order, keeps evidence collapsed,
+  and presents execution only after completed approval as a separate explicit operation;
 - the golden accepted extraction completes without clarification;
 - a conflicting pre-effective booking value pauses the same run for one typed `true`
   clarification, then resumes it;
@@ -869,6 +871,10 @@ detail groups. Worker, finding, and enterprise-impact records are collapsed inde
 default. Their summaries retain classification, business title, reason code, and side status;
 opening one record reveals full persisted explanations, evidence, relationship paths, stable
 identity, and source-record lineage. Worker totals are explicitly labeled as worker-trip outcomes.
+The comparison uses the same quiet surfaces, authority language, and technical disclosures as the
+guided analysis and approval experiences. Accepted semantic values and materiality remain visible;
+rule identity, provenance, source spans, and aggregate lineage begin collapsed without being
+discarded.
 
 The proposed assessment deterministically classifies all six travelers as unaffected:
 

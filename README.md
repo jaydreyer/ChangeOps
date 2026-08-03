@@ -221,6 +221,16 @@ retried explicitly. Timeouts, connection loss, and 5xx responses are treated as 
 never resent automatically, because Jira Create Issue has no unique client idempotency key and this
 milestone excludes search and reconciliation. This intentionally prioritizes no duplicate issues.
 
+The guided approval view leads with the persisted review count, current approval state, and the
+explicit boundary that a decision does not execute an action. Each item presents its proposal,
+persisted deterministic explanation, evidence, and human decision separately; evidence, reason
+codes, identifiers, and lineage remain available in disclosures. After approval completes,
+execution appears as a distinct section that renders authoritative preparation, command, result,
+manual-follow-up, and replay fields without deriving eligibility or transitions in the frontend.
+Approved actions without an automated execution mapping are described as requiring manual
+follow-up, while their authoritative unsupported classification and persisted reason remain
+available in technical details.
+
 ## Deterministic policy comparison
 
 `POST /api/v1/policy-comparisons` accepts only baseline and proposed policy identifiers; reviewer
@@ -260,6 +270,9 @@ change story and operational summary. Worker counts are labeled as worker-trip o
 the persisted comparison identity. Individual worker, finding, and enterprise-impact records are
 collapsed by default; each can be opened independently to inspect explanations, evidence,
 relationship paths, stable identity, and record lineage.
+The page uses the same calm reviewer hierarchy as analysis and approval: immutable authority and
+causal scope stay visible, business semantic values lead, and rule provenance, source spans,
+identifiers, fingerprints, and lineage remain available through native technical disclosures.
 
 ## Requirements
 

@@ -19,9 +19,9 @@ export function InterpretationSection({
       <div className="section-heading">
         <div>
           <p className="eyebrow">Grounded model synthesis</p>
-          <h2 id="interpretation-heading">Interpretation and change plan</h2>
+          <h2 id="interpretation-heading">How should the organization respond?</h2>
         </div>
-        <span className="badge ai_proposal">AI recommendation</span>
+        <span className="badge ai_proposal">AI-suggested review</span>
       </div>
       {interpretation.status === "available" && interpretation.change_plan ? (
         <>
@@ -42,55 +42,59 @@ export function InterpretationSection({
                   <p>
                     <strong>Recommended review:</strong> {gap.recommended_review_action}
                   </p>
-                  <div className="lineage-group">
-                    <h4>Persisted policy snapshot</h4>
-                    {lineage?.policy_spans.map((span) => (
-                      <blockquote key={`${span.start}-${span.end}`}>
-                        “{span.quote}”{" "}
-                        <small>
-                          Characters {span.start}–{span.end} · Validated against the policy snapshot
-                        </small>
-                      </blockquote>
-                    ))}
-                  </div>
-                  {lineage && lineage.impacts.length > 0 && (
+                  <details className="technical-disclosure">
+                    <summary>View persisted grounding and lineage</summary>
                     <div className="lineage-group">
-                      <h4>Enterprise impacts</h4>
-                      {lineage.impacts.map((impact) => (
-                        <article className="lineage-reference" key={impact.impact_id}>
-                          <strong>{impact.display_name}</strong>
-                          <span>
-                            {humanize(impact.domain)} · {humanize(impact.classification)}
-                          </span>
+                      <h4>Persisted policy snapshot</h4>
+                      {lineage?.policy_spans.map((span) => (
+                        <blockquote key={`${span.start}-${span.end}`}>
+                          “{span.quote}”{" "}
                           <small>
-                            Reason: <code>{impact.reason_code}</code>
+                            Characters {span.start}–{span.end} · Validated against the policy
+                            snapshot
                           </small>
-                          <small title={impact.impact_id}>
-                            Impact ID: <code>{shortIdentifier(impact.impact_id)}</code>
-                          </small>
-                        </article>
+                        </blockquote>
                       ))}
                     </div>
-                  )}
-                  {lineage && lineage.evidence.length > 0 && (
-                    <div className="lineage-group">
-                      <h4>Evidence</h4>
-                      {lineage.evidence.map((evidence) => (
-                        <article className="lineage-reference" key={evidence.evidence_key}>
-                          <strong>{evidence.label}</strong>
-                          <span>
-                            {humanize(evidence.evidence_type)} · {humanize(evidence.source_type)}
-                          </span>
-                          <small>
-                            Source: <code>{evidence.source_id}</code>
-                          </small>
-                          <small>
-                            Evidence key: <code>{evidence.evidence_key}</code>
-                          </small>
-                        </article>
-                      ))}
-                    </div>
-                  )}
+                    {lineage && lineage.impacts.length > 0 && (
+                      <div className="lineage-group">
+                        <h4>Enterprise impacts</h4>
+                        {lineage.impacts.map((impact) => (
+                          <article className="lineage-reference" key={impact.impact_id}>
+                            <strong>{impact.display_name}</strong>
+                            <span>
+                              {humanize(impact.domain)} · {humanize(impact.classification)}
+                            </span>
+                            <small>
+                              Reason: <code>{impact.reason_code}</code>
+                            </small>
+                            <small title={impact.impact_id}>
+                              Impact ID: <code>{shortIdentifier(impact.impact_id)}</code>
+                            </small>
+                          </article>
+                        ))}
+                      </div>
+                    )}
+                    {lineage && lineage.evidence.length > 0 && (
+                      <div className="lineage-group">
+                        <h4>Evidence</h4>
+                        {lineage.evidence.map((evidence) => (
+                          <article className="lineage-reference" key={evidence.evidence_key}>
+                            <strong>{evidence.label}</strong>
+                            <span>
+                              {humanize(evidence.evidence_type)} · {humanize(evidence.source_type)}
+                            </span>
+                            <small>
+                              Source: <code>{evidence.source_id}</code>
+                            </small>
+                            <small>
+                              Evidence key: <code>{evidence.evidence_key}</code>
+                            </small>
+                          </article>
+                        ))}
+                      </div>
+                    )}
+                  </details>
                 </article>
               );
             })}

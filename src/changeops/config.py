@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     interpretation_model_timeout_seconds: float = 120.0
     interpretation_model_max_retries: int = 0
     openai_api_key: SecretStr | None = None
+    jira_base_url: str | None = None
+    jira_email: str | None = None
+    jira_api_token: SecretStr | None = None
+    jira_project_id_or_key: str | None = None
+    jira_issue_type_id: str | None = None
+    jira_timeout_seconds: float = 10.0
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

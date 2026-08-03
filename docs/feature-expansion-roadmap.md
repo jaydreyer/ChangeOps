@@ -395,7 +395,7 @@ Add explicit persisted records only where a genuine audit fact currently does no
 
 ---
 
-## 4. Second Jira-style execution pattern — Optional
+## 4. Real Jira create-issue execution — Implemented in Milestone 6
 
 ### Product value: Moderate
 
@@ -415,14 +415,18 @@ It demonstrates that the command abstraction is not accidentally coupled to trai
 
 However, the existing execution architecture already proves most important governance properties.
 
-### Recommendation
+### Decision
 
-Defer it unless either of these becomes true:
+The first condition became true after policy comparison: the primary document remediation now
+produces one comparison-backed operational task. Milestone 6 implements create-only Jira execution
+with an at-most-once delivery gate. The following original conditions remain the record of why the
+feature was conditional:
 
 1. Policy comparison generates a compelling operational-remediation action that naturally requires issue creation.
 2. Repository refactoring reveals that the execution-command contract is secretly Learning-specific and needs validation against a second semantic.
 
-Do not build Jira merely to claim two integrations.
+The implementation does not generalize adapters and adds no Jira update, transition, search,
+synchronization, queue, worker, or MCP capability.
 
 ---
 
@@ -517,9 +521,10 @@ These are design outputs, not new platform frameworks.
 
 # 5. Features that should be optional or removed
 
-## Optional: Jira execution
+## Implemented: Jira create-only execution
 
-Build only when it naturally follows from the comparison feature or exposes a real defect in the generic command model.
+Milestone 6 implements the comparison-backed create Task operation. Additional Jira capabilities
+and adapters remain excluded.
 
 ## Optional: Small quality evidence page
 

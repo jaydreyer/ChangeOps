@@ -311,9 +311,10 @@ Exit criteria
 
 Milestone 4 — Controlled Enterprise Execution
 
-Status: Slices 1 and 2 complete. Immutable execution commands can be prepared from approved
-reviews, and `learning.assign_training` can be executed explicitly against one durable simulated
-learning system. MCP and all other integrations remain deferred.
+Status: Slices 1–3 complete. Immutable execution commands can be prepared from approved reviews;
+`learning.assign_training` executes against the durable simulation; and one comparison-backed
+`jira.create_issue` command creates a real Task through an at-most-once adapter. MCP and all other
+integrations remain deferred.
 
 Product capability
 
@@ -343,7 +344,7 @@ Deferred technologies
 
 * MCP;
 * retry and failure handling;
-* additional execution adapters and simulated systems.
+* additional execution adapters and simulated systems beyond Jira create Task.
 
 Simulated systems
 

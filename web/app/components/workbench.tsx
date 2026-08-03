@@ -336,7 +336,7 @@ function ExecutionPreparationPanel({
       </div>
       <p>
         {preparation.execution_performed
-          ? "Approval is complete. Durable simulated assignments and immutable attempt history are shown below."
+          ? "Approval is complete. Durable side-effect receipts and immutable attempt history are shown below."
           : "Approval is complete. ChangeOps can materialize the exact authorized command contract; execution still requires an explicit action."}
       </p>
       <dl className="preparation-counts">
@@ -376,10 +376,19 @@ function ExecutionPreparationPanel({
                 {humanize(command.target_type)}: {command.target_identifier}
               </p>
               <p>{command.effective_action.description}</p>
-              <p>
-                Training:{" "}
-                <code>{String(command.parameters.course_identifier ?? "invalid command")}</code>
-              </p>
+              {command.system === "learning" ? (
+                <p>
+                  Training:{" "}
+                  <code>{String(command.parameters.course_identifier ?? "invalid command")}</code>
+                </p>
+              ) : (
+                <>
+                  <p>{String(command.parameters.summary ?? "Invalid Jira command")}</p>
+                  <small>
+                    Comparison <code>{String(command.parameters.comparison_id ?? "missing")}</code>
+                  </small>
+                </>
+              )}
               <small>
                 Due {command.effective_action.due_date ?? "none"} · Idempotency{" "}
                 <code>{command.idempotency_key.slice(0, 12)}…</code>
@@ -397,7 +406,9 @@ function ExecutionPreparationPanel({
                   ? "Executing…"
                   : command.execution_state === "executed"
                     ? "Execute again safely"
-                    : "Execute training assignment"}
+                    : command.system === "jira"
+                      ? "Create Jira task"
+                      : "Execute training assignment"}
               </button>
               {command.execution_results.length > 0 && (
                 <div className="execution-history">
@@ -412,6 +423,15 @@ function ExecutionPreparationPanel({
                           {result.learning_assignment.worker_id} →{" "}
                           {result.learning_assignment.training_course_id} (
                           {humanize(result.learning_assignment.assignment_status)})
+                        </p>
+                      )}
+                      {result.jira_issue && (
+                        <p>
+                          Jira task{" "}
+                          <a href={result.jira_issue.browse_url} target="_blank" rel="noreferrer">
+                            {result.jira_issue.issue_key}
+                          </a>{" "}
+                          in {result.jira_issue.project_id_or_key}
                         </p>
                       )}
                     </div>
@@ -440,8 +460,8 @@ function ExecutionPreparationPanel({
         </div>
       )}
       <p className="execution-inline">
-        <strong>Execution is always explicit.</strong> Only supported prepared training commands
-        expose a control; unsupported approved actions remain visible and inactive.
+        <strong>Execution is always explicit.</strong> Only supported prepared Learning and Jira
+        commands expose a control; unsupported approved actions remain visible and inactive.
       </p>
     </section>
   );

@@ -911,3 +911,19 @@ requires accepted validated rules and completed assessments on both sides. Analy
 not repeat its POST during recovery. UTC-stable client timestamps avoid server/browser hydration
 differences; an interrupted response is reconciled with one authoritative entry read, after which
 recovery controls only reopen the persisted run.
+
+## Milestone 6 Jira Execution Extension
+
+The proposed assessment contains one `operational_remediation` recommendation for the primary
+International Business Travel Policy document. After the baseline/proposed comparison exists, the
+reviewer approves that recommendation and completes all other decisions. Command preparation
+creates one `jira.create_issue` command whose frozen human-readable description includes the three
+semantic policy changes, document impact and deterministic reason, persisted evidence, command and
+comparison IDs, baseline/proposed assessment IDs, and extraction lineage.
+
+Explicit execution creates one Task in the configured Enterprise Change Management project. The
+project's Task workflow places it in To Do. The workbench shows the returned Jira key and link plus
+the immutable success result. Repeating execution returns `already_applied`, references the same
+receipt, and performs no second Jira request. A mocked ambiguous availability failure demonstrates
+the at-most-once safety rule: ChangeOps records the unavailable outcome and refuses to resend when
+the first delivery may have succeeded.

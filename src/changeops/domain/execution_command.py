@@ -11,8 +11,8 @@ EXECUTION_COMMAND_SCHEMA_VERSION = "execution-command-v1"
 INTERNATIONAL_TRAVEL_SECURITY_COURSE_ID = "international-travel-security"
 
 ExecutionCommandStatus = Literal["pending_execution"]
-ExecutionSystem = Literal["learning"]
-ExecutionOperation = Literal["assign_training"]
+ExecutionSystem = Literal["learning", "jira"]
+ExecutionOperation = Literal["assign_training", "create_issue"]
 UnsupportedReasonCode = Literal["unsupported_action_type", "unsupported_target_type"]
 
 
@@ -78,7 +78,27 @@ def snapshot_effective_action(
     )
 
 
-def map_effective_action(action: OriginalActionSnapshot) -> ExecutionMappingResult:
+def map_effective_action(
+    action: OriginalActionSnapshot,
+    *,
+    jira_command: ExecutionCommandCandidate | None = None,
+) -> ExecutionMappingResult:
+    if action.action_type == "operational_remediation":
+        if action.target_type != "enterprise_document":
+            return ExecutionMappingResult(
+                unsupported=UnsupportedExecutionMapping(
+                    code="unsupported_target_type",
+                    message="Operational remediation requires an enterprise-document target.",
+                )
+            )
+        if jira_command is None:
+            return ExecutionMappingResult(
+                unsupported=UnsupportedExecutionMapping(
+                    code="unsupported_action_type",
+                    message="Operational remediation requires immutable comparison lineage.",
+                )
+            )
+        return ExecutionMappingResult(command=jira_command)
     if action.action_type != "training_assignment":
         return ExecutionMappingResult(
             unsupported=UnsupportedExecutionMapping(

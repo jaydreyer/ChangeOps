@@ -1,8 +1,9 @@
-from changeops.db.models import ExecutionResult, SimulatedLearningAssignment
+from changeops.db.models import ExecutionResult, JiraIssue, SimulatedLearningAssignment
 from changeops.schemas.execution_commands import (
     ExecutionCommandPreparationResponse,
     ExecutionCommandResponse,
     ExecutionResultResponse,
+    JiraIssueResponse,
     SimulatedLearningAssignmentResponse,
     UnsupportedExecutionActionResponse,
 )
@@ -97,6 +98,9 @@ def serialize_execution_result(result: ExecutionResult) -> ExecutionResultRespon
             if result.learning_assignment is not None
             else None
         ),
+        jira_issue=(
+            serialize_jira_issue(result.jira_issue) if result.jira_issue is not None else None
+        ),
     )
 
 
@@ -112,4 +116,17 @@ def serialize_learning_assignment(
         assignment_status=assignment.assignment_status,
         assigned_at=assignment.assigned_at,
         created_at=assignment.created_at,
+    )
+
+
+def serialize_jira_issue(issue: JiraIssue) -> JiraIssueResponse:
+    return JiraIssueResponse(
+        id=issue.id,
+        issue_id=issue.issue_id,
+        issue_key=issue.issue_key,
+        api_url=issue.api_url,
+        browse_url=issue.browse_url,
+        project_id_or_key=issue.project_id_or_key,
+        execution_command_id=issue.execution_command_id,
+        created_at=issue.created_at,
     )

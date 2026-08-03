@@ -362,7 +362,9 @@ def _add_document_impacts(
         )
         action_key = f"{key}:update_document"
         action_type = (
-            "update_document"
+            "operational_remediation"
+            if dependency.relationship_type == "contains_changed_policy"
+            else "update_document"
             if dependency.impact_classification == "update_required"
             else "review_document"
         )
@@ -372,7 +374,11 @@ def _add_document_impacts(
             action_type=action_type,
             target_type="enterprise_document",
             target_identifier=document.id,
-            description=f"{action_type.replace('_', ' ').capitalize()}: {document.title}.",
+            description=(
+                f"Apply the approved policy remediation to {document.title}."
+                if action_type == "operational_remediation"
+                else f"{action_type.replace('_', ' ').capitalize()}: {document.title}."
+            ),
         )
 
 

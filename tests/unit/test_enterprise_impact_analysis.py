@@ -359,6 +359,21 @@ def test_each_domain_uses_explicit_positive_and_negative_rules() -> None:
     } <= {action.action_type for action in actions}
 
 
+def test_primary_policy_document_produces_one_operational_remediation() -> None:
+    _, _, _, context = make_inputs()
+    dependency = context.document_dependencies[0]
+    context = replace(
+        context,
+        document_dependencies=(replace(dependency, relationship_type="contains_changed_policy"),),
+    )
+
+    _, actions = analyze(context_override=context)
+    remediation = [item for item in actions if item.action_type == "operational_remediation"]
+
+    assert len(remediation) == 1
+    assert remediation[0].target_type == "enterprise_document"
+
+
 def test_reason_codes_paths_duplicate_prevention_and_ordering_are_stable() -> None:
     impacts, _ = analyze()
 

@@ -34,6 +34,7 @@ ActionType = Literal[
     "training_assignment",
     "review_team_travel",
     "review_system_workflow",
+    "operational_remediation",
     "update_document",
     "review_document",
     "review_customer_commitment",

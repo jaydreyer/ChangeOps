@@ -155,6 +155,8 @@ AI does not own comparison.
 - immutable rule-difference records;
 - durable idempotency constraints.
 
+For this milestone, the authoritative policy records are limited to the selected baseline and proposed source records; they do not form a general lifecycle model.
+
 ### LangGraph
 
 LangGraph is not required for this milestone.
@@ -271,6 +273,8 @@ The expected aggregate contains:
 - creation timestamp.
 
 Exact table, model, and field names must follow existing repository conventions.
+
+The immutable comparison aggregate owns the baseline/proposed relationship. This milestone intentionally does not introduce a generalized policy-version management model.
 
 ### Required invariants
 
@@ -403,9 +407,9 @@ The proposed revision must:
 
 - belong to the same fictional organization;
 - use the same supported policy family;
-- produce accepted schema-version-1 rules;
-- contain a small and understandable number of semantic changes;
-- produce at least two different comparison change categories where naturally supported;
+- support schema-version-1 typed rules when the reviewer analyzes it through the product;
+- contain several meaningful semantic differences;
+- use multiple comparison categories only where the existing typed schema naturally supports them;
 - remain realistic for the existing scenario.
 
 Potential supported differences include:
@@ -422,6 +426,23 @@ The implementation must inspect the actual current rule schema before selecting 
 Do not add another policy family.
 
 Do not create an unrealistically large revision merely to increase comparison counts.
+
+Do not introduce artificial seed data merely to produce `added` or `removed` examples.
+
+### Ordinary seed state
+
+The ordinary seed persists both source policy records.
+
+The ordinary seed does not persist:
+
+- accepted extraction attempts;
+- completed analysis runs;
+- completed comparisons;
+- other generated workflow artifacts.
+
+The reviewer must perform analysis through the product before comparison becomes available. Provider-free fixtures may still represent completed states for automated tests.
+
+This preserves the existing demonstration philosophy that the reviewer begins with source data rather than completed workflow history.
 
 ---
 
@@ -442,6 +463,14 @@ A reviewer must be able to see:
 - proposed provenance;
 - materiality;
 - reason codes or readable explanations.
+
+The comparison UI must clearly communicate whether each policy record is ready for comparison. Comparison must not be available until both records have:
+
+- an accepted extraction;
+- validated typed rules;
+- no blocking clarification.
+
+This is product behavior only. Do not design new workflow infrastructure for readiness.
 
 Reuse the current application design language and product terminology.
 

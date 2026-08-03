@@ -18,7 +18,11 @@ from changeops.services.policy_analysis_journey_service import (
     PolicyAnalysisJourneyIntegrityError,
     _resolve_change_plan_references,
 )
-from changeops.services.seed_service import POLICY_CHANGE_ID, POLICY_TEXT
+from changeops.services.seed_service import (
+    POLICY_CHANGE_ID,
+    POLICY_TEXT,
+    PROPOSED_POLICY_CHANGE_ID,
+)
 from tests.integration.test_execution_commands_api import ADMIN_HEADERS, _complete_run
 from tests.integration.test_policy_extraction_api import configured_fixture_model
 from tests.integration.test_policy_interpretation_api import configured_interpreter
@@ -38,8 +42,16 @@ def test_entry_returns_seeded_policy_and_recent_analysis(client) -> None:
     assert response.status_code == 200
     body = response.json()
     policy = next(item for item in body["policies"] if item["id"] == POLICY_CHANGE_ID)
+    proposed = next(item for item in body["policies"] if item["id"] == PROPOSED_POLICY_CHANGE_ID)
     assert policy["policy_text"] == POLICY_TEXT
     assert policy["organization_name"] == "Acme Global Manufacturing"
+    assert policy["comparison_readiness"]["ready"] is True
+    assert proposed["comparison_readiness"] == {
+        "ready": False,
+        "status": "policy_not_ready",
+        "accepted_extraction_attempt_id": None,
+    }
+    assert body["recent_comparisons"] == []
     assert body["recent_runs"][0]["id"] == created.json()["id"]
 
 

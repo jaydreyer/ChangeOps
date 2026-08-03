@@ -74,6 +74,130 @@ dd,
   box-shadow: 0 12px 40px rgb(23 35 31 / 8%);
 }
 
+.comparison-entry {
+  margin-top: 1.5rem;
+}
+
+.comparison-selectors,
+.comparison-source-grid,
+.semantic-values,
+.provenance-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.comparison-selectors {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 1.25rem 0;
+}
+
+.comparison-selectors small {
+  font-weight: 600;
+}
+
+.ready {
+  color: #236342;
+}
+
+.not-ready {
+  color: #8a4a18;
+}
+
+.comparison-history {
+  margin-top: 1.5rem;
+  border-top: 1px solid #d9dfdb;
+  padding-top: 1rem;
+}
+
+.comparison-source-grid {
+  margin: 1.5rem 0;
+}
+
+.difference-list {
+  display: grid;
+  gap: 1rem;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.difference-card {
+  border: 1px solid #cbd3ce;
+  border-left: 5px solid #234a3b;
+  background: white;
+  padding: 1.25rem;
+}
+
+.difference-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: start;
+}
+
+.difference-heading h3 {
+  margin: 0.55rem 0 1rem;
+}
+
+.badge.added {
+  background: #dff2e7;
+  color: #164f32;
+}
+
+.badge.removed {
+  background: #f8e6df;
+  color: #7a2f1a;
+}
+
+.badge.modified {
+  background: #e5ebf7;
+  color: #294d79;
+}
+
+.materiality {
+  color: #7a4518;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.semantic-values {
+  margin-bottom: 1rem;
+}
+
+.semantic-values > div,
+.provenance-grid > div {
+  border: 1px solid #d9dfdb;
+  background: #f7f9f7;
+  padding: 0.9rem;
+}
+
+.semantic-values span {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: #596a63;
+  font-size: 0.75rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.provenance-grid {
+  margin-top: 1rem;
+}
+
+.provenance-grid blockquote {
+  margin: 0 0 0.5rem;
+  border-left: 3px solid #8ca59a;
+  padding-left: 0.75rem;
+}
+
+.impact-delta-notice {
+  margin: 1.5rem 0;
+  border: 1px solid #b99055;
+  background: #fff8eb;
+  padding: 1.25rem;
+}
+
 .eyebrow {
   margin: 0 0 0.55rem;
   color: #52655d;

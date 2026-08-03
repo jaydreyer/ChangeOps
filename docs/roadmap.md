@@ -564,3 +564,46 @@ Examples:
   environment is reproducible.
 
 Technologies should not be introduced solely to increase the number of tools represented in the repository.
+
+⸻
+
+Milestone 5A — Policy Comparison Foundation
+
+Status: complete.
+
+Product capability
+
+Allow a reviewer to analyze one baseline international-travel policy and one proposed revision,
+then create or retrieve an immutable deterministic comparison of their accepted typed semantics.
+
+Delivered behavior
+
+* the ordinary seed contains both source policies and no generated workflow history;
+* comparison remains unavailable until each source has a completed analysis, accepted extraction,
+  validated schema-v1 rules, complete provenance, and no pending clarification;
+* explicit domain code reports stable added, removed, and modified rule differences;
+* each difference preserves applicable baseline and proposed values and provenance;
+* PostgreSQL owns the immutable fingerprinted comparison aggregate and idempotency;
+* FastAPI exposes narrow create and retrieve resources;
+* Next.js exposes source readiness, comparison initiation, immutable results, and the explicit
+  boundary that enterprise impact delta is not yet calculated;
+* guarded demo reset removes comparisons while preserving both sources.
+
+Architectural boundary
+
+AI may propose each source extraction but does not compare policies. Deterministic code owns
+compatibility, accepted-attempt resolution, typed comparison, identity, ordering, materiality,
+reason codes, provenance validation, fingerprinting, and API behavior. LangGraph is not used
+because comparison is synchronous and has no pause/resume lifecycle.
+
+Not included
+
+* enterprise impact delta;
+* policy version numbering, current flags, supersession, or lifecycle management;
+* raw text or generic JSON diff;
+* AI comparison or explanation;
+* assessment, approval, plan, command, or execution changes.
+
+Next vertical slice
+
+Enterprise impact delta from two immutable policy assessments remains the next planned capability.

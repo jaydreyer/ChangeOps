@@ -13,7 +13,11 @@ vi.mock("./components/policy-analysis-entry", () => ({
 
 describe("home page", () => {
   it("loads the product-facing policy analysis entry", async () => {
-    vi.mocked(getPolicyAnalysisEntry).mockResolvedValue({ policies: [], recent_runs: [] });
+    vi.mocked(getPolicyAnalysisEntry).mockResolvedValue({
+      policies: [],
+      recent_runs: [],
+      recent_comparisons: [],
+    });
 
     render(await HomePage());
 

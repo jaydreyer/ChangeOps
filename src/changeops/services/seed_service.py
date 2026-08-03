@@ -23,6 +23,7 @@ from changeops.db.models import (
 
 ORGANIZATION_ID = "org-acme-global-manufacturing"
 POLICY_CHANGE_ID = "policy-international-travel-2026-09"
+PROPOSED_POLICY_CHANGE_ID = "policy-international-travel-proposed-2026-10"
 COURSE_IDENTIFIER = "international-travel-security"
 
 POLICY_TEXT = """Effective September 1, 2026, U.S.-based employees and contractors traveling
@@ -47,6 +48,37 @@ STRUCTURED_RULES = {
     "trip_scope": {
         "origin_country": "US",
         "excluded_destination_countries": ["US", "CA"],
+    },
+    "manager_approval": {
+        "booking_before_effective_date_is_exempt": True,
+    },
+    "security_training": {
+        "course_identifier": COURSE_IDENTIFIER,
+    },
+}
+
+PROPOSED_POLICY_TEXT = """Effective October 1, 2026, U.S.-based employees traveling
+internationally for business must complete the International Travel Security course before
+departure.
+
+Manager approval is required before any nonrefundable international travel is booked.
+
+Travel booked before October 1, 2026 is exempt from the new manager-approval requirement.
+However, travelers departing on or after October 1, 2026 must still complete the
+International Travel Security course before departure.
+
+Travel between the United States, Canada, and Mexico is excluded from this policy."""
+
+PROPOSED_STRUCTURED_RULES = {
+    "kind": "international_travel",
+    "schema_version": 1,
+    "worker_scope": {
+        "assigned_work_country": "US",
+        "worker_types": ["employee"],
+    },
+    "trip_scope": {
+        "origin_country": "US",
+        "excluded_destination_countries": ["US", "CA", "MX"],
     },
     "manager_approval": {
         "booking_before_effective_date_is_exempt": True,
@@ -464,6 +496,18 @@ def seed_database(session: Session) -> None:
             effective_date=date(2026, 9, 1),
             policy_text=POLICY_TEXT,
             structured_rules=STRUCTURED_RULES,
+        )
+    )
+    session.merge(
+        PolicyChange(
+            id=PROPOSED_POLICY_CHANGE_ID,
+            organization_id=ORGANIZATION_ID,
+            title="Proposed International Business Travel Revision",
+            owner="Corporate Security and Global Travel",
+            version="proposed-draft",
+            effective_date=date(2026, 10, 1),
+            policy_text=PROPOSED_POLICY_TEXT,
+            structured_rules=PROPOSED_STRUCTURED_RULES,
         )
     )
     for manager in MANAGERS:

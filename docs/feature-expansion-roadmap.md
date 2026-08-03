@@ -598,6 +598,11 @@ Establish comparison between one baseline policy and one proposed revision using
 
 The first slice is governed by [`docs/milestone-5a-policy-comparison.md`](milestone-5a-policy-comparison.md). The roadmap intentionally does not repeat API design, table design, endpoint payloads, test lists, or other implementation details governed by that milestone.
 
+**Status: complete.** The product now resolves two completed accepted analyses, compares their
+schema-v1 typed semantics deterministically, persists one immutable fingerprinted aggregate,
+preserves side-specific provenance, exposes create/retrieve APIs and a focused Next.js experience,
+and resets generated comparisons without removing either source policy.
+
 ### Slice 2 — Enterprise impact delta
 
 Extend the trusted policy comparison into before-and-after enterprise consequences. Deterministic code must continue to own the authoritative delta; AI may explain the completed, grounded delta but cannot alter it.
@@ -636,34 +641,22 @@ The local trusted-header boundary must be replaced for public deployment, but th
 
 ## Recommended next slice
 
-**Compare validated rules for one baseline policy and one proposed revision.**
+**Calculate enterprise impact delta from two immutable policy assessments.**
 
-Do not start with complete impact-delta analysis.
-
-The current domain model needs a trustworthy immutable comparison aggregate first.
+The trustworthy immutable semantic comparison aggregate now exists. The next slice should derive
+before-and-after enterprise consequences without changing the completed policy comparison or
+allowing AI to author authoritative delta.
 
 ## User-visible outcome
 
-A reviewer can choose:
-
-- one current policy;
-- one proposed revision;
-
-and see:
-
-- which validated obligations were added;
-- which were removed;
-- which were modified;
-- both exact source references;
-- whether each difference is operationally material under the supported schema.
+A reviewer should be able to see which workers and enterprise objects became affected, remained
+affected, or were cleared, with deterministic evidence explaining every delta.
 
 ## Why this is the right first slice
 
-It answers a new product question while remaining bounded.
-
-It validates the hardest domain assumptions before the system computes two assessments and compares enterprise effects.
-
-It also avoids embedding comparison logic inside UI code or AI prompts.
+It builds directly on the completed semantic comparison while keeping assessment snapshots and
+enterprise facts authoritative. It is the next point where ChangeOps can answer not only what
+policy obligations changed, but what operational consequences changed.
 
 ---
 

@@ -19,8 +19,29 @@ const entry = {
       version: "2",
       effective_date: "2026-09-01",
       policy_text: "Travelers must complete training.",
+      comparison_readiness: {
+        ready: true,
+        status: "ready",
+        accepted_extraction_attempt_id: "attempt-1",
+      },
+    },
+    {
+      id: "policy-proposed",
+      organization_id: "org-acme",
+      organization_name: "Acme Global",
+      title: "Proposed International Business Travel",
+      owner: "People Operations",
+      version: "proposed-draft",
+      effective_date: "2026-10-01",
+      policy_text: "Employees must complete training.",
+      comparison_readiness: {
+        ready: true,
+        status: "ready",
+        accepted_extraction_attempt_id: "attempt-2",
+      },
     },
   ],
+  recent_comparisons: [],
   recent_runs: [
     {
       id: "run-1",
@@ -38,7 +59,7 @@ describe("policy analysis entry", () => {
   it("shows the golden policy and opens a recent durable run", () => {
     render(<PolicyAnalysisEntryView entry={entry} />);
 
-    expect(screen.getByText("International Business Travel")).toBeInTheDocument();
+    expect(screen.getAllByText("International Business Travel")).not.toHaveLength(0);
     expect(screen.getByText("Travelers must complete training.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open analysis" })).toHaveAttribute(
       "href",
@@ -66,5 +87,54 @@ describe("policy analysis entry", () => {
       }),
     );
     expect(push).toHaveBeenCalledWith("/policy-analyses/run-2");
+  });
+
+  it("creates a deterministic comparison from the selected ready policies", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ id: "comparison-1" }), {
+        status: 201,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+    render(<PolicyAnalysisEntryView entry={entry} />);
+
+    await user.click(screen.getByRole("button", { name: "Compare accepted rules" }));
+
+    expect(fetch).toHaveBeenCalledWith(
+      "/api/v1/policy-comparisons",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          "X-ChangeOps-Actor": "portfolio-reviewer",
+        }),
+      }),
+    );
+    expect(push).toHaveBeenCalledWith("/policy-comparisons/comparison-1");
+  });
+
+  it("presents pending clarification as policy readiness, not lineage integrity", () => {
+    const notReadyEntry = {
+      ...entry,
+      policies: entry.policies.map((policy) =>
+        policy.id === "policy-proposed"
+          ? {
+              ...policy,
+              comparison_readiness: {
+                ready: false,
+                status: "policy_not_ready",
+                accepted_extraction_attempt_id: null,
+              },
+            }
+          : policy,
+      ),
+    };
+
+    render(<PolicyAnalysisEntryView entry={notReadyEntry} />);
+
+    expect(
+      screen.getByText("Not ready · analysis incomplete or clarification pending"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Compare accepted rules" })).toBeDisabled();
   });
 });

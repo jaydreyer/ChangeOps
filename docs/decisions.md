@@ -627,3 +627,51 @@ destroying or duplicating the stable fictional enterprise catalog.
   limited to the recognized local demo database.
 - No table, workflow engine, state library, scenario manager, adapter, or deployment technology is
   introduced.
+
+# ADR-0017 — Compare Accepted Typed Policy Semantics Deterministically
+
+## Status
+
+Accepted
+
+## Context
+
+ChangeOps can govern the analysis of one policy, but it needs to answer what obligations changed
+between a selected baseline source and proposed revision. Raw text diffing would promote editorial
+changes to operational changes, while an LLM comparison would make classification, ordering,
+materiality, and replay probabilistic. Comparing impact assessments at the same time would combine
+policy semantics with the separately complex question of changed enterprise consequences.
+
+The current accepted extraction boundary already produces validated
+`InternationalTravelPolicyRules`, owns source provenance, resolves enterprise course identifiers,
+and records bounded human clarification. That is the narrowest trustworthy comparison input.
+
+## Decision
+
+- Compare only accepted typed semantics for `international_travel / schema_version 1`.
+- Resolve each source through its most recent completed policy-analysis run and authoritative
+  accepted attempt; fail closed on pending clarification, source drift, missing provenance, or
+  cross-owned lineage.
+- Use one explicit pure comparator for the supported fields. Do not introduce recursive JSON diff,
+  reflection-driven comparison, a schema registry, raw text diff, embeddings, or an LLM prompt.
+- Classify persisted differences as `added`, `removed`, or `modified`, mark supported operational
+  rule changes material deterministically, assign stable reason codes, and preserve stable order.
+- Persist one immutable comparison parent and ordered immutable difference children with
+  references to both policies and attempts, semantic value snapshots, side-specific provenance,
+  creator identity, contract version, and canonical fingerprint.
+- Return the same comparison for an equivalent repeated request.
+- Keep the baseline/proposed relationship inside the comparison aggregate. Do not add policy
+  version numbers, current flags, supersession, or general lifecycle management.
+- Keep comparison synchronous. Do not add LangGraph because there is no branching, pause, human
+  wait, retry lifecycle, or recovery state.
+- Defer enterprise impact delta to the next vertical slice.
+
+## Consequences
+
+- Wording and source-span changes with identical accepted rules create no operational difference.
+- Materiality and reason codes are reproducible, testable, and independent of model behavior.
+- Every persisted value resolves to accepted policy-text or human-clarification lineage.
+- Historical comparisons remain stable when source or enterprise records later change.
+- The domain and persistence models are intentionally specific to one typed policy family.
+- Reviewers must analyze both policy sources before comparison becomes available.
+- The product does not yet identify newly affected or no-longer-affected enterprise objects.

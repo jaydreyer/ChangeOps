@@ -801,3 +801,44 @@ The seeded assessment returns 18 affected enterprise impacts:
 Every impact contains a stable reason code, evidence references, a stable sort key, and an ordered
 relationship path. The complete response contains the four Milestone 0 worker actions plus nine
 cross-domain actions. All 13 actions remain `not_executed`.
+
+## Milestone 5A Policy Comparison Extension
+
+The ordinary source catalog now contains a second policy record:
+
+**Title:** Proposed International Business Travel Revision
+
+**Effective date:** October 1, 2026
+
+**Source identity:** `policy-international-travel-proposed-2026-10`
+
+The proposed source keeps the existing international-travel family, U.S. work-location scope,
+manager-approval exemption contract, and International Travel Security course. It makes three
+bounded semantic changes supported by the current typed schema:
+
+- effective date changes from September 1 to October 1, 2026;
+- contractor coverage is removed, leaving employees;
+- Mexico is added to the excluded destination countries alongside the United States and Canada.
+
+The seed contains neither policy's accepted extraction, analysis run, assessment, nor comparison.
+The reviewer analyzes both through the product. Comparison remains unavailable until each selected
+source has a completed run whose authoritative attempt contains accepted typed rules and no
+pending clarification.
+
+The deterministic comparison then returns exactly three ordered differences:
+
+1. `effective_date` — `modified` — `POLICY_EFFECTIVE_DATE_MODIFIED`;
+2. `worker_scope.worker_types:contractor` — `removed` — `WORKER_TYPE_REMOVED`;
+3. `trip_scope.excluded_destination_countries:MX` — `added` —
+   `EXCLUDED_DESTINATION_ADDED`.
+
+Each applicable semantic value includes provenance from its owning accepted extraction. An absent
+collection member has no fabricated source span on that side. Every difference is operationally
+material within the supported schema. Repeating the request reuses the immutable comparison.
+
+This extension compares accepted policy obligations only. It does not compare assessments,
+workers, enterprise impacts, proposed actions, approvals, commands, or execution results. The
+product explicitly labels enterprise impact delta as not yet calculated.
+
+`make demo-reset` removes generated comparisons and all existing workflow history while preserving
+both policy sources and the rest of the fictional catalog.

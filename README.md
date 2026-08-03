@@ -4,14 +4,14 @@ ChangeOps analyzes operational and policy changes, identifies affected people an
 
 ## Current milestone
 
-Milestone 5, product-facing policy-analysis journey.
+Milestone 5A, deterministic policy comparison.
 
-The local application now starts with the seeded international-travel policy and exposes the
-governed journey from source language through extraction, deterministic validation, bounded
-clarification, immutable assessment, enterprise coverage, grounded interpretation, approval, and
-the existing controlled execution workbench. Milestones 0–4 remain intact. Production
-authentication, AWS, Terraform, observability, additional policy families, and additional
-enterprise adapters remain deferred.
+The local application now starts with a baseline international-travel policy and one proposed
+revision. A reviewer analyzes both through the existing governed journey, then creates or retrieves
+an immutable deterministic comparison of their accepted typed rules. The comparison shows stable
+added, removed, and modified obligations with values, materiality, reason codes, and lineage to
+both accepted extraction attempts. Enterprise impact delta remains deferred. Milestones 0–5 and
+the controlled execution workbench remain intact.
 
 Milestone 0 is complete and preserved by the `v0.0.1-milestone-0` tag.
 
@@ -23,6 +23,7 @@ See:
 - `docs/milestone-2.md`
 - `docs/milestone-3.md`
 - `docs/milestone-4.md`
+- `docs/milestone-5a-policy-comparison.md`
 - `docs/demo-scenario.md`
 - `docs/decisions.md`
 - [Contributing and engineering standards](CONTRIBUTING.md)
@@ -190,6 +191,20 @@ replay gets its own immutable `already_applied` result referencing the original 
 The workbench shows the worker, course, approval lineage, execution control, assignment, and audit
 history. Proposed actions and approval history remain unchanged.
 
+## Deterministic policy comparison
+
+`POST /api/v1/policy-comparisons` accepts only baseline and proposed policy identifiers; reviewer
+identity comes from `X-ChangeOps-Actor`. Application code resolves the latest completed analysis
+for each source, verifies accepted extraction ownership, source snapshots, family, schema,
+readiness, and provenance, then compares the explicit `InternationalTravelPolicyRules` fields.
+No model or LangGraph workflow participates.
+
+The comparison aggregate and its ordered differences are immutable PostgreSQL records. Repeated
+requests over the same accepted source attempts reuse the same SHA-256-fingerprinted comparison.
+The seeded proposed revision changes the effective date, removes contractor coverage, and adds
+Mexico to excluded destinations. Wording or source-span changes with identical accepted semantics
+produce no rule difference.
+
 ## Requirements
 
 - Docker Desktop or another Docker Engine with Docker Compose
@@ -238,9 +253,9 @@ Configure `OPENAI_API_KEY` in `.env`, then use this repeatable golden path:
 1. Run `make demo-reset`. This builds the stack, applies migrations, preserves and idempotently
    refreshes the fictional enterprise catalog, removes prior workflow history, and leaves the API
    and web application healthy.
-2. Open <http://localhost:3000>. The landing page should show the seeded International Business
-   Travel policy and no recent analysis runs.
-3. Select that policy and choose **Start analysis**.
+2. Open <http://localhost:3000>. The landing page should show the baseline policy, proposed
+   revision, no recent analysis runs, and both policies as not ready for comparison.
+3. Select the baseline policy and choose **Start new analysis**.
 4. On the journey page, inspect the AI-proposed structured values, deterministic validation, and
    exact source quotes. The ordinary golden policy needs no clarification and is labeled
    **No clarification required**.
@@ -260,6 +275,11 @@ Configure `OPENAI_API_KEY` in `.env`, then use this repeatable golden path:
    `succeeded`; replay is `already_applied` and reuses the same durable assignment.
 10. Inspect the workbench history and return to the analysis journey. Approval, command
     preparation, execution, and replay counts remain distinct.
+11. Return to the landing page, analyze the proposed revision, then select the baseline and
+    proposed records under **Compare accepted policy rules**.
+12. Create the comparison. Confirm three ordered semantic differences—effective date modified,
+    contractor coverage removed, and Mexico exclusion added—with accepted provenance on every
+    applicable side. Confirm the page states that enterprise impact delta has not been calculated.
 
 The eight legacy assessment questions remain only in the historical schema-v1 assessment response.
 They are seeded scenario fixtures and are not displayed as AI-derived uncertainty in the journey.
@@ -366,9 +386,10 @@ make demo-reset
 ```
 
 This command preserves the fictional organization, people, trips, systems, documents, training,
-commitments, policy, and dependency catalog. It removes analysis runs, extraction attempts,
-clarifications, assessments, findings, evidence, impacts, proposed actions, interpretation
-attempts and plans, reviews, approval runs, commands, assignments, and execution results.
+commitments, both policy sources, and the dependency catalog. It removes comparisons, analysis
+runs, extraction attempts, clarifications, assessments, findings, evidence, impacts, proposed
+actions, interpretation attempts and plans, reviews, approval runs, commands, assignments, and
+execution results.
 
 The reset fails closed unless the database is PostgreSQL, the host and database name match the
 recognized local Compose target, the seeded organization marker exists, and the explicit
@@ -421,6 +442,30 @@ Retrieve durable state after completion or a process restart:
 ```http
 GET /api/v1/policy-analysis-runs/{run_id}
 ```
+
+Create or idempotently retrieve a deterministic policy comparison after both policies have
+completed analyses:
+
+```http
+POST /api/v1/policy-comparisons
+X-ChangeOps-Actor: reviewer@example.com
+Content-Type: application/json
+
+{
+  "baseline_policy_change_id": "policy-international-travel-2026-09",
+  "proposed_policy_change_id": "policy-international-travel-proposed-2026-10"
+}
+```
+
+Retrieve the immutable comparison:
+
+```http
+GET /api/v1/policy-comparisons/{comparison_id}
+```
+
+A new comparison returns `201`; an equivalent repeat returns `200`. Both include `Location`.
+The client cannot supply attempts, rules, differences, provenance, materiality, reason codes,
+ordering, or fingerprints.
 
 Answer the pending typed clarification and resume:
 
@@ -526,9 +571,11 @@ returns the stable `approval_workbench_inconsistent` error instead of silently d
 
 ## Local application
 
-The Compose seed creates stable fictional source data, not completed workflow history. Start at
-<http://localhost:3000>, run the policy analysis, and follow the product handoff into the approval
-workbench. API and OpenAPI documentation remain available at <http://localhost:8000/docs>.
+The Compose seed creates stable fictional source data—including the baseline and proposed
+international-travel sources—but no completed workflow or comparison history. Start at
+<http://localhost:3000>, analyze either source, follow the product handoff into the approval
+workbench when useful, and compare the two sources after both are ready. API and OpenAPI
+documentation remain available at <http://localhost:8000/docs>.
 
 The reviewer email field populates `X-ChangeOps-Actor`; decision and retry requests send
 `X-ChangeOps-Role: reviewer`, while command preparation sends the narrowly authorized

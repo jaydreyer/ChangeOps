@@ -9,6 +9,7 @@ def main() -> None:
         summary = reset_from_environment(session, settings.database_url)
     print(
         "Demo reset complete: "
+        f"{summary.policy_comparisons} policy comparisons, "
         f"{summary.policy_analysis_runs} analysis runs, "
         f"{summary.approval_runs} approval runs, "
         f"{summary.execution_results} execution results."

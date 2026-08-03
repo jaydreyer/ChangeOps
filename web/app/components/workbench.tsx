@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { parseApiError } from "@/lib/api";
@@ -53,6 +54,8 @@ export function WorkbenchView({
   const [message, setMessage] = useState("");
   const [resuming, setResuming] = useState(false);
   const { run, assessment, items } = initialWorkbench;
+  const currentReviewId =
+    items.find((item) => item.review.status === "pending")?.review.id ?? items[0]?.review.id;
 
   async function resume() {
     setResuming(true);
@@ -83,28 +86,48 @@ export function WorkbenchView({
     <main className="workbench">
       <header className="workbench-header">
         <div>
-          <p className="eyebrow">ChangeOps · focused reviewer interface</p>
-          <h1>Human Approval Workbench</h1>
+          <Link href={`/policy-analyses/${run.policy_analysis_run_id}`} className="back-link">
+            ← Return to policy analysis
+          </Link>
+          <p className="product-mark">ChangeOps</p>
+          <p className="eyebrow">Human review and approval</p>
+          <h1>Review proposed actions</h1>
           <p className="lede">
-            Review persisted proposals against deterministic findings, enterprise impacts, and
-            evidence.
+            You are reviewing {run.summary.total} proposed{" "}
+            {run.summary.total === 1 ? "action" : "actions"}. Approval records a decision; it does
+            not execute the action.
           </p>
         </div>
-        <dl className="identifiers">
-          <div>
-            <dt>Assessment</dt>
-            <dd>{assessment.id}</dd>
-          </div>
-          <div>
-            <dt>Approval run</dt>
-            <dd>{run.id}</dd>
-          </div>
-        </dl>
+        <div className="approval-status-panel">
+          <ProvenanceLabel kind="human_decision" />
+          <strong>Authoritative approval state</strong>
+          <span>{humanize(run.status)}</span>
+          <span className="quiet-label">Current step: {humanize(run.current_step)}</span>
+          <details className="technical-disclosure">
+            <summary>View approval identity</summary>
+            <dl className="identifiers">
+              <div>
+                <dt>Assessment</dt>
+                <dd>{assessment.id}</dd>
+              </div>
+              <div>
+                <dt>Approval run</dt>
+                <dd>{run.id}</dd>
+              </div>
+            </dl>
+          </details>
+        </div>
       </header>
 
-      <aside className="execution-notice" aria-label="Execution status notice">
-        <ProvenanceLabel kind="not_executed" />
-        <strong>Approval records a human decision. It does not execute the action.</strong>
+      <aside className="approval-boundary-notice" aria-label="Approval authority notice">
+        <ProvenanceLabel kind="human_decision" />
+        <div>
+          <strong>A person decides whether each proposal may advance.</strong>
+          <span>
+            Deterministic findings and persisted evidence provide context; they do not make the
+            decision.
+          </span>
+        </div>
       </aside>
 
       {run.status === "completed" && (
@@ -147,15 +170,6 @@ export function WorkbenchView({
         </label>
       </section>
 
-      {run.status === "completed" && initialPreparation && (
-        <ExecutionPreparationPanel
-          runId={run.id}
-          actor={actor}
-          preparation={initialPreparation}
-          onStatus={setMessage}
-        />
-      )}
-
       {run.failure_code && (
         <section className="failure-panel" aria-labelledby="failure-heading">
           <h2 id="failure-heading">Approval reconciliation failed</h2>
@@ -185,8 +199,11 @@ export function WorkbenchView({
       <section aria-labelledby="reviews-heading">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">Immutable membership order</p>
-            <h2 id="reviews-heading">Proposed actions</h2>
+            <p className="eyebrow">Human decision boundary</p>
+            <h2 id="reviews-heading">Review each proposed action</h2>
+            <p className="section-intro">
+              Items remain in their persisted membership order. The next pending review is open.
+            </p>
           </div>
           <span>{items.length} actions</span>
         </div>
@@ -197,14 +214,24 @@ export function WorkbenchView({
               item={item}
               actor={actor}
               onStatus={setMessage}
+              isCurrent={item.review.id === currentReviewId}
             />
           ))}
         </div>
       </section>
 
-      <details className="technical">
-        <summary>Technical workflow details</summary>
-        <dl>
+      {run.status === "completed" && initialPreparation && (
+        <ExecutionPreparationPanel
+          runId={run.id}
+          actor={actor}
+          preparation={initialPreparation}
+          onStatus={setMessage}
+        />
+      )}
+
+      <details className="technical-disclosure workbench-technical">
+        <summary>View technical workflow details</summary>
+        <dl className="identifiers">
           <div>
             <dt>Lifecycle value</dt>
             <dd>{run.status}</dd>
@@ -327,18 +354,38 @@ function ExecutionPreparationPanel({
     <section className="preparation-panel" aria-labelledby="preparation-heading">
       <div className="section-heading">
         <div>
-          <p className="eyebrow">Deterministic execution boundary</p>
-          <h2 id="preparation-heading">Execution Preparation</h2>
+          <p className="eyebrow">Separate controlled operation</p>
+          <h2 id="preparation-heading">Carry out approved actions</h2>
+          <p className="section-intro">
+            Approval is complete. Preparation creates immutable commands; execution still requires
+            an explicit request.
+          </p>
         </div>
         <ProvenanceLabel
           kind={preparation.execution_performed ? "execution_attempted" : "not_executed"}
         />
       </div>
-      <p>
-        {preparation.execution_performed
-          ? "Approval is complete. Durable simulated assignments and immutable attempt history are shown below."
-          : "Approval is complete. ChangeOps can materialize the exact authorized command contract; execution still requires an explicit action."}
-      </p>
+      <dl className="execution-stage-summary" aria-label="Execution progress">
+        <div>
+          <dt>Authorization</dt>
+          <dd>Completed</dd>
+          <small>Human decisions are recorded.</small>
+        </div>
+        <div>
+          <dt>Commands</dt>
+          <dd>
+            {preparation.prepared_command_count > 0
+              ? `${preparation.prepared_command_count} prepared`
+              : "Not prepared"}
+          </dd>
+          <small>Prepared contracts remain immutable.</small>
+        </div>
+        <div>
+          <dt>Execution request</dt>
+          <dd>{preparation.execution_performed ? "Recorded" : "Not requested"}</dd>
+          <small>Execution never occurs during page load.</small>
+        </div>
+      </dl>
       <dl className="preparation-counts">
         <div>
           <dt>Approved</dt>
@@ -349,7 +396,7 @@ function ExecutionPreparationPanel({
           <dd>{preparation.eligible_action_count}</dd>
         </div>
         <div>
-          <dt>Unsupported</dt>
+          <dt>Manual follow-up</dt>
           <dd>{preparation.unsupported_approved_action_count}</dd>
         </div>
         <div>
@@ -363,31 +410,28 @@ function ExecutionPreparationPanel({
 
       {preparation.commands.length > 0 && (
         <div className="command-list">
-          <h3>Immutable prepared commands</h3>
+          <div className="execution-group-heading">
+            <div>
+              <p className="eyebrow">Commands prepared</p>
+              <h3>Authorized operations awaiting an explicit request</h3>
+            </div>
+            <span>{preparation.prepared_command_count} commands</span>
+          </div>
           {preparation.commands.map((command) => (
             <article className="command-card" key={command.id}>
-              <div>
-                <strong>
-                  {humanize(command.system)} · {humanize(command.operation)}
-                </strong>
+              <div className="command-heading">
+                <div>
+                  <strong>{command.effective_action.description}</strong>
+                  <span>
+                    {humanize(command.target_type)} · {command.target_identifier}
+                  </span>
+                </div>
                 <span className="badge execution">{humanize(command.execution_state)}</span>
               </div>
-              <p>
-                {humanize(command.target_type)}: {command.target_identifier}
-              </p>
-              <p>{command.effective_action.description}</p>
               <p>
                 Training:{" "}
                 <code>{String(command.parameters.course_identifier ?? "invalid command")}</code>
               </p>
-              <small>
-                Due {command.effective_action.due_date ?? "none"} · Idempotency{" "}
-                <code>{command.idempotency_key.slice(0, 12)}…</code>
-              </small>
-              <small className="command-lineage">
-                Approval decision <code>{command.action_review_decision_id}</code> · Action{" "}
-                <code>{command.proposed_action_id}</code>
-              </small>
               <button
                 type="button"
                 onClick={() => execute(command.id)}
@@ -399,9 +443,61 @@ function ExecutionPreparationPanel({
                     ? "Execute again safely"
                     : "Execute training assignment"}
               </button>
+              <details className="technical-disclosure command-technical">
+                <summary>View command contract and lineage</summary>
+                <dl className="identifiers">
+                  <div>
+                    <dt>Adapter operation</dt>
+                    <dd>
+                      <code>
+                        {command.system}.{command.operation}
+                      </code>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Command status</dt>
+                    <dd>{humanize(command.status)}</dd>
+                  </div>
+                  <div>
+                    <dt>Due date</dt>
+                    <dd>{command.effective_action.due_date ?? "None"}</dd>
+                  </div>
+                  <div>
+                    <dt>Idempotency key</dt>
+                    <dd>
+                      <code>{command.idempotency_key}</code>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Approval decision</dt>
+                    <dd>
+                      <code>{command.action_review_decision_id}</code>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Proposed action</dt>
+                    <dd>
+                      <code>{command.proposed_action_id}</code>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Prepared by</dt>
+                    <dd>
+                      {command.prepared_by} · {humanize(command.prepared_role)}
+                    </dd>
+                  </div>
+                </dl>
+                <h4>Immutable parameters</h4>
+                <pre>{JSON.stringify(command.parameters, null, 2)}</pre>
+              </details>
               {command.execution_results.length > 0 && (
                 <div className="execution-history">
-                  <h4>Immutable execution results</h4>
+                  <div className="execution-group-heading">
+                    <div>
+                      <p className="eyebrow">Execution requested</p>
+                      <h4>Immutable execution results</h4>
+                    </div>
+                  </div>
                   {command.execution_results.map((result) => (
                     <div key={result.id}>
                       <strong>{humanize(result.status)}</strong>
@@ -414,6 +510,33 @@ function ExecutionPreparationPanel({
                           {humanize(result.learning_assignment.assignment_status)})
                         </p>
                       )}
+                      <details className="technical-disclosure inline-technical">
+                        <summary>View result audit details</summary>
+                        <dl className="identifiers">
+                          <div>
+                            <dt>Outcome code</dt>
+                            <dd>
+                              <code>{result.outcome_code}</code>
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Result ID</dt>
+                            <dd>
+                              <code>{result.id}</code>
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Attempted by</dt>
+                            <dd>
+                              {result.attempted_by} · {humanize(result.attempted_role)}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Recorded</dt>
+                            <dd>{result.created_at}</dd>
+                          </div>
+                        </dl>
+                      </details>
                     </div>
                   ))}
                 </div>
@@ -425,23 +548,60 @@ function ExecutionPreparationPanel({
 
       {preparation.unsupported_items.length > 0 && (
         <div className="unsupported-list">
-          <h3>Unsupported approved actions</h3>
+          <div className="execution-group-heading">
+            <div>
+              <p className="eyebrow">Manual completion required</p>
+              <h3>Approved actions requiring manual follow-up</h3>
+              <p>
+                Automated execution is not available for these action types. Their approved
+                records remain visible for follow-up outside ChangeOps.
+              </p>
+            </div>
+            <span>
+              {preparation.unsupported_approved_action_count}{" "}
+              {preparation.unsupported_approved_action_count === 1 ? "action" : "actions"}
+            </span>
+          </div>
           {preparation.unsupported_items.map((item) => (
             <article key={item.action_review_id}>
               <strong>{humanize(item.action_type)}</strong>
               <p>
                 {humanize(item.target_type)}: {item.target_identifier}
               </p>
-              <small>
-                {humanize(item.reason_code)} — {item.reason}
-              </small>
+              <small>Manual follow-up required. No automated execution is available.</small>
+              <details className="technical-disclosure inline-technical">
+                <summary>View execution limitation details</summary>
+                <dl className="identifiers">
+                  <div>
+                    <dt>Authoritative classification</dt>
+                    <dd>{humanize(item.reason_code)}</dd>
+                  </div>
+                  <div>
+                    <dt>Persisted reason</dt>
+                    <dd>{item.reason}</dd>
+                  </div>
+                  <div>
+                    <dt>Action review</dt>
+                    <dd>
+                      <code>{item.action_review_id}</code>
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Proposed action</dt>
+                    <dd>
+                      <code>{item.proposed_action_id}</code>
+                    </dd>
+                  </div>
+                </dl>
+              </details>
             </article>
           ))}
         </div>
       )}
       <p className="execution-inline">
         <strong>Execution is always explicit.</strong> Only supported prepared training commands
-        expose a control; unsupported approved actions remain visible and inactive.
+        expose a control; approved actions without an automated mapping remain visible and
+        inactive.
       </p>
     </section>
   );
@@ -451,15 +611,17 @@ function ReviewCard({
   item,
   actor,
   onStatus,
+  isCurrent,
 }: {
   item: WorkbenchItem;
   actor: string;
   onStatus: (message: string) => void;
+  isCurrent: boolean;
 }) {
   const { review } = item;
   const action = review.original_action;
   return (
-    <details className="review-card" open={item.sequence === 0}>
+    <details className="review-card" open={isCurrent}>
       <summary>
         <span className="sequence">{item.sequence + 1}</span>
         <span className="review-title">
@@ -476,37 +638,30 @@ function ReviewCard({
         </span>
       </summary>
       <div className="review-body">
-        <section>
+        <section className="review-proposal">
           <div className="subheading">
-            <h3>Original action snapshot</h3>
+            <h3>What is being proposed?</h3>
             <ProvenanceLabel kind="ai_proposal" />
           </div>
+          <p className="review-proposal-copy">{action.description}</p>
           <dl className="action-grid">
-            <div>
-              <dt>Action type</dt>
-              <dd>{humanize(action.action_type)}</dd>
-            </div>
             <div>
               <dt>Target</dt>
               <dd>
-                {action.target_type}: {action.target_identifier}
+                {humanize(action.target_type)} · {action.target_identifier}
               </dd>
-            </div>
-            <div>
-              <dt>Worker</dt>
-              <dd>{action.worker_id ?? "Not worker-specific"}</dd>
             </div>
             <div>
               <dt>Due date</dt>
               <dd>{action.due_date ?? "None"}</dd>
             </div>
-            <div className="wide">
-              <dt>Description</dt>
-              <dd>{action.description}</dd>
+            <div>
+              <dt>Decision state</dt>
+              <dd>{humanize(review.status)}</dd>
             </div>
             <div>
               <dt>Execution state</dt>
-              <dd>not_executed</dd>
+              <dd>{humanize(action.execution_status)}</dd>
             </div>
           </dl>
         </section>
@@ -514,30 +669,58 @@ function ReviewCard({
         {(item.finding || item.enterprise_impact) && (
           <section>
             <div className="subheading">
-              <h3>Deterministic context</h3>
+              <h3>Why is it being proposed?</h3>
               <ProvenanceLabel kind="deterministic_finding" />
             </div>
             {item.finding && (
               <div className="context-box">
-                <strong>
-                  {humanize(item.finding.finding_type)} · {item.finding.worker_id}
-                </strong>
+                <strong>{humanize(item.finding.finding_type)}</strong>
                 <p>{item.finding.explanation}</p>
-                <small>
-                  Severity: {item.finding.severity} · Reason code: {item.finding.rule_code}
-                </small>
+                <details className="technical-disclosure inline-technical">
+                  <summary>View deterministic finding details</summary>
+                  <dl className="identifiers">
+                    <div>
+                      <dt>Worker</dt>
+                      <dd>{item.finding.worker_id}</dd>
+                    </div>
+                    <div>
+                      <dt>Severity</dt>
+                      <dd>{humanize(item.finding.severity)}</dd>
+                    </div>
+                    <div>
+                      <dt>Reason code</dt>
+                      <dd>
+                        <code>{item.finding.rule_code}</code>
+                      </dd>
+                    </div>
+                  </dl>
+                </details>
               </div>
             )}
             {item.enterprise_impact && (
               <div className="context-box">
                 <strong>{item.enterprise_impact.display_name}</strong>
                 <p>{item.enterprise_impact.explanation}</p>
-                <small>
-                  {humanize(item.enterprise_impact.domain)} ·{" "}
-                  {humanize(item.enterprise_impact.classification)} · Reason code:{" "}
-                  {item.enterprise_impact.reason_code}
-                </small>
-                <RelationshipPath item={item} />
+                <details className="technical-disclosure inline-technical">
+                  <summary>View deterministic impact details</summary>
+                  <dl className="identifiers">
+                    <div>
+                      <dt>Domain</dt>
+                      <dd>{humanize(item.enterprise_impact.domain)}</dd>
+                    </div>
+                    <div>
+                      <dt>Classification</dt>
+                      <dd>{humanize(item.enterprise_impact.classification)}</dd>
+                    </div>
+                    <div>
+                      <dt>Reason code</dt>
+                      <dd>
+                        <code>{item.enterprise_impact.reason_code}</code>
+                      </dd>
+                    </div>
+                  </dl>
+                  <RelationshipPath item={item} />
+                </details>
               </div>
             )}
           </section>
@@ -545,14 +728,17 @@ function ReviewCard({
 
         <section>
           <div className="subheading">
-            <h3>Resolved evidence</h3>
+            <h3>What evidence supports it?</h3>
             <span>{item.evidence.length} persisted references</span>
           </div>
-          <div className="evidence-list">
-            {item.evidence.map((evidence) => (
-              <EvidencePanel key={evidence.key} evidence={evidence} />
-            ))}
-          </div>
+          <details className="technical-disclosure evidence-disclosure">
+            <summary>View persisted evidence</summary>
+            <div className="evidence-list">
+              {item.evidence.map((evidence) => (
+                <EvidencePanel key={evidence.key} evidence={evidence} />
+              ))}
+            </div>
+          </details>
         </section>
 
         {review.status === "pending" ? (
@@ -561,9 +747,17 @@ function ReviewCard({
           <DecisionSummary review={review} />
         )}
 
-        <details className="technical">
-          <summary>Technical action details</summary>
-          <dl>
+        <details className="technical-disclosure inline-technical">
+          <summary>View technical action details</summary>
+          <dl className="identifiers">
+            <div>
+              <dt>Action type</dt>
+              <dd>{humanize(action.action_type)}</dd>
+            </div>
+            <div>
+              <dt>Worker</dt>
+              <dd>{action.worker_id ?? "Not worker-specific"}</dd>
+            </div>
             <div>
               <dt>Review ID</dt>
               <dd>{review.id}</dd>
@@ -691,7 +885,7 @@ function DecisionForm({
   return (
     <form className="decision-form" onSubmit={submit}>
       <div className="subheading">
-        <h3>Record human decision</h3>
+        <h3>Record your decision</h3>
         <ProvenanceLabel kind="human_decision" />
       </div>
       <fieldset>
@@ -762,7 +956,7 @@ function DecisionSummary({ review }: { review: Review }) {
   return (
     <section className="decision-summary">
       <div className="subheading">
-        <h3>Persisted human decision</h3>
+        <h3>Recorded decision</h3>
         <ProvenanceLabel kind="human_decision" />
       </div>
       <p>

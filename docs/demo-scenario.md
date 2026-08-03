@@ -345,6 +345,8 @@ not a persistent scenario-management feature:
 
 - the landing page explains the governed journey before analysis begins, and the analysis page
   leads with reviewer questions while retaining authoritative technical detail in disclosures;
+- the approval workbench opens the next pending item in persisted order, keeps evidence collapsed,
+  and presents execution only after completed approval as a separate explicit operation;
 - the golden accepted extraction completes without clarification;
 - a conflicting pre-effective booking value pauses the same run for one typed `true`
   clarification, then resumes it;

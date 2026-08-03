@@ -338,6 +338,25 @@ The completed impact assessment should produce the following summary.
 - Sarah Johnson
 - David Miller
 
+## Reviewer lifecycle fixtures
+
+The browser-facing lifecycle is verified with focused frontend and PostgreSQL integration fixtures,
+not a persistent scenario-management feature:
+
+- the golden accepted extraction completes without clarification;
+- a conflicting pre-effective booking value pauses the same run for one typed `true`
+  clarification, then resumes it;
+- an unsupported policy family stops before assessment and leaves future steps unavailable;
+- malformed or provider-failed extraction persists a stable failure code and cannot continue;
+- interpretation provider failure leaves the deterministic assessment intact and retryable;
+- completed approval remains separate from execution eligibility and command preparation;
+- executing the same supported training command twice creates one assignment plus `succeeded` and
+  `already_applied` history.
+
+Run `make demo-reset` before a reviewer session. The command preserves all fictional source records
+described above and removes prior generated lifecycle records so the landing page starts with no
+stale run or approval history.
+
 ### Already compliant with security training
 
 - Marcus Lee

@@ -770,8 +770,8 @@ dd {
 
 .journey-nav ol {
   display: grid;
-  grid-template-columns: repeat(7, minmax(105px, 1fr));
-  min-width: 800px;
+  grid-template-columns: repeat(7, minmax(150px, 1fr));
+  min-width: 1050px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -784,6 +784,14 @@ dd {
   column-gap: 0.45rem;
   align-items: center;
   padding-right: 0.7rem;
+}
+
+.journey-nav li > strong {
+  position: relative;
+  z-index: 1;
+  width: fit-content;
+  background: white;
+  padding-right: 0.3rem;
 }
 
 .journey-nav li:not(:last-child)::after {
@@ -822,6 +830,23 @@ dd {
 
 .journey-nav li.blocked > span {
   border-color: #a44c43;
+}
+
+.journey-nav li.failed > span {
+  border-color: #a44c43;
+  background: #a44c43;
+  color: white;
+}
+
+.journey-nav li.available > span {
+  border-color: #3d6f85;
+  background: #edf6fa;
+}
+
+.journey-nav li.not_required > span {
+  border-color: #789286;
+  background: #eef2ef;
+  color: #42554c;
 }
 
 .journey-nav li.unavailable {
@@ -1015,6 +1040,46 @@ dd {
   color: #66776f;
 }
 
+.lineage-group {
+  margin-top: 1rem;
+}
+
+.lineage-group h4 {
+  margin: 0 0 0.5rem;
+}
+
+.interpretation-list .lineage-reference {
+  display: grid;
+  gap: 0.2rem;
+  overflow-wrap: anywhere;
+  border: 1px solid #d6ddd8;
+  border-left: 3px solid #789286;
+  background: white;
+  padding: 0.7rem;
+}
+
+.lineage-reference + .lineage-reference {
+  margin-top: 0.45rem;
+}
+
+.execution-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin: 1rem 0 0;
+}
+
+.execution-summary div {
+  background: #f3f6f4;
+  padding: 0.6rem;
+}
+
+.execution-summary dd {
+  margin-top: 0.2rem;
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+
 .proposed-action-list p {
   margin: 0.25rem 0 0;
   color: #52615b;
@@ -1053,6 +1118,10 @@ dd {
   .worker-columns,
   .approval-handoff {
     grid-template-columns: 1fr;
+  }
+
+  .execution-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .counts {

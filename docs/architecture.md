@@ -670,7 +670,7 @@ code and explanation, command idempotency key, execution actor, role, and timest
 checks outcome/assignment consistency and rejects update or delete. Replays add history without
 duplicating simulated enterprise state.
 
-## Seeded demonstration
+## Seeded demonstration catalog and reset
 
 The idempotent seed contains:
 
@@ -691,9 +691,27 @@ The completed golden assessment returns:
 - 13 proposed actions, all unexecuted;
 - eight copied unresolved questions.
 
-The Compose seed also persists that deterministic assessment behind stable demonstration ID
-`8f4f647d-7f2d-4da8-8e02-77d5301f2002` and associates it with an explicitly marked provider-free
-seeded policy-analysis run.
+The normal Compose seed now persists only the stable fictional source catalog. The historical
+provider-free assessment seed remains available to focused integration tests, but it is not loaded
+into the reviewer application because a pre-completed run obscures the start of the golden path.
+
+`make demo-reset` applies migrations, runs the idempotent catalog seed, then truncates the explicit
+set of workflow-owned tables in one transaction. It preserves catalog tables and requires an exact
+confirmation value, recognized local PostgreSQL host and database name, and the seeded organization
+marker. No database or volume is dropped.
+
+## Policy-analysis journey read model
+
+The journey projection resolves immutable change-plan impact and evidence references against the
+same persisted assessment. It adds display names, domains, classifications, reason codes, evidence
+labels and source identifiers while retaining original UUIDs and evidence keys. Policy quotes are
+rechecked against the run's persisted policy snapshot. Missing, cross-assessment, or wrongly owned
+references raise a stable integrity error rather than disappearing from the response.
+
+The same read model summarizes approval and execution independently. Approval status comes from the
+approval run; execution eligibility, prepared-command count, executed-command count, result count,
+and replay count come from persisted commands and results. These values are derived for display and
+are never written back to the plan, assessment, or workflow.
 
 ## Approval workbench read boundary
 

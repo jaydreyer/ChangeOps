@@ -386,8 +386,9 @@ Exit criteria
 
 Milestone 5 — Portfolio Application and Production Readiness
 
-Status: the local product-facing policy-analysis journey is implemented. Production deployment,
-authentication, infrastructure, and observability remain planned.
+Status: the local product-facing journey, readable lineage projection, deterministic lifecycle
+labels, and safe repeatable reviewer reset are implemented. Production deployment, authentication,
+infrastructure, and observability remain planned.
 
 Product capability
 
@@ -421,6 +422,12 @@ The pre-deployment product-facing slice resolves the schema-v1 uncertainty proje
 by ADR-0015. Extraction findings and persisted clarifications are authoritative; the UI does not
 present the eight copied seed questions as model-derived uncertainty. Immutable historical
 assessments remain unchanged, and no clarification or screen snapshot is duplicated.
+
+The final local-demo polish keeps the seven product steps fixed and derives their presentation
+state with a small pure function. It enriches immutable interpretation citations in the existing
+read model, decomposes the journey UI by product domain, and supplies a guarded reset plus one
+reviewer walkthrough. AWS and Terraform remain the next architecture phase; this work does not
+preselect or implement that deployment.
 
 User experience
 

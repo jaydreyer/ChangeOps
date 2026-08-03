@@ -231,6 +231,39 @@ Stop the stack while preserving database data:
 docker compose down
 ```
 
+## Portfolio reviewer walkthrough
+
+Configure `OPENAI_API_KEY` in `.env`, then use this repeatable golden path:
+
+1. Run `make demo-reset`. This builds the stack, applies migrations, preserves and idempotently
+   refreshes the fictional enterprise catalog, removes prior workflow history, and leaves the API
+   and web application healthy.
+2. Open <http://localhost:3000>. The landing page should show the seeded International Business
+   Travel policy and no recent analysis runs.
+3. Select that policy and choose **Start analysis**.
+4. On the journey page, inspect the AI-proposed structured values, deterministic validation, and
+   exact source quotes. The ordinary golden policy needs no clarification and is labeled
+   **No clarification required**.
+5. Inspect the immutable assessment: 3 affected workers, 3 cleared workers, 6 findings, 18
+   enterprise impacts, and 13 deterministic proposed actions. Expand impacts to inspect persisted
+   evidence and relationship paths.
+6. Choose **Generate grounded interpretation**. Each cited policy span is confirmed against the
+   persisted policy snapshot; impact and evidence citations show readable labels while preserving
+   their IDs, keys, source types, and reason codes.
+7. Choose **Create approval run**. In the workbench, approve the supported training assignments
+   and record terminal decisions for the other recommendations. Approval completion does not mean
+   execution.
+8. After the approval run completes, prepare execution commands. The workbench reports one
+   supported Learning System mapping type; the golden data produces two training commands while
+   other approved action types remain explicitly unsupported.
+9. Execute a training assignment, then execute the same command again. The first result is
+   `succeeded`; replay is `already_applied` and reuses the same durable assignment.
+10. Inspect the workbench history and return to the analysis journey. Approval, command
+    preparation, execution, and replay counts remain distinct.
+
+The eight legacy assessment questions remain only in the historical schema-v1 assessment response.
+They are seeded scenario fixtures and are not displayed as AI-derived uncertainty in the journey.
+
 ## Test
 
 Run all unit and PostgreSQL integration tests:
@@ -326,13 +359,22 @@ Reload the idempotent scenario seed:
 docker compose run --rm seed
 ```
 
-Reset all local ChangeOps database data:
+Reset the local reviewer demo to a clean workflow state and start the stack:
 
 ```bash
-docker compose down -v
+make demo-reset
 ```
 
-The `-v` form permanently deletes the local ChangeOps PostgreSQL volume. The next `docker compose up --build` recreates, migrates, and seeds it.
+This command preserves the fictional organization, people, trips, systems, documents, training,
+commitments, policy, and dependency catalog. It removes analysis runs, extraction attempts,
+clarifications, assessments, findings, evidence, impacts, proposed actions, interpretation
+attempts and plans, reviews, approval runs, commands, assignments, and execution results.
+
+The reset fails closed unless the database is PostgreSQL, the host and database name match the
+recognized local Compose target, the seeded organization marker exists, and the explicit
+confirmation value supplied by the narrowly named Make target matches. It does not drop the
+database or volume and is safe to repeat. Do not adapt the target for a shared or production
+database.
 
 ## API
 
@@ -482,23 +524,11 @@ membership, complete review snapshots, findings, enterprise impacts, persisted e
 ordered relationship paths without creating a durable workbench record. A missing reference
 returns the stable `approval_workbench_inconsistent` error instead of silently dropping context.
 
-## Local approval workbench
+## Local application
 
-Start PostgreSQL, migrations, provider-free demonstration seed data, the API, and Next.js:
-
-```bash
-docker compose up --build
-```
-
-Open:
-
-- API and OpenAPI docs: <http://localhost:8000/docs>
-- approval workbench entry: <http://localhost:3000>
-
-The Compose seed creates completed demonstration assessment
-`8f4f647d-7f2d-4da8-8e02-77d5301f2002`. Enter that ID on the workbench home page. The page
-idempotently creates or retrieves its approval run and displays every action in immutable
-membership order.
+The Compose seed creates stable fictional source data, not completed workflow history. Start at
+<http://localhost:3000>, run the policy analysis, and follow the product handoff into the approval
+workbench. API and OpenAPI documentation remain available at <http://localhost:8000/docs>.
 
 The reviewer email field populates `X-ChangeOps-Actor`; decision and retry requests send
 `X-ChangeOps-Role: reviewer`, while command preparation sends the narrowly authorized
@@ -512,10 +542,6 @@ assessment artifacts even when a separate command has execution results. Once th
 the same page shows execution eligibility, unsupported approvals, immutable commands, an explicit
 control for the one supported training-assignment operation, durable assignments, and immutable
 result history. Approval alone never invokes that control.
-
-Policy submission, extraction monitoring, clarification, and interpretation screens are
-intentionally deferred. This slice begins at a completed assessment and does not call an LLM or an
-enterprise system.
 
 Create operations return `201 Created`; run, extraction, and change-plan creates include a
 `Location` header.

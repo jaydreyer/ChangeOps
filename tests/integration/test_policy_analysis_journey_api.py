@@ -1,12 +1,25 @@
+import uuid
 from copy import deepcopy
+from types import SimpleNamespace
 
+import pytest
 from sqlalchemy import func, select
 
 from changeops.api.policy_extractions import extraction_model_dependency
 from changeops.api.policy_interpretation import interpretation_model_dependency
-from changeops.db.models import AssessmentEnterpriseImpact, ImpactAssessment, PolicyChange
+from changeops.db.models import (
+    AssessmentEnterpriseImpact,
+    ImpactAssessment,
+    PolicyAnalysisRun,
+    PolicyChange,
+)
 from changeops.db.session import SessionLocal
+from changeops.services.policy_analysis_journey_service import (
+    PolicyAnalysisJourneyIntegrityError,
+    _resolve_change_plan_references,
+)
 from changeops.services.seed_service import POLICY_CHANGE_ID, POLICY_TEXT
+from tests.integration.test_execution_commands_api import ADMIN_HEADERS, _complete_run
 from tests.integration.test_policy_extraction_api import configured_fixture_model
 from tests.integration.test_policy_interpretation_api import configured_interpreter
 from tests.policy_extraction_fixtures import accepted_model_response, canonical_proposal_payload
@@ -58,7 +71,15 @@ def test_completed_journey_preserves_lineage_and_omits_legacy_questions(client) 
     assert body["assessment"]["id"] == created["assessment_id"]
     assert "unresolved_questions" not in body["assessment"]
     assert body["interpretation"]["status"] == "not_created"
+    assert body["interpretation"]["resolved_references"] == []
     assert body["approval_run"] is None
+    assert body["execution"] == {
+        "status": "unavailable",
+        "command_count": 0,
+        "executed_command_count": 0,
+        "result_count": 0,
+        "replay_count": 0,
+    }
     assert before == after
 
 
@@ -198,7 +219,125 @@ def test_journey_resolves_change_plan_and_approval_from_same_lineage(client) -> 
     assert body["interpretation"]["change_plan"]["id"] == plan["id"]
     assert body["interpretation"]["change_plan"]["policy_analysis_run_id"] == run["id"]
     assert body["interpretation"]["change_plan"]["impact_assessment_id"] == run["assessment_id"]
+    span = body["interpretation"]["resolved_references"][0]["policy_spans"][0]
+    assert span["quote"] == "U.S.-based"
+    assert span["validated_against_policy_snapshot"] is True
     assert body["approval_run"] == {"id": approval["id"], "status": approval["status"]}
+
+
+def test_journey_enriches_impact_and_owned_evidence_without_changing_plan(client) -> None:
+    client.app.dependency_overrides[extraction_model_dependency] = lambda: (
+        configured_fixture_model()
+    )
+    run = client.post(
+        "/api/v1/policy-analysis-runs", json={"policy_change_id": POLICY_CHANGE_ID}
+    ).json()
+    with SessionLocal() as session:
+        assessment = session.get(ImpactAssessment, run["assessment_id"])
+        impact = assessment.enterprise_impacts[0]
+        evidence = impact.evidence[0]
+        impact_id = impact.id
+        evidence_key = evidence.evidence_key
+        expected = {
+            "display_name": impact.display_name,
+            "domain": impact.domain,
+            "classification": impact.classification,
+            "reason_code": impact.reason_code,
+            "label": evidence.label,
+            "evidence_type": evidence.evidence_type,
+            "source_type": evidence.source_type,
+            "source_id": evidence.source_id,
+        }
+    proposal = configured_interpreter().model.candidate
+    proposal["coverage_gaps"][0]["impact_ids"] = [str(impact_id)]
+    proposal["coverage_gaps"][0]["evidence_keys"] = [evidence_key]
+    client.app.dependency_overrides[interpretation_model_dependency] = lambda: (
+        lambda: configured_interpreter(proposal)
+    )
+    client.post(f"/api/v1/impact-assessments/{run['assessment_id']}/change-plans")
+
+    body = client.get(f"/api/v1/policy-analysis-runs/{run['id']}/journey").json()
+    references = body["interpretation"]["resolved_references"][0]
+
+    assert references["impacts"] == [
+        {
+            "impact_id": str(impact_id),
+            "display_name": expected["display_name"],
+            "domain": expected["domain"],
+            "classification": expected["classification"],
+            "reason_code": expected["reason_code"],
+        }
+    ]
+    assert references["evidence"] == [
+        {
+            "evidence_key": evidence_key,
+            "label": expected["label"],
+            "evidence_type": expected["evidence_type"],
+            "source_type": expected["source_type"],
+            "source_id": expected["source_id"],
+        }
+    ]
+
+
+def test_journey_fails_closed_when_lineage_uses_another_assessment(client) -> None:
+    client.app.dependency_overrides[extraction_model_dependency] = lambda: (
+        configured_fixture_model()
+    )
+    run = client.post(
+        "/api/v1/policy-analysis-runs", json={"policy_change_id": POLICY_CHANGE_ID}
+    ).json()
+    client.app.dependency_overrides[interpretation_model_dependency] = lambda: (
+        lambda: configured_interpreter()
+    )
+    plan_body = client.post(
+        f"/api/v1/impact-assessments/{run['assessment_id']}/change-plans"
+    ).json()["change_plan"]
+    plan_body["coverage_gaps"][0]["impact_references"] = [
+        {
+            "assessment_id": str(uuid.uuid4()),
+            "impact_id": str(uuid.uuid4()),
+        }
+    ]
+    with SessionLocal() as session:
+        assessment = session.get(ImpactAssessment, run["assessment_id"])
+        analysis_run = session.get(PolicyAnalysisRun, run["id"])
+        with pytest.raises(PolicyAnalysisJourneyIntegrityError):
+            _resolve_change_plan_references(
+                analysis_run,
+                assessment,
+                SimpleNamespace(validated_plan=plan_body),
+            )
+
+
+def test_journey_execution_summary_distinguishes_eligibility_preparation_and_replay(client) -> None:
+    _, approval = _complete_run(client, approve_training_only=True)
+    journey_url = f"/api/v1/policy-analysis-runs/{approval['policy_analysis_run_id']}/journey"
+
+    eligible = client.get(journey_url).json()
+    assert eligible["approval_run"]["status"] == "completed"
+    assert eligible["execution"]["status"] == "eligible"
+
+    prepared = client.post(
+        f"/api/v1/action-approval-runs/{approval['id']}/execution-commands",
+        headers=ADMIN_HEADERS,
+    ).json()
+    assert client.get(journey_url).json()["execution"]["status"] == "command_prepared"
+
+    command_id = prepared["commands"][0]["id"]
+    client.post(
+        f"/api/v1/execution-commands/{command_id}/execute",
+        headers=ADMIN_HEADERS,
+    )
+    client.post(
+        f"/api/v1/execution-commands/{command_id}/execute",
+        headers=ADMIN_HEADERS,
+    )
+    executed = client.get(journey_url).json()["execution"]
+    assert executed["status"] == "executed"
+    assert executed["command_count"] == 2
+    assert executed["executed_command_count"] == 1
+    assert executed["result_count"] == 2
+    assert executed["replay_count"] == 1
 
 
 def test_missing_journey_returns_stable_error(client) -> None:

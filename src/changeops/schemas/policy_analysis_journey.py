@@ -114,10 +114,50 @@ class EnterpriseCoverageDomainResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class ResolvedImpactReferenceResponse(BaseModel):
+    impact_id: uuid.UUID
+    display_name: str
+    domain: str
+    classification: str
+    reason_code: str
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ResolvedEvidenceReferenceResponse(BaseModel):
+    evidence_key: str
+    label: str
+    evidence_type: str
+    source_type: str
+    source_id: str
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ResolvedPolicySpanReferenceResponse(BaseModel):
+    policy_change_id: str
+    start: int
+    end: int
+    quote: str
+    validated_against_policy_snapshot: Literal[True]
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ResolvedCoverageGapReferencesResponse(BaseModel):
+    finding_key: str
+    impacts: list[ResolvedImpactReferenceResponse]
+    evidence: list[ResolvedEvidenceReferenceResponse]
+    policy_spans: list[ResolvedPolicySpanReferenceResponse]
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class InterpretationJourneyResponse(BaseModel):
     status: Literal["not_available", "not_created", "available", "failed"]
     failure_code: str | None
     change_plan: ChangePlanResponse | None
+    resolved_references: list[ResolvedCoverageGapReferencesResponse]
 
     model_config = ConfigDict(extra="forbid")
 
@@ -125,6 +165,16 @@ class InterpretationJourneyResponse(BaseModel):
 class ApprovalRunReferenceResponse(BaseModel):
     id: uuid.UUID
     status: str
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ExecutionJourneySummaryResponse(BaseModel):
+    status: Literal["unavailable", "eligible", "command_prepared", "executed", "failed"]
+    command_count: int
+    executed_command_count: int
+    result_count: int
+    replay_count: int
 
     model_config = ConfigDict(extra="forbid")
 
@@ -138,5 +188,6 @@ class PolicyAnalysisJourneyResponse(BaseModel):
     enterprise_coverage: list[EnterpriseCoverageDomainResponse]
     interpretation: InterpretationJourneyResponse
     approval_run: ApprovalRunReferenceResponse | None
+    execution: ExecutionJourneySummaryResponse
 
     model_config = ConfigDict(extra="forbid")

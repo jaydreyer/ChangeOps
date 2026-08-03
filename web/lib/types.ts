@@ -434,6 +434,37 @@ export interface PolicyAnalysisJourney {
     status: "not_available" | "not_created" | "available" | "failed";
     failure_code: string | null;
     change_plan: ChangePlan | null;
+    resolved_references: {
+      finding_key: string;
+      impacts: {
+        impact_id: string;
+        display_name: string;
+        domain: string;
+        classification: string;
+        reason_code: string;
+      }[];
+      evidence: {
+        evidence_key: string;
+        label: string;
+        evidence_type: string;
+        source_type: string;
+        source_id: string;
+      }[];
+      policy_spans: {
+        policy_change_id: string;
+        start: number;
+        end: number;
+        quote: string;
+        validated_against_policy_snapshot: true;
+      }[];
+    }[];
   };
   approval_run: { id: string; status: string } | null;
+  execution: {
+    status: "unavailable" | "eligible" | "command_prepared" | "executed" | "failed";
+    command_count: number;
+    executed_command_count: number;
+    result_count: number;
+    replay_count: number;
+  };
 }

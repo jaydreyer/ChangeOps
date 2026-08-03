@@ -172,8 +172,11 @@ Clients cannot inject delta values.
 The focused comparison page now presents:
 
 - the existing semantic comparison;
+- a semantic-first hierarchy and compact response-derived change story;
 - seven operational summary counts;
-- grouped worker, finding, and enterprise-impact changes;
+- worker counts labeled as worker-trip outcomes;
+- grouped worker, finding, and enterprise-impact changes with classification totals;
+- independently collapsed delta records with concise summaries;
 - baseline/proposed assessment explanations;
 - deterministic delta and assessment reason codes;
 - expandable authoritative evidence;
@@ -182,6 +185,12 @@ The focused comparison page now presents:
 - an explicit boundary that AI explanation remains deferred.
 
 It retains a stable unavailable state for a historical comparison without a delta.
+
+The landing action is labeled **Compare policy versions** while preserving the existing readiness
+contract. Client-rendered timestamps use a fixed UTC representation to prevent server/browser
+hydration differences. Analysis creation is never automatically repeated: if a synchronous POST
+response becomes uncertain after persistence, the UI performs one authoritative entry read and
+offers navigation-only recovery to the discovered run.
 
 ## Seed and golden behavior
 
@@ -215,7 +224,9 @@ historical stability, parent/child immutability, and demo reset. Seed tests cove
 source-specific dependency catalog and repeatability. The comparison integration suite verifies
 that the seeded enterprise catalog is unchanged across both assessment executions and that the two
 policy dependency sets are business-equivalent. Frontend tests cover populated, empty,
-historical-unavailable, and visible causal-scope states.
+historical-unavailable, visible causal-scope, response-derived change-story, progressive-disclosure,
+UTC-stable rendering, persisted-run navigation, non-duplicating recovery, and explicit failure
+states.
 
 All prior backend, frontend, migration round-trip, offline evaluation, demo-reset, and production-
 build gates remain required.

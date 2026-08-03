@@ -227,6 +227,12 @@ snapshots the authoritative assessment explanation, reason codes, evidence, and 
 PostgreSQL constrains comparison-to-assessment lineage, makes creation idempotent, and rejects
 delta or delta-item updates and deletes. AI and LangGraph do not participate.
 
+The comparison experience presents accepted policy obligations before a compact, response-derived
+change story and operational summary. Worker counts are labeled as worker-trip outcomes to match
+the persisted comparison identity. Individual worker, finding, and enterprise-impact records are
+collapsed by default; each can be opened independently to inspect explanations, evidence,
+relationship paths, stable identity, and record lineage.
+
 ## Requirements
 
 - Docker Desktop or another Docker Engine with Docker Compose
@@ -298,15 +304,22 @@ Configure `OPENAI_API_KEY` in `.env`, then use this repeatable golden path:
 10. Inspect the workbench history and return to the analysis journey. Approval, command
     preparation, execution, and replay counts remain distinct.
 11. Return to the landing page, analyze the proposed revision, then select the baseline and
-    proposed records under **Compare accepted policy rules**.
+    proposed records under **Compare policy versions**.
 12. Create the comparison. Confirm three ordered semantic differences—effective date modified,
     contractor coverage removed, and Mexico exclusion added—with accepted provenance on every
     applicable side.
-13. Inspect the immutable enterprise impact delta. The golden revision shows three workers no
-    longer affected, six findings disappeared, and fourteen enterprise impacts removed. No worker,
-    finding, or enterprise impact is introduced, and no worker remains affected. The three
-    document impacts and policy-required course impact are unchanged and omitted from the delta.
-    Expand an item to inspect authoritative before/after reasons, evidence, and relationship paths.
+13. Inspect the change summary and immutable enterprise impact delta. The golden revision shows
+    three worker-trip outcomes no longer affected, six findings disappeared, and fourteen
+    enterprise impacts removed. No worker-trip outcome, finding, or enterprise impact is
+    introduced, and no worker-trip outcome remains affected. The three document impacts and
+    policy-required course impact are unchanged and omitted from the delta. Detailed records start
+    collapsed; open one item at a time to inspect authoritative before/after reasons, evidence,
+    relationship paths, stable identity, and lineage.
+
+Analysis creation uses one long-running POST and never automatically repeats that mutation. Client
+timestamps render in a fixed timezone to keep server and browser markup stable. If the response is
+interrupted after the backend persists a run, the landing UI performs one authoritative entry read
+and offers navigation-only recovery; its retry controls do not create a duplicate analysis.
 
 The eight legacy assessment questions remain only in the historical schema-v1 assessment response.
 They are seeded scenario fixtures and are not displayed as AI-derived uncertainty in the journey.

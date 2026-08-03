@@ -2,14 +2,36 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { parseApiError } from "@/lib/api";
 import type { PolicyAnalysisEntry } from "@/lib/types";
 
-export function PolicyAnalysisEntryView({ entry }: { entry: PolicyAnalysisEntry }) {
+const ANALYSIS_REQUEST_TIMEOUT_MS = 270_000;
+
+type PersistedRunNavigation = {
+  id: string;
+  href: string;
+};
+
+function navigateBrowserToRun(href: string) {
+  window.location.assign(href);
+}
+
+export function PolicyAnalysisEntryView({
+  entry,
+  navigateToRun = navigateBrowserToRun,
+}: {
+  entry: PolicyAnalysisEntry;
+  navigateToRun?: (href: string) => void;
+}) {
   const router = useRouter();
+  const submissionInFlight = useRef(false);
+  const initialRunIds = useRef(new Set(entry.recent_runs.map((run) => run.id)));
   const [selectedPolicyId, setSelectedPolicyId] = useState(entry.policies[0]?.id ?? "");
   const [starting, setStarting] = useState(false);
+  const [checkingPersistedRun, setCheckingPersistedRun] = useState(false);
+  const [uncertainPolicyId, setUncertainPolicyId] = useState("");
+  const [persistedRun, setPersistedRun] = useState<PersistedRunNavigation | null>(null);
   const [baselinePolicyId, setBaselinePolicyId] = useState(entry.policies.at(-1)?.id ?? "");
   const [proposedPolicyId, setProposedPolicyId] = useState(entry.policies[0]?.id ?? "");
   const [comparisonActor, setComparisonActor] = useState("portfolio-reviewer");
@@ -26,25 +48,92 @@ export function PolicyAnalysisEntryView({ entry }: { entry: PolicyAnalysisEntry 
     comparisonActor.trim().length > 0;
 
   async function startAnalysis() {
+    if (submissionInFlight.current || !selectedPolicyId) return;
+    submissionInFlight.current = true;
+    const requestedPolicyId = selectedPolicyId;
     setStarting(true);
     setError("");
+    setUncertainPolicyId("");
+    setPersistedRun(null);
+    const controller = new AbortController();
+    const timeoutId = window.setTimeout(
+      () => controller.abort("analysis_request_timeout"),
+      ANALYSIS_REQUEST_TIMEOUT_MS,
+    );
     try {
       const response = await fetch("/api/v1/policy-analysis-runs", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ policy_change_id: selectedPolicyId }),
+        body: JSON.stringify({ policy_change_id: requestedPolicyId }),
+        signal: controller.signal,
       });
       if (!response.ok) {
+        if (response.status >= 500) {
+          await reconcilePersistedRun(requestedPolicyId);
+          return;
+        }
         const apiError = await parseApiError(response);
         setError(apiError.message);
         return;
       }
       const run = (await response.json()) as { id: string };
-      router.push(`/policy-analyses/${run.id}`);
+      openPersistedRun(run.id);
     } catch {
-      setError("The ChangeOps API is unavailable. Check that the local stack is running.");
+      await reconcilePersistedRun(requestedPolicyId);
     } finally {
+      window.clearTimeout(timeoutId);
+      submissionInFlight.current = false;
       setStarting(false);
+    }
+  }
+
+  function openPersistedRun(runId: string) {
+    const navigation = {
+      id: runId,
+      href: `/policy-analyses/${runId}`,
+    };
+    setPersistedRun(navigation);
+    setUncertainPolicyId("");
+    setError("");
+    try {
+      navigateToRun(navigation.href);
+    } catch {
+      setError(
+        "The analysis was persisted, but automatic navigation failed. Open the authoritative run below.",
+      );
+    }
+  }
+
+  async function reconcilePersistedRun(policyId = uncertainPolicyId) {
+    if (!policyId || checkingPersistedRun) return;
+    setCheckingPersistedRun(true);
+    setUncertainPolicyId(policyId);
+    setError("");
+    try {
+      const response = await fetch("/api/v1/policy-analysis-entry", {
+        method: "GET",
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        throw new Error("authoritative_entry_unavailable");
+      }
+      const authoritativeEntry = (await response.json()) as PolicyAnalysisEntry;
+      const run = authoritativeEntry.recent_runs.find(
+        (item) => item.policy_change_id === policyId && !initialRunIds.current.has(item.id),
+      );
+      if (run) {
+        openPersistedRun(run.id);
+        return;
+      }
+      setError(
+        "The request outcome is not confirmed yet. Recovery did not send another analysis request. Check again for the persisted run.",
+      );
+    } catch {
+      setError(
+        "The request outcome could not be confirmed. Recovery did not send another analysis request. Check the API, then check again for the persisted run.",
+      );
+    } finally {
+      setCheckingPersistedRun(false);
     }
   }
 
@@ -110,6 +199,7 @@ export function PolicyAnalysisEntryView({ entry }: { entry: PolicyAnalysisEntry 
             <select
               id="policy-selector"
               value={selectedPolicyId}
+              disabled={starting}
               onChange={(event) => setSelectedPolicyId(event.target.value)}
             >
               {entry.policies.map((item) => (
@@ -144,7 +234,7 @@ export function PolicyAnalysisEntryView({ entry }: { entry: PolicyAnalysisEntry 
             <button
               type="button"
               onClick={startAnalysis}
-              disabled={starting || !selectedPolicyId}
+              disabled={starting || !selectedPolicyId || persistedRun !== null}
             >
               {starting ? "Analyzing policy…" : "Start new analysis"}
             </button>
@@ -152,6 +242,29 @@ export function PolicyAnalysisEntryView({ entry }: { entry: PolicyAnalysisEntry 
               Analysis runs synchronously. This button waits for the authoritative workflow
               response; it does not simulate progress.
             </p>
+            <div aria-live="polite">
+              {persistedRun && (
+                <p className="analysis-navigation-status">
+                  Analysis persisted. Opening the authoritative run.{" "}
+                  <a href={persistedRun.href}>Open completed analysis</a>
+                  <button type="button" onClick={() => openPersistedRun(persistedRun.id)}>
+                    Retry opening analysis
+                  </button>
+                </p>
+              )}
+              {uncertainPolicyId && !persistedRun && (
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => reconcilePersistedRun()}
+                  disabled={checkingPersistedRun}
+                >
+                  {checkingPersistedRun
+                    ? "Checking authoritative state…"
+                    : "Check for persisted analysis"}
+                </button>
+              )}
+            </div>
             {error && (
               <p className="error" role="alert">
                 {error}
@@ -176,7 +289,8 @@ export function PolicyAnalysisEntryView({ entry }: { entry: PolicyAnalysisEntry 
                     <div>
                       <strong>{humanize(run.status)}</strong>
                       <small>
-                        {humanize(run.current_step)} · {formatDateTime(run.updated_at)}
+                        {humanize(run.current_step)} ·{" "}
+                        <time dateTime={run.updated_at}>{formatDateTime(run.updated_at)}</time>
                       </small>
                     </div>
                     <Link href={`/policy-analyses/${run.id}`}>Open analysis</Link>
@@ -193,13 +307,13 @@ export function PolicyAnalysisEntryView({ entry }: { entry: PolicyAnalysisEntry 
           <div className="section-heading">
             <div>
               <p className="eyebrow">Deterministic policy comparison</p>
-              <h2 id="comparison-heading">Compare accepted policy rules</h2>
+              <h2 id="comparison-heading">Compare policy versions</h2>
             </div>
             <span className="badge deterministic">No AI comparison</span>
           </div>
           <p>
-            Analyze both source policies first. Comparison becomes available only when each has
-            accepted typed rules and no blocking clarification.
+            Comparison becomes available after both policies have accepted, validated rules and
+            completed assessments.
           </p>
           <div className="comparison-selectors">
             <label>
@@ -239,7 +353,7 @@ export function PolicyAnalysisEntryView({ entry }: { entry: PolicyAnalysisEntry 
             </label>
           </div>
           <button type="button" onClick={comparePolicies} disabled={!comparisonReady || comparing}>
-            {comparing ? "Comparing accepted rules…" : "Compare accepted rules"}
+            {comparing ? "Comparing policy versions…" : "Compare policy versions"}
           </button>
           {baselinePolicyId === proposedPolicyId && (
             <p className="error">Choose two distinct policy source records.</p>
@@ -250,8 +364,8 @@ export function PolicyAnalysisEntryView({ entry }: { entry: PolicyAnalysisEntry 
             </p>
           )}
           <p className="honest-pending">
-            This comparison covers accepted policy semantics only. Enterprise impact delta is not
-            available in this milestone.
+            Deterministic code compares accepted policy semantics and the two persisted assessment
+            outcomes. AI does not calculate the comparison.
           </p>
           <div className="comparison-history">
             <h3>Recent comparisons</h3>
@@ -305,5 +419,6 @@ function formatDateTime(value: string) {
   return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: "UTC",
   }).format(new Date(value));
 }

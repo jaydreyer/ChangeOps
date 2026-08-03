@@ -110,8 +110,11 @@ export function PolicyAnalysisJourneyView({
           <p className="eyebrow">Policy analysis</p>
           <h1>{policy.title}</h1>
           <p className="lede">
-            Review the accepted policy rules, persisted operational impact, and any proposed
-            actions before human approval.
+            {extraction?.accepted_rules
+              ? "Review the accepted policy rules, persisted operational impact, and any proposed actions before human approval."
+              : run.status === "failed" || run.status === "unsupported"
+                ? "Review the persisted policy-analysis outcome and the evidence explaining where the workflow stopped."
+                : "Review the current persisted policy-analysis state and any information needed to continue."}
           </p>
           <p className="reference-line">
             {policy.organization_name} · Effective {formatDate(policy.effective_date)}
@@ -139,11 +142,31 @@ export function PolicyAnalysisJourneyView({
 
       {run.failure_code && (
         <section className="failure-panel" aria-labelledby="analysis-failure-heading">
-          <h2 id="analysis-failure-heading">Analysis did not complete</h2>
-          <p>
-            <code>{run.failure_code}</code> — The persisted workflow stopped safely at{" "}
-            {humanize(run.current_step)}.
-          </p>
+          <h2 id="analysis-failure-heading">Analysis could not complete</h2>
+          <FailureExplanation journey={initialJourney} />
+          <details className="technical-disclosure">
+            <summary>View technical failure details</summary>
+            <dl className="identifiers">
+              <div>
+                <dt>Failure code</dt>
+                <dd>
+                  <code>{run.failure_code}</code>
+                </dd>
+              </div>
+              <div>
+                <dt>Backend step</dt>
+                <dd>{humanize(run.current_step)}</dd>
+              </div>
+              {run.failure_detail && (
+                <div>
+                  <dt>Failure detail</dt>
+                  <dd>
+                    <code>{run.failure_detail}</code>
+                  </dd>
+                </div>
+              )}
+            </dl>
+          </details>
         </section>
       )}
       {message && (
@@ -181,15 +204,18 @@ export function PolicyAnalysisJourneyView({
 
 function AnalysisOverview({ journey }: { journey: PolicyAnalysisJourney }) {
   const { extraction, assessment, run } = journey;
+  const overviewDescription =
+    extraction?.accepted_rules && assessment
+      ? "These values come directly from the accepted extraction and immutable assessment. Use the sections below to inspect their supporting explanations and evidence."
+      : run.status === "failed" || run.status === "unsupported"
+        ? "No immutable assessment was created. The persisted rule-validation result and unavailable downstream outcomes are shown below."
+        : "These values reflect the current persisted analysis state. Downstream outcomes remain unavailable until the workflow can continue.";
   return (
     <section className="analysis-overview" aria-labelledby="analysis-overview-heading">
       <div className="overview-copy">
         <p className="eyebrow">Current persisted outcome</p>
         <h2 id="analysis-overview-heading">What did this analysis establish?</h2>
-        <p>
-          These values come directly from the accepted extraction and immutable assessment. Use
-          the sections below to inspect their supporting explanations and evidence.
-        </p>
+        <p>{overviewDescription}</p>
       </div>
       <dl>
         <div>
@@ -218,5 +244,32 @@ function AnalysisOverview({ journey }: { journey: PolicyAnalysisJourney }) {
         </div>
       </dl>
     </section>
+  );
+}
+
+function FailureExplanation({ journey }: { journey: PolicyAnalysisJourney }) {
+  const { extraction } = journey;
+  if (extraction?.validation_outcome === "validation_failed") {
+    return (
+      <>
+        <p>
+          ChangeOps identified proposed policy rules, but their supporting policy evidence did not
+          pass deterministic validation. No impact assessment or proposed actions were created.
+        </p>
+        {extraction.validation_errors.length > 0 && (
+          <ul className="failure-summary-list">
+            {extraction.validation_errors.map((error) => (
+              <li key={`${error.code}-${error.field_path}`}>{error.message}</li>
+            ))}
+          </ul>
+        )}
+      </>
+    );
+  }
+  return (
+    <p>
+      The persisted workflow stopped before an impact assessment was created. No proposed actions
+      were created.
+    </p>
   );
 }

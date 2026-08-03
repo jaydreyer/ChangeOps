@@ -1151,9 +1151,53 @@ dd {
   padding: 1rem;
 }
 
-.error,
-.failure-panel {
+.error {
   color: #7c251f;
+}
+
+.failure-panel {
+  border-left: 4px solid #b9544b;
+  background: #fffafa;
+  color: var(--color-ink);
+}
+
+.failure-panel h2 {
+  color: #7c251f;
+}
+
+.failure-panel > p {
+  max-width: 72ch;
+}
+
+.failure-panel .technical-disclosure {
+  margin-top: 1rem;
+}
+
+.failure-summary-list {
+  max-width: 72ch;
+  margin-bottom: 0;
+  padding-left: 1.25rem;
+}
+
+.technical-record-list {
+  display: grid;
+  gap: 0.65rem;
+  margin-bottom: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.technical-record-list li {
+  border-left: 3px solid var(--color-border-strong);
+  background: var(--color-surface-subtle);
+  padding: 0.65rem 0.75rem;
+}
+
+.technical-record-list span {
+  display: block;
+  margin-top: 0.25rem;
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
 }
 
 .status-message {

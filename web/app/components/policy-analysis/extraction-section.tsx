@@ -50,7 +50,7 @@ export function ExtractionSection({ extraction }: { extraction: AnalysisExtracti
         <summary>View exact policy provenance ({extraction.provenance.length} records)</summary>
         <div className="provenance-list">
           {extraction.provenance.map((item) => (
-            <article key={item.field_path}>
+            <article key={`${item.field_path}-${item.start}-${item.end}`}>
               <code>{item.field_path}</code>
               <blockquote>“{item.quote}”</blockquote>
               <small>
@@ -61,16 +61,25 @@ export function ExtractionSection({ extraction }: { extraction: AnalysisExtracti
         </div>
       </details>
       {extraction.validation_errors.length > 0 && (
-        <>
-          <h3>Deterministic validation findings</h3>
-          <ul>
+        <details className="technical-disclosure inline-technical">
+          <summary>View deterministic validation records</summary>
+          <ul className="technical-record-list">
             {extraction.validation_errors.map((error) => (
               <li key={`${error.code}-${error.field_path}`}>
-                <code>{error.code}</code> — {error.message}
+                <strong>{error.message}</strong>
+                <span>
+                  <code>{error.code}</code>
+                  {error.field_path && (
+                    <>
+                      {" · "}
+                      <code>{error.field_path}</code>
+                    </>
+                  )}
+                </span>
               </li>
             ))}
           </ul>
-        </>
+        </details>
       )}
     </section>
   );

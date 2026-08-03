@@ -393,12 +393,85 @@ describe("policy analysis journey", () => {
 
     render(<PolicyAnalysisJourneyView initialJourney={unsupported} />);
 
-    expect(screen.getByText("Analysis did not complete")).toBeInTheDocument();
+    expect(screen.getByText("Analysis could not complete")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "The persisted workflow stopped before an impact assessment was created. No proposed actions were created.",
+      ),
+    ).toBeInTheDocument();
     expect(screen.getAllByText("Unsupported", { selector: ".badge" })).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Create approval run" })).toBeDisabled();
     const workflow = screen.getByRole("navigation", { name: "ChangeOps workflow" });
     expect(within(workflow).getByText("Analysis").closest("li")).toHaveClass("failed");
     expect(within(workflow).getByText("Assessment").closest("li")).toHaveClass("unavailable");
+  });
+
+  it("explains validation failure plainly and keeps internal records collapsed", () => {
+    const failed: PolicyAnalysisJourney = {
+      ...journey,
+      run: {
+        ...journey.run,
+        status: "failed",
+        assessment_id: null,
+        failure_code: "extraction_validation_failed",
+        failure_detail: "duplicate_provenance",
+      },
+      extraction: {
+        ...journey.extraction!,
+        validation_outcome: "validation_failed",
+        accepted_rules: null,
+        validation_errors: [
+          {
+            code: "duplicate_provenance",
+            message: "Each material field must have exactly one provenance span.",
+            field_path:
+              "candidate_rules.manager_approval.booking_before_effective_date_is_exempt",
+          },
+        ],
+      },
+      assessment: null,
+      enterprise_coverage: [],
+      interpretation: {
+        status: "not_available",
+        failure_code: null,
+        change_plan: null,
+        resolved_references: [],
+      },
+      approval_run: null,
+    };
+
+    render(<PolicyAnalysisJourneyView initialJourney={failed} />);
+
+    expect(
+      screen.getByText(
+        "ChangeOps identified proposed policy rules, but their supporting policy evidence did not pass deterministic validation. No impact assessment or proposed actions were created.",
+      ),
+    ).toBeInTheDocument();
+    const validationMessages = screen.getAllByText(
+      "Each material field must have exactly one provenance span.",
+    );
+    expect(validationMessages).toHaveLength(2);
+    expect(validationMessages[0]).toBeVisible();
+    expect(validationMessages[1].closest("details")).not.toHaveAttribute("open");
+    expect(
+      screen.queryByText(
+        "These values come directly from the accepted extraction and immutable assessment. Use the sections below to inspect their supporting explanations and evidence.",
+      ),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "No immutable assessment was created. The persisted rule-validation result and unavailable downstream outcomes are shown below.",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.getByText("View technical failure details").closest("details")).not.toHaveAttribute(
+      "open",
+    );
+    expect(
+      screen.getByText("View deterministic validation records").closest("details"),
+    ).not.toHaveAttribute("open");
+    for (const code of screen.getAllByText("duplicate_provenance")) {
+      expect(code.closest("details")).not.toHaveAttribute("open");
+    }
   });
 
   it("does not conflate completed approval, prepared commands, and execution", () => {

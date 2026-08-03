@@ -214,6 +214,13 @@ enterprise impact delta between the two completed policy-analysis assessments. P
 matches stable worker-and-trip, finding, and enterprise-impact business identities. Database UUIDs
 are retained only for lineage and never participate in matching or fingerprinting.
 
+The delta compares two authoritative persisted assessment outcomes. It does not prove that policy
+changes were the sole cause of every outcome difference if enterprise source facts differed
+between the assessment runs. ChangeOps exposes the persisted evidence on each side but does not
+infer causation beyond those records. The seeded demonstration deliberately runs both assessments
+against the same enterprise catalog state; Milestone 5B does not add generalized enterprise
+snapshot versioning or catalog-state comparison.
+
 The delta classifies workers as became affected, no longer affected, or remained affected;
 findings as introduced or disappeared; and enterprise impacts as introduced or removed. Each side
 snapshots the authoritative assessment explanation, reason codes, evidence, and relationship path.

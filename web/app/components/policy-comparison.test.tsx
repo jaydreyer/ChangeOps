@@ -167,7 +167,20 @@ describe("policy comparison", () => {
     expect(screen.getByText("employees and contractors")).toBeInTheDocument();
     expect(screen.getByText("Operationally material")).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "What operational consequences changed?" }),
+      screen.getByRole("heading", { name: "How did the persisted operational outcomes differ?" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Outcome comparison, not sole-cause proof" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /compares two authoritative persisted assessment outcomes.*does not prove that policy changes alone caused every difference/s,
+      ),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /seeded demonstration evaluates both assessments against the same enterprise catalog state/,
+      ),
     ).toBeInTheDocument();
     expect(screen.getByText("Marcus Lee")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Technology Operations" })).toBeInTheDocument();

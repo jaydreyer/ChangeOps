@@ -287,7 +287,7 @@ It changes the central user question from:
 
 to:
 
-> What changed, and what operational consequences changed because of it?
+> What changed semantically, and how did the persisted operational outcomes differ?
 
 ### New engineering capability
 
@@ -610,12 +610,18 @@ and resets generated comparisons without removing either source policy.
 
 Extend the trusted policy comparison into before-and-after enterprise consequences. Deterministic code must continue to own the authoritative delta; AI may explain the completed, grounded delta but cannot alter it.
 
-This is where the product becomes recognizably ChangeOps: it can explain not only what policy semantics changed, but what operational consequences changed because of them.
+This is where the product becomes recognizably ChangeOps: it can explain both what policy
+semantics changed and how the two persisted operational outcomes differ. The outcome delta does not
+by itself establish sole policy causation when enterprise source facts differ between assessments.
 
 **Status: complete.** The comparison now owns a separate immutable, assessment-anchored delta.
 Stable business identity—not database UUID—matches worker results, findings, and enterprise
 impacts. Persisted side snapshots retain deterministic explanations, reason codes, evidence, and
-relationship paths. AI explanation remains deferred.
+relationship paths. The product explicitly frames this as a comparison of authoritative persisted
+assessment outcomes, not proof that policy changes were the sole cause if enterprise facts changed
+between runs. The seeded demonstration holds enterprise catalog state constant and tests that
+invariant; generalized enterprise snapshot versioning remains deferred. AI explanation remains
+deferred.
 
 ## Capability 2 — Governed plan revision
 

@@ -5,9 +5,14 @@ from datetime import UTC, datetime
 import pytest
 from sqlalchemy import func, select, text
 from sqlalchemy.exc import DatabaseError
+from sqlalchemy.orm import Session
 
 from changeops.api.policy_extractions import extraction_model_dependency
 from changeops.db.models import (
+    CommitmentAssignment,
+    CustomerCommitment,
+    EnterpriseDocument,
+    EnterpriseSystem,
     Organization,
     PolicyAnalysisClarification,
     PolicyAnalysisRun,
@@ -16,7 +21,16 @@ from changeops.db.models import (
     PolicyComparisonDifference,
     PolicyComparisonImpactDelta,
     PolicyComparisonImpactDeltaItem,
+    PolicyDocumentDependency,
     PolicyExtractionAttempt,
+    PolicySystemDependency,
+    PolicyTrainingDependency,
+    Team,
+    TrainingCourse,
+    TrainingRecord,
+    Trip,
+    Worker,
+    WorkerTeamMembership,
 )
 from changeops.db.session import SessionLocal
 from changeops.services import policy_comparison_service
@@ -27,6 +41,64 @@ from tests.integration.test_policy_extraction_api import configured_fixture_mode
 from tests.policy_extraction_fixtures import accepted_model_response, proposed_revision_payload
 
 ACTOR_HEADERS = {"X-ChangeOps-Actor": "portfolio-reviewer"}
+
+ENTERPRISE_CATALOG_MODELS = (
+    Worker,
+    Team,
+    WorkerTeamMembership,
+    Trip,
+    EnterpriseSystem,
+    EnterpriseDocument,
+    TrainingCourse,
+    TrainingRecord,
+    CustomerCommitment,
+    CommitmentAssignment,
+)
+
+
+def _shared_enterprise_catalog_state(
+    session: Session,
+) -> dict[str, tuple[tuple[object, ...], ...]]:
+    state = {}
+    for model in ENTERPRISE_CATALOG_MODELS:
+        table = model.__table__
+        rows = session.execute(select(*table.columns).order_by(*table.primary_key.columns)).all()
+        state[table.name] = tuple(tuple(row) for row in rows)
+    return state
+
+
+def _policy_dependency_business_state(
+    session: Session,
+    policy_change_id: str,
+) -> dict[str, tuple[tuple[object, ...], ...]]:
+    dependency_contracts = (
+        (
+            PolicySystemDependency,
+            ("rule_code", "system_id", "relationship_type", "explanation"),
+        ),
+        (
+            PolicyDocumentDependency,
+            (
+                "rule_code",
+                "document_id",
+                "relationship_type",
+                "impact_classification",
+                "explanation",
+            ),
+        ),
+        (
+            PolicyTrainingDependency,
+            ("rule_code", "course_id", "relationship_type", "explanation"),
+        ),
+    )
+    state = {}
+    for model, field_names in dependency_contracts:
+        fields = tuple(getattr(model, field_name) for field_name in field_names)
+        rows = session.execute(
+            select(*fields).where(model.policy_change_id == policy_change_id).order_by(*fields)
+        ).all()
+        state[model.__tablename__] = tuple(tuple(row) for row in rows)
+    return state
 
 
 def _complete_both_policy_analyses(client) -> tuple[dict, dict]:
@@ -48,6 +120,43 @@ def _complete_both_policy_analyses(client) -> tuple[dict, dict]:
     )
     assert proposed.status_code == 201
     return baseline.json(), proposed.json()
+
+
+def test_seeded_comparison_uses_same_enterprise_catalog_state_for_both_assessments(
+    client,
+) -> None:
+    with SessionLocal() as session:
+        initial_catalog = _shared_enterprise_catalog_state(session)
+        assert _policy_dependency_business_state(
+            session, POLICY_CHANGE_ID
+        ) == _policy_dependency_business_state(session, PROPOSED_POLICY_CHANGE_ID)
+
+    client.app.dependency_overrides[extraction_model_dependency] = lambda: (
+        configured_fixture_model()
+    )
+    baseline = client.post(
+        "/api/v1/policy-analysis-runs",
+        json={"policy_change_id": POLICY_CHANGE_ID},
+    )
+    assert baseline.status_code == 201
+    with SessionLocal() as session:
+        after_baseline = _shared_enterprise_catalog_state(session)
+
+    client.app.dependency_overrides[extraction_model_dependency] = lambda: configured_fixture_model(
+        accepted_model_response(proposed_revision_payload())
+    )
+    proposed = client.post(
+        "/api/v1/policy-analysis-runs",
+        json={"policy_change_id": PROPOSED_POLICY_CHANGE_ID},
+    )
+    assert proposed.status_code == 201
+    with SessionLocal() as session:
+        after_proposed = _shared_enterprise_catalog_state(session)
+        assert _policy_dependency_business_state(
+            session, POLICY_CHANGE_ID
+        ) == _policy_dependency_business_state(session, PROPOSED_POLICY_CHANGE_ID)
+
+    assert initial_catalog == after_baseline == after_proposed
 
 
 def _create_comparison(client):

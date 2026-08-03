@@ -687,7 +687,9 @@ Accepted
 Milestone 5A preserves immutable semantic differences between two accepted typed policy sources.
 Each completed policy analysis separately owns an immutable assessment containing worker results,
 findings, enterprise impacts, evidence, relationship paths, and proposed actions. ChangeOps now
-needs to explain which operational consequences changed between those two assessments.
+needs to explain which operational consequences differ between those two persisted outcomes. The
+comparison can establish outcome differences, but it cannot prove that policy semantics were the
+sole cause if enterprise source facts differed between assessment executions.
 
 Three designs were considered. Recomputing a read projection would reuse authoritative assessment
 rows but would not persist the selected assessment pairing, idempotency identity, or historical
@@ -718,6 +720,10 @@ matching is complete.
 - Omit unaffected-to-unaffected workers and unchanged findings or impacts from persisted items.
 - Copy applicable explanations, reason codes, evidence records, and relationship paths verbatim
   from the two persisted assessment aggregates. Do not invent missing-side facts or causal claims.
+- Describe the result as a comparison of two authoritative persisted assessment outcomes. Do not
+  claim sole policy causation when enterprise source facts may differ.
+- Keep generalized enterprise catalog snapshot versioning and catalog-state comparison outside
+  this aggregate and milestone.
 - Create or reuse the impact delta in the same transaction as policy-comparison creation/reuse.
 - Use PostgreSQL constraints and insert triggers to validate comparison, assessment, and child
   ownership. Reject parent and child updates and deletes.
@@ -735,6 +741,9 @@ matching is complete.
   fingerprint even though their lineage UUIDs differ.
 - Every displayed why/evidence statement resolves to a snapshot copied from an authoritative
   completed assessment; absence remains explicit rather than inferred.
+- The seeded demonstration tests that both assessments read the same unchanged shared enterprise
+  catalog and business-equivalent policy dependencies, making policy-rule changes the controlled
+  scenario variable without creating a generalized snapshot-version contract.
 - Repeated comparison requests reuse both aggregates, and partial delta failure rolls back a new
   comparison.
 - The generic-looking child table remains a closed three-kind contract, not a generalized diff

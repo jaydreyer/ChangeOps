@@ -11,7 +11,8 @@ migrations, tests, and the golden demo scenario remain the source of truth.
 
 Extend one deterministic policy comparison to answer:
 
-> What operational consequences changed between the baseline and proposed accepted policies?
+> What operational consequences differ between the two authoritative persisted assessment
+> outcomes?
 
 A reviewer can now identify:
 
@@ -24,6 +25,23 @@ A reviewer can now identify:
 
 AI explanation remains deferred. AI does not calculate, match, classify, persist, or serialize the
 delta.
+
+## Causal scope
+
+The delta is an outcome comparison, not proof that policy changes alone caused every difference.
+Each assessment is authoritative for its own persisted worker results, findings, impacts, reasons,
+and evidence. If enterprise source facts changed between assessment runs, those fact changes could
+also contribute to the observed delta. The comparator does not infer or persist a sole-cause claim.
+
+The seeded demonstration removes that ambiguity by executing both assessments against the same
+unchanged enterprise catalog state. A PostgreSQL integration test snapshots the seeded worker,
+team, membership, trip, system, document, course, training, commitment, and assignment facts before
+and after each assessment and verifies equality. It also verifies that the baseline and proposed
+policy dependency sets are business-equivalent after excluding source-specific row and policy
+identifiers.
+
+This invariant is specific to the demonstration fixture. Generalized enterprise catalog snapshot
+versioning, snapshot selection, and catalog-state comparison are explicitly outside Milestone 5B.
 
 ## Smallest architectural extension
 
@@ -171,6 +189,10 @@ Both policy sources now own business-equivalent system, document, and training d
 This avoids treating an incomplete proposed dependency catalog as a real operational removal.
 Dependency row IDs remain source-specific and are not used as impact identity.
 
+Both seeded assessment executions read the same unchanged enterprise source facts. This is a
+documented and tested demo invariant, not a generalized product guarantee or snapshot-versioning
+mechanism.
+
 The golden delta is:
 
 - 0 workers became affected;
@@ -190,8 +212,10 @@ Pure domain tests cover all closed classifications, ordering, duplicate stable i
 independent fingerprints. PostgreSQL/API tests cover atomic creation, exact golden behavior,
 idempotent reuse, complete evidence/path serialization, inability to inject authoritative values,
 historical stability, parent/child immutability, and demo reset. Seed tests cover the expanded
-source-specific dependency catalog and repeatability. Frontend tests cover populated, empty, and
-historical-unavailable states.
+source-specific dependency catalog and repeatability. The comparison integration suite verifies
+that the seeded enterprise catalog is unchanged across both assessment executions and that the two
+policy dependency sets are business-equivalent. Frontend tests cover populated, empty,
+historical-unavailable, and visible causal-scope states.
 
 All prior backend, frontend, migration round-trip, offline evaluation, demo-reset, and production-
 build gates remain required.
@@ -207,6 +231,7 @@ build gates remain required.
 - AWS;
 - Terraform;
 - generalized policy comparison;
+- generalized enterprise catalog snapshot versioning or catalog-state comparison;
 - additional policy families.
 
 ## Recommended next vertical slice

@@ -646,6 +646,14 @@ One delta is allowed per policy comparison. Insert triggers validate that assess
 the comparison's policies and accepted attempts and that every child record belongs to the correct
 assessment side. Update/delete triggers make both tables immutable.
 
+This aggregate compares the two authoritative persisted assessment outcomes; it is not a causal
+model. If their enterprise source facts differ, the delta alone cannot prove that policy changes
+were the sole cause of an observed difference. The seeded demonstration controls that variable by
+running both assessments against the same unchanged enterprise catalog and business-equivalent
+policy dependency sets, enforced by an integration test. The architecture intentionally does not
+add generalized enterprise snapshot versioning, snapshot selection, or catalog-state comparison in
+Milestone 5B.
+
 ### Durable workflow records
 
 `policy_analysis_runs` stores the immutable policy snapshot, closed status and step, latest

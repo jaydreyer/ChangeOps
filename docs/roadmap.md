@@ -629,6 +629,10 @@ Delivered behavior
 * enterprise impacts are classified as introduced or removed;
 * every applicable side snapshots persisted assessment explanations, reason codes, evidence, and
   relationship paths;
+* the UI explicitly describes the delta as a comparison of two authoritative persisted assessment
+  outcomes, not proof of sole policy causation when enterprise source facts differ;
+* the seeded demonstration tests that both assessments use the same unchanged enterprise catalog
+  state and business-equivalent policy dependencies;
 * PostgreSQL owns one immutable delta per comparison, validates assessment and item ownership, and
   rejects update/delete;
 * the comparison create/retrieve response and focused Next.js view expose the complete delta;
@@ -640,7 +644,8 @@ Architectural boundary
 The Milestone 5A semantic comparison remains unchanged. Enterprise Impact Delta is a separate
 one-to-one aggregate because it has different authoritative inputs, identity, evidence, and
 fingerprinting. AI and LangGraph do not participate. Proposed actions are inspected as assessment
-artifacts but are not compared in this slice.
+artifacts but are not compared in this slice. Generalized enterprise catalog snapshot versioning
+and catalog-state comparison are not introduced.
 
 Not included
 

@@ -120,10 +120,23 @@ function ImpactDeltaView({
       <div className="section-heading">
         <div>
           <p className="eyebrow">Immutable enterprise impact delta</p>
-          <h2>What operational consequences changed?</h2>
+          <h2>How did the persisted operational outcomes differ?</h2>
         </div>
         <span>Deterministic · {formatDateTime(delta.created_at)}</span>
       </div>
+
+      <aside className="impact-delta-scope" aria-label="Enterprise impact delta scope">
+        <h3>Outcome comparison, not sole-cause proof</h3>
+        <p>
+          This delta compares two authoritative persisted assessment outcomes. If enterprise
+          source facts differed between assessment runs, it does not prove that policy changes
+          alone caused every difference.
+        </p>
+        <p>
+          The seeded demonstration evaluates both assessments against the same enterprise catalog
+          state. This milestone does not version or compare generalized enterprise snapshots.
+        </p>
+      </aside>
 
       <div className="delta-summary" aria-label="Enterprise impact delta summary">
         <SummaryCount label="Workers became affected" value={summary.workers_became_affected} />

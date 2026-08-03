@@ -850,6 +850,17 @@ systems, three relevant documents, and the International Travel Security course.
 rows have source-specific record identifiers, but the deterministic impact comparator never uses
 those identifiers as enterprise-impact identity.
 
+The demonstration executes both assessments against the same enterprise catalog state. Shared
+worker, team, membership, trip, system, document, course, training, commitment, and assignment
+facts remain unchanged between executions, and the source-specific policy dependency sets are
+business-equivalent after excluding row and policy identifiers. An integration test enforces this
+fixture invariant.
+
+The resulting delta compares two authoritative persisted assessment outcomes. In a non-controlled
+scenario where enterprise source facts changed between assessment executions, the delta would not
+prove that policy changes alone caused every observed difference. Milestone 5B deliberately does
+not generalize the demo invariant into enterprise catalog snapshot versioning.
+
 The proposed assessment deterministically classifies all six travelers as unaffected:
 
 - Sarah Johnson is no longer affected because September 15 is before the proposed October 1

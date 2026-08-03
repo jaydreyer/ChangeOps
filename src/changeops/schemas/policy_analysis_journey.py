@@ -46,9 +46,32 @@ class AnalysisJourneyRunSummaryResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class PolicyComparisonReadinessResponse(BaseModel):
+    ready: bool
+    status: str
+    accepted_extraction_attempt_id: uuid.UUID | None
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class AnalysisEntryPolicyResponse(AnalysisJourneyPolicyResponse):
+    comparison_readiness: PolicyComparisonReadinessResponse
+
+
+class PolicyComparisonSummaryResponse(BaseModel):
+    id: uuid.UUID
+    baseline_policy_change_id: str
+    proposed_policy_change_id: str
+    difference_count: int
+    created_at: datetime
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class PolicyAnalysisEntryResponse(BaseModel):
-    policies: list[AnalysisJourneyPolicyResponse]
+    policies: list[AnalysisEntryPolicyResponse]
     recent_runs: list[AnalysisJourneyRunSummaryResponse]
+    recent_comparisons: list[PolicyComparisonSummaryResponse]
 
     model_config = ConfigDict(extra="forbid")
 

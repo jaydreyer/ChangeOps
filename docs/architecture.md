@@ -1,8 +1,9 @@
 # ChangeOps Architecture
 
-This document describes the current implementation through Milestone 4, Slice 2: the completed
-policy-analysis and approval lifecycles, the integrated focused Next.js workbench, and
-deterministic preparation and explicit execution of one learning-assignment command.
+This document describes the current implementation through Milestone 5A: the completed
+policy-analysis and approval lifecycles, the integrated Next.js journey and workbench,
+deterministic preparation and explicit execution of one learning-assignment command, and immutable
+deterministic comparison of two accepted international-travel policy rulesets.
 
 ## High-level architecture
 
@@ -40,6 +41,8 @@ flowchart LR
         CommandMapping["Pure supported-action<br/>command mapping"]
         ExecutionService["Deterministic execution<br/>and lineage validation"]
         LearningAdapter["Simulated learning adapter"]
+        Comparison["Policy comparison service"]
+        Comparator["Pure typed semantic comparator"]
         ORM["SQLAlchemy models and sessions"]
     end
 
@@ -77,6 +80,9 @@ flowchart LR
     CommandPreparation --> CommandMapping
     CommandPreparation --> ORM
     Routes --> ExecutionService
+    Routes --> Comparison
+    Comparison --> Comparator
+    Comparison --> ORM
     ExecutionService --> CommandMapping
     ExecutionService --> LearningAdapter
     LearningAdapter --> ORM
@@ -87,8 +93,9 @@ flowchart LR
 
 ChangeOps remains a synchronous modular monolith. The HTTP, application, domain, serialization, and
 persistence code run in one Python process. PostgreSQL stores source, extraction, workflow,
-assessment, interpretation, review, approval-run, command, simulated learning-assignment, and
-execution-result data. The Next.js runtime provides the focused local workbench. A configured
+assessment, comparison, interpretation, review, approval-run, command, simulated
+learning-assignment, and execution-result data. The Next.js runtime provides the local analysis,
+comparison, and approval experiences. A configured
 chat-model provider is the only external service used by extraction and interpretation; command
 preparation and simulated execution have no external dependency.
 
@@ -107,6 +114,8 @@ The FastAPI application exposes:
 - `GET /api/v1/policy-analysis-runs/{run_id}`
 - `GET /api/v1/policy-analysis-entry`
 - `GET /api/v1/policy-analysis-runs/{run_id}/journey`
+- `POST /api/v1/policy-comparisons`
+- `GET /api/v1/policy-comparisons/{comparison_id}`
 - `POST /api/v1/policy-analysis-runs/{run_id}/clarifications/{clarification_id}/answer`
 - `POST /api/v1/impact-assessments/{assessment_id}/change-plans`
 - `GET /api/v1/impact-assessments/{assessment_id}/change-plan`
@@ -132,6 +141,35 @@ questions remain available.
 
 Pydantic constrains impact domains, object types, classifications, and action types. It also
 validates allowed domain-classification combinations.
+
+### Deterministic policy comparison
+
+Comparison is a synchronous application operation, not a workflow graph. The create service loads
+two distinct `PolicyChange` records, requires common organization ownership, and resolves the most
+recent completed `PolicyAnalysisRun` for each source. Each run must point to an accepted extraction
+attempt that it and its policy own, have no pending clarification, retain the current source-text
+snapshot and effective date, and expose complete validated policy-text or human provenance.
+
+Compatibility checks inspect family and rule-schema values before reconstructing two immutable
+`InternationalTravelPolicyRules` values. A pure domain comparator explicitly evaluates effective
+date, worker location and types, trip origin and excluded destinations, booking exemption, and
+training identifier. Collection membership produces stable `added` or `removed` differences;
+scalar changes produce `modified`. Every supported change is operationally material under the
+closed schema and owns a stable reason code. Identical typed semantics produce no difference even
+when wording or source spans differ.
+
+The service fingerprints the contract version, ordered baseline/proposed source identities,
+accepted attempts, effective dates, rules, and semantic differences. It persists one
+`PolicyComparison` plus ordered `PolicyComparisonDifference` children in one transaction. A
+fingerprint uniqueness constraint makes repeated and concurrent equivalent creation idempotent.
+PostgreSQL composite foreign keys bind organization/policy and attempt/policy ownership, checks
+constrain classifications and side values, and triggers reject parent or child mutation.
+
+The comparison UI is enabled only when both entry policies resolve as ready. It shows both sources,
+accepted attempts, ordered values, provenance, materiality, and reason codes, while explicitly
+stating that enterprise impact delta has not been calculated. AI can independently propose each
+source extraction but is not invoked by comparison. LangGraph is likewise absent because the
+operation has no pause, retry, or branching lifecycle.
 
 ### Action review and decision service
 
@@ -567,6 +605,17 @@ versions. Every POST inserts a new UUID row. A PostgreSQL trigger rejects update
 failed and superseded attempts remain inspectable. Workflow attempts additionally reference their
 run and record a retry or human-clarification derivation reason.
 
+### Immutable policy comparisons
+
+`policy_comparisons` owns the baseline/proposed relationship, organization, two authoritative
+accepted attempts, compact policy display snapshots, comparison contract, SHA-256 fingerprint,
+creator, and creation time.
+`policy_comparison_differences` stores stable sequence and rule identity, field path,
+classification, baseline/proposed semantic values, deterministic materiality and reason code, and
+validated side-specific provenance snapshots. This is a bounded aggregate for
+`international_travel / schema_version 1`; it is not policy version management, a generic schema
+registry, event sourcing, or a generic JSON diff.
+
 ### Durable workflow records
 
 `policy_analysis_runs` stores the immutable policy snapshot, closed status and step, latest
@@ -674,6 +723,7 @@ duplicating simulated enterprise state.
 
 The idempotent seed contains:
 
+- one baseline international-travel source and one proposed revision source;
 - six travelers and six manager worker records;
 - four teams and six memberships;
 - three systems, one unaffected;
@@ -691,12 +741,15 @@ The completed golden assessment returns:
 - 13 proposed actions, all unexecuted;
 - eight copied unresolved questions.
 
-The normal Compose seed now persists only the stable fictional source catalog. The historical
+The proposed source naturally changes the accepted effective date, worker-type coverage, and
+destination exclusions. The normal Compose seed persists no accepted attempt, completed analysis,
+or completed comparison for either source. The historical
 provider-free assessment seed remains available to focused integration tests, but it is not loaded
 into the reviewer application because a pre-completed run obscures the start of the golden path.
 
 `make demo-reset` applies migrations, runs the idempotent catalog seed, then truncates the explicit
-set of workflow-owned tables in one transaction. It preserves catalog tables and requires an exact
+set of comparison- and workflow-owned tables in one transaction. It preserves both policy sources
+and other catalog tables and requires an exact
 confirmation value, recognized local PostgreSQL host and database name, and the seeded organization
 marker. No database or volume is dropped.
 

@@ -1,6 +1,7 @@
 import type {
   ApiError,
   ExecutionPreparation,
+  PolicyComparison,
   PolicyAnalysisEntry,
   PolicyAnalysisJourney,
   Workbench,
@@ -71,4 +72,16 @@ export async function getPolicyAnalysisJourney(runId: string): Promise<PolicyAna
     throw new Error(`${error.code}|${error.message}`);
   }
   return response.json() as Promise<PolicyAnalysisJourney>;
+}
+
+export async function getPolicyComparison(comparisonId: string): Promise<PolicyComparison> {
+  const response = await fetch(
+    `${apiBaseUrl()}/api/v1/policy-comparisons/${encodeURIComponent(comparisonId)}`,
+    { cache: "no-store" },
+  );
+  if (!response.ok) {
+    const error = await parseApiError(response);
+    throw new Error(`${error.code}|${error.message}`);
+  }
+  return response.json() as Promise<PolicyComparison>;
 }

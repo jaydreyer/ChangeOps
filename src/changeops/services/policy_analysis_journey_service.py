@@ -16,12 +16,14 @@ from changeops.db.models import (
     Organization,
     PolicyAnalysisRun,
     PolicyChange,
+    PolicyComparison,
     PolicyExtractionAttempt,
     PolicyInterpretationAttempt,
     Team,
 )
 from changeops.domain.policy_interpretation import ValidatedChangePlan
 from changeops.schemas.policy_analysis_journey import (
+    AnalysisEntryPolicyResponse,
     AnalysisJourneyAssessmentResponse,
     AnalysisJourneyExtractionResponse,
     AnalysisJourneyPolicyResponse,
@@ -34,6 +36,8 @@ from changeops.schemas.policy_analysis_journey import (
     InterpretationJourneyResponse,
     PolicyAnalysisEntryResponse,
     PolicyAnalysisJourneyResponse,
+    PolicyComparisonReadinessResponse,
+    PolicyComparisonSummaryResponse,
     ResolvedCoverageGapReferencesResponse,
     ResolvedEvidenceReferenceResponse,
     ResolvedImpactReferenceResponse,
@@ -48,6 +52,7 @@ from changeops.services.policy_analysis_service import (
     PolicyAnalysisRunNotFoundError,
     get_policy_analysis_run,
 )
+from changeops.services.policy_comparison_service import get_policy_comparison_readiness
 
 
 class PolicyAnalysisJourneyNotFoundError(Exception):
@@ -81,9 +86,21 @@ def get_policy_analysis_entry(session: Session) -> PolicyAnalysisEntryResponse:
             .limit(10)
         )
     )
+    comparisons = list(
+        session.scalars(
+            select(PolicyComparison)
+            .order_by(PolicyComparison.created_at.desc(), PolicyComparison.id.desc())
+            .limit(10)
+        )
+    )
     return PolicyAnalysisEntryResponse(
         policies=[
-            _serialize_policy(policy, organizations[policy.organization_id]) for policy in policies
+            _serialize_entry_policy(
+                session,
+                policy,
+                organizations[policy.organization_id],
+            )
+            for policy in policies
         ],
         recent_runs=[
             AnalysisJourneyRunSummaryResponse(
@@ -96,6 +113,16 @@ def get_policy_analysis_entry(session: Session) -> PolicyAnalysisEntryResponse:
                 updated_at=run.updated_at,
             )
             for run in runs
+        ],
+        recent_comparisons=[
+            PolicyComparisonSummaryResponse(
+                id=comparison.id,
+                baseline_policy_change_id=comparison.baseline_policy_change_id,
+                proposed_policy_change_id=comparison.proposed_policy_change_id,
+                difference_count=len(comparison.differences),
+                created_at=comparison.created_at,
+            )
+            for comparison in comparisons
         ],
     )
 
@@ -174,6 +201,22 @@ def _serialize_policy(
         version=policy.version,
         effective_date=policy.effective_date,
         policy_text=policy_text if policy_text is not None else policy.policy_text,
+    )
+
+
+def _serialize_entry_policy(
+    session: Session,
+    policy: PolicyChange,
+    organization: Organization,
+) -> AnalysisEntryPolicyResponse:
+    readiness = get_policy_comparison_readiness(session, policy)
+    return AnalysisEntryPolicyResponse(
+        **_serialize_policy(policy, organization).model_dump(),
+        comparison_readiness=PolicyComparisonReadinessResponse(
+            ready=readiness.ready,
+            status=readiness.status,
+            accepted_extraction_attempt_id=readiness.accepted_extraction_attempt_id,
+        ),
     )
 
 

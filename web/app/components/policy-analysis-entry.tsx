@@ -10,8 +10,20 @@ export function PolicyAnalysisEntryView({ entry }: { entry: PolicyAnalysisEntry 
   const router = useRouter();
   const [selectedPolicyId, setSelectedPolicyId] = useState(entry.policies[0]?.id ?? "");
   const [starting, setStarting] = useState(false);
+  const [baselinePolicyId, setBaselinePolicyId] = useState(entry.policies.at(-1)?.id ?? "");
+  const [proposedPolicyId, setProposedPolicyId] = useState(entry.policies[0]?.id ?? "");
+  const [comparisonActor, setComparisonActor] = useState("portfolio-reviewer");
+  const [comparing, setComparing] = useState(false);
   const [error, setError] = useState("");
+  const [comparisonError, setComparisonError] = useState("");
   const policy = entry.policies.find((item) => item.id === selectedPolicyId);
+  const baselinePolicy = entry.policies.find((item) => item.id === baselinePolicyId);
+  const proposedPolicy = entry.policies.find((item) => item.id === proposedPolicyId);
+  const comparisonReady =
+    baselinePolicyId !== proposedPolicyId &&
+    baselinePolicy?.comparison_readiness.ready === true &&
+    proposedPolicy?.comparison_readiness.ready === true &&
+    comparisonActor.trim().length > 0;
 
   async function startAnalysis() {
     setStarting(true);
@@ -33,6 +45,37 @@ export function PolicyAnalysisEntryView({ entry }: { entry: PolicyAnalysisEntry 
       setError("The ChangeOps API is unavailable. Check that the local stack is running.");
     } finally {
       setStarting(false);
+    }
+  }
+
+  async function comparePolicies() {
+    setComparing(true);
+    setComparisonError("");
+    try {
+      const response = await fetch("/api/v1/policy-comparisons", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "X-ChangeOps-Actor": comparisonActor.trim(),
+        },
+        body: JSON.stringify({
+          baseline_policy_change_id: baselinePolicyId,
+          proposed_policy_change_id: proposedPolicyId,
+        }),
+      });
+      if (!response.ok) {
+        const apiError = await parseApiError(response);
+        setComparisonError(apiError.message);
+        return;
+      }
+      const comparison = (await response.json()) as { id: string };
+      router.push(`/policy-comparisons/${comparison.id}`);
+    } catch {
+      setComparisonError(
+        "The ChangeOps API is unavailable. Check that the local stack is running.",
+      );
+    } finally {
+      setComparing(false);
     }
   }
 
@@ -144,7 +187,100 @@ export function PolicyAnalysisEntryView({ entry }: { entry: PolicyAnalysisEntry 
           </section>
         </section>
       )}
+
+      {entry.policies.length > 0 && (
+        <section className="journey-card comparison-entry" aria-labelledby="comparison-heading">
+          <div className="section-heading">
+            <div>
+              <p className="eyebrow">Deterministic policy comparison</p>
+              <h2 id="comparison-heading">Compare accepted policy rules</h2>
+            </div>
+            <span className="badge deterministic">No AI comparison</span>
+          </div>
+          <p>
+            Analyze both source policies first. Comparison becomes available only when each has
+            accepted typed rules and no blocking clarification.
+          </p>
+          <div className="comparison-selectors">
+            <label>
+              Baseline policy
+              <select
+                value={baselinePolicyId}
+                onChange={(event) => setBaselinePolicyId(event.target.value)}
+              >
+                {entry.policies.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.title}
+                  </option>
+                ))}
+              </select>
+              {baselinePolicy && <Readiness policy={baselinePolicy} />}
+            </label>
+            <label>
+              Proposed revision
+              <select
+                value={proposedPolicyId}
+                onChange={(event) => setProposedPolicyId(event.target.value)}
+              >
+                {entry.policies.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.title}
+                  </option>
+                ))}
+              </select>
+              {proposedPolicy && <Readiness policy={proposedPolicy} />}
+            </label>
+            <label>
+              Comparison initiated by
+              <input
+                value={comparisonActor}
+                onChange={(event) => setComparisonActor(event.target.value)}
+              />
+            </label>
+          </div>
+          <button type="button" onClick={comparePolicies} disabled={!comparisonReady || comparing}>
+            {comparing ? "Comparing accepted rules…" : "Compare accepted rules"}
+          </button>
+          {baselinePolicyId === proposedPolicyId && (
+            <p className="error">Choose two distinct policy source records.</p>
+          )}
+          {comparisonError && (
+            <p className="error" role="alert">
+              {comparisonError}
+            </p>
+          )}
+          <p className="honest-pending">
+            This comparison covers accepted policy semantics only. Enterprise impact delta is not
+            available in this milestone.
+          </p>
+          <div className="comparison-history">
+            <h3>Recent comparisons</h3>
+            {entry.recent_comparisons.length === 0 ? (
+              <p>No policy comparison has been created yet.</p>
+            ) : (
+              <ol className="run-list">
+                {entry.recent_comparisons.map((comparison) => (
+                  <li key={comparison.id}>
+                    <span>{comparison.difference_count} semantic differences</span>
+                    <Link href={`/policy-comparisons/${comparison.id}`}>Open comparison</Link>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </div>
+        </section>
+      )}
     </main>
+  );
+}
+
+function Readiness({ policy }: { policy: PolicyAnalysisEntry["policies"][number] }) {
+  return (
+    <small className={policy.comparison_readiness.ready ? "ready" : "not-ready"}>
+      {policy.comparison_readiness.ready
+        ? "Ready · accepted extraction validated"
+        : `Not ready · ${humanize(policy.comparison_readiness.status)}`}
+    </small>
   );
 }
 

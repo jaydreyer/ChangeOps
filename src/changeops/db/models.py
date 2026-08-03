@@ -206,6 +206,13 @@ class TrainingRecord(Base):
 
 class PolicyChange(Base):
     __tablename__ = "policy_changes"
+    __table_args__ = (
+        UniqueConstraint(
+            "id",
+            "organization_id",
+            name="uq_policy_changes_id_organization",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String(100), primary_key=True)
     organization_id: Mapped[str] = mapped_column(
@@ -230,6 +237,11 @@ class PolicyExtractionAttempt(Base):
         CheckConstraint(
             "validation_outcome IN ('accepted', 'unsupported', 'validation_failed')",
             name="ck_policy_extraction_attempts_validation_outcome",
+        ),
+        UniqueConstraint(
+            "id",
+            "policy_change_id",
+            name="uq_policy_extraction_attempts_id_policy",
         ),
     )
 
@@ -344,6 +356,116 @@ class PolicyAnalysisClarification(Base):
     answer_provenance: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class PolicyComparison(Base):
+    __tablename__ = "policy_comparisons"
+    __table_args__ = (
+        CheckConstraint(
+            "baseline_policy_change_id <> proposed_policy_change_id",
+            name="ck_policy_comparisons_distinct_policies",
+        ),
+        CheckConstraint(
+            "comparison_contract_version = 'international-travel-policy-comparison-v1'",
+            name="ck_policy_comparisons_contract_version",
+        ),
+        CheckConstraint(
+            "length(comparison_fingerprint) = 64",
+            name="ck_policy_comparisons_fingerprint_length",
+        ),
+        CheckConstraint(
+            "length(btrim(created_by)) > 0",
+            name="ck_policy_comparisons_creator",
+        ),
+        UniqueConstraint(
+            "comparison_fingerprint",
+            name="uq_policy_comparisons_fingerprint",
+        ),
+        ForeignKeyConstraint(
+            ["baseline_policy_change_id", "organization_id"],
+            ["policy_changes.id", "policy_changes.organization_id"],
+            name="fk_policy_comparisons_baseline_policy_organization",
+        ),
+        ForeignKeyConstraint(
+            ["proposed_policy_change_id", "organization_id"],
+            ["policy_changes.id", "policy_changes.organization_id"],
+            name="fk_policy_comparisons_proposed_policy_organization",
+        ),
+        ForeignKeyConstraint(
+            ["baseline_extraction_attempt_id", "baseline_policy_change_id"],
+            ["policy_extraction_attempts.id", "policy_extraction_attempts.policy_change_id"],
+            name="fk_policy_comparisons_baseline_attempt_policy",
+        ),
+        ForeignKeyConstraint(
+            ["proposed_extraction_attempt_id", "proposed_policy_change_id"],
+            ["policy_extraction_attempts.id", "policy_extraction_attempts.policy_change_id"],
+            name="fk_policy_comparisons_proposed_attempt_policy",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    organization_id: Mapped[str] = mapped_column(
+        ForeignKey("organizations.id"),
+        index=True,
+    )
+    baseline_policy_change_id: Mapped[str] = mapped_column(String(100), index=True)
+    proposed_policy_change_id: Mapped[str] = mapped_column(String(100), index=True)
+    baseline_extraction_attempt_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    proposed_extraction_attempt_id: Mapped[uuid.UUID] = mapped_column(index=True)
+    baseline_policy_snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    proposed_policy_snapshot: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    comparison_contract_version: Mapped[str] = mapped_column(String(100))
+    comparison_fingerprint: Mapped[str] = mapped_column(String(64))
+    created_by: Mapped[str] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+    differences: Mapped[list["PolicyComparisonDifference"]] = relationship(
+        order_by="PolicyComparisonDifference.sequence",
+    )
+
+
+class PolicyComparisonDifference(Base):
+    __tablename__ = "policy_comparison_differences"
+    __table_args__ = (
+        CheckConstraint(
+            "change_type IN ('added', 'removed', 'modified')",
+            name="ck_policy_comparison_differences_change_type",
+        ),
+        CheckConstraint(
+            "sequence > 0",
+            name="ck_policy_comparison_differences_sequence",
+        ),
+        CheckConstraint(
+            "material",
+            name="ck_policy_comparison_differences_material",
+        ),
+        UniqueConstraint(
+            "policy_comparison_id",
+            "sequence",
+            name="uq_policy_comparison_differences_sequence",
+        ),
+        UniqueConstraint(
+            "policy_comparison_id",
+            "rule_identity",
+            name="uq_policy_comparison_differences_identity",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    policy_comparison_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("policy_comparisons.id"),
+        index=True,
+    )
+    sequence: Mapped[int] = mapped_column(Integer)
+    rule_identity: Mapped[str] = mapped_column(String(300))
+    field_path: Mapped[str] = mapped_column(String(200))
+    change_type: Mapped[str] = mapped_column(String(20))
+    baseline_value: Mapped[Any | None] = mapped_column(JSONB(none_as_null=True))
+    proposed_value: Mapped[Any | None] = mapped_column(JSONB(none_as_null=True))
+    material: Mapped[bool] = mapped_column(Boolean)
+    reason_code: Mapped[str] = mapped_column(String(100))
+    baseline_provenance: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
+    proposed_provenance: Mapped[dict[str, Any] | None] = mapped_column(JSONB(none_as_null=True))
 
 
 class PolicyChangeQuestion(Base):

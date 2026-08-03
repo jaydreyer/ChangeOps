@@ -9,6 +9,7 @@ from changeops.api.execution_commands import router as execution_commands_router
 from changeops.api.health import router as health_router
 from changeops.api.policy_analysis import router as policy_analysis_router
 from changeops.api.policy_analysis_journey import router as policy_analysis_journey_router
+from changeops.api.policy_comparisons import router as policy_comparisons_router
 from changeops.api.policy_extractions import router as policy_extractions_router
 from changeops.api.policy_interpretation import router as policy_interpretation_router
 
@@ -32,6 +33,7 @@ def create_app() -> FastAPI:
     app.include_router(policy_extractions_router)
     app.include_router(policy_analysis_router)
     app.include_router(policy_analysis_journey_router)
+    app.include_router(policy_comparisons_router)
     app.include_router(policy_interpretation_router)
     app.include_router(action_reviews_router)
     app.include_router(action_approval_router)

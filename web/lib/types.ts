@@ -210,6 +210,14 @@ export interface AnalysisPolicy {
   policy_text: string;
 }
 
+export interface AnalysisEntryPolicy extends AnalysisPolicy {
+  comparison_readiness: {
+    ready: boolean;
+    status: string;
+    accepted_extraction_attempt_id: string | null;
+  };
+}
+
 export interface AnalysisRunSummary {
   id: string;
   policy_change_id: string;
@@ -221,8 +229,52 @@ export interface AnalysisRunSummary {
 }
 
 export interface PolicyAnalysisEntry {
-  policies: AnalysisPolicy[];
+  policies: AnalysisEntryPolicy[];
   recent_runs: AnalysisRunSummary[];
+  recent_comparisons: {
+    id: string;
+    baseline_policy_change_id: string;
+    proposed_policy_change_id: string;
+    difference_count: number;
+    created_at: string;
+  }[];
+}
+
+export interface PolicyComparison {
+  id: string;
+  organization_id: string;
+  baseline: {
+    policy_change_id: string;
+    title: string;
+    version: string;
+    effective_date: string;
+    accepted_extraction_attempt_id: string;
+  };
+  proposed: {
+    policy_change_id: string;
+    title: string;
+    version: string;
+    effective_date: string;
+    accepted_extraction_attempt_id: string;
+  };
+  comparison_contract_version: string;
+  comparison_fingerprint: string;
+  difference_count: number;
+  differences: {
+    id: string;
+    sequence: number;
+    rule_identity: string;
+    field_path: string;
+    change_type: "added" | "removed" | "modified";
+    baseline_value: unknown | null;
+    proposed_value: unknown | null;
+    material: true;
+    reason_code: string;
+    baseline_provenance: Record<string, unknown> | null;
+    proposed_provenance: Record<string, unknown> | null;
+  }[];
+  created_by: string;
+  created_at: string;
 }
 
 export interface AnalysisClarification {

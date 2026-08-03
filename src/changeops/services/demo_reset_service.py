@@ -12,6 +12,7 @@ from changeops.db.models import (
     ImpactAssessment,
     Organization,
     PolicyAnalysisRun,
+    PolicyComparison,
     SimulatedLearningAssignment,
 )
 from changeops.services.seed_service import ORGANIZATION_ID, seed_database
@@ -21,6 +22,8 @@ LOCAL_DATABASE_HOSTS = {"db", "localhost", "127.0.0.1", "::1"}
 LOCAL_DATABASE_NAMES = {"changeops"}
 
 WORKFLOW_TABLES = (
+    "policy_comparison_differences",
+    "policy_comparisons",
     "execution_results",
     "simulated_learning_assignments",
     "execution_commands",
@@ -53,6 +56,7 @@ class DemoResetSafetyError(RuntimeError):
 
 @dataclass(frozen=True)
 class DemoResetSummary:
+    policy_comparisons: int
     policy_analysis_runs: int
     impact_assessments: int
     approval_runs: int
@@ -95,6 +99,7 @@ def _summary(session: Session) -> DemoResetSummary:
         return session.scalar(select(func.count()).select_from(model)) or 0
 
     return DemoResetSummary(
+        policy_comparisons=count(PolicyComparison),
         policy_analysis_runs=count(PolicyAnalysisRun),
         impact_assessments=count(ImpactAssessment),
         approval_runs=count(ActionApprovalRun),

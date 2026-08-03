@@ -69,7 +69,7 @@ def test_seed_is_repeatable_without_duplicates() -> None:
         == after
         == {
             "organizations": 1,
-            "policy_changes": 1,
+            "policy_changes": 2,
             "policy_change_questions": 8,
             "policy_extraction_attempts": 0,
             "workers": 12,
@@ -116,6 +116,7 @@ def test_demo_reset_removes_workflow_history_preserves_catalog_and_is_repeatable
 
     assert first == second
     assert first.policy_analysis_runs == 0
+    assert first.policy_comparisons == 0
     assert first.impact_assessments == 0
     assert first.approval_runs == 0
     assert first.execution_commands == 0
@@ -124,3 +125,4 @@ def test_demo_reset_removes_workflow_history_preserves_catalog_and_is_repeatable
     with SessionLocal() as session:
         assert session.get(Organization, "org-acme-global-manufacturing") is not None
         assert session.get(PolicyChange, "policy-international-travel-2026-09") is not None
+        assert session.get(PolicyChange, "policy-international-travel-proposed-2026-10") is not None

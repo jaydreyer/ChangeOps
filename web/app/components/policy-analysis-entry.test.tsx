@@ -67,8 +67,20 @@ describe("policy analysis entry", () => {
   it("shows the golden policy and opens a recent durable run", () => {
     render(<PolicyAnalysisEntryView entry={entry} />);
 
+    expect(
+      screen.getByRole("heading", {
+        name: "Understand a policy change before anyone acts.",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Choose a policy to analyze" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "From policy language to governed action" }),
+    ).toBeInTheDocument();
     expect(screen.getAllByText("International Business Travel")).not.toHaveLength(0);
     expect(screen.getByText("Travelers must complete training.")).toBeInTheDocument();
+    expect(screen.getByText("Read the selected policy").closest("details")).not.toHaveAttribute(
+      "open",
+    );
     expect(screen.getByRole("link", { name: "Open analysis" })).toHaveAttribute(
       "href",
       "/policy-analyses/run-1",
@@ -91,7 +103,7 @@ describe("policy analysis entry", () => {
     );
     render(<PolicyAnalysisEntryView entry={entry} navigateToRun={navigateToRun} />);
 
-    await user.click(screen.getByRole("button", { name: "Start new analysis" }));
+    await user.click(screen.getByRole("button", { name: "Start policy analysis" }));
 
     expect(fetch).toHaveBeenCalledWith(
       "/api/v1/policy-analysis-runs",
@@ -124,7 +136,7 @@ describe("policy analysis entry", () => {
     );
     render(<PolicyAnalysisEntryView entry={entry} navigateToRun={navigateToRun} />);
 
-    await user.click(screen.getByRole("button", { name: "Start new analysis" }));
+    await user.click(screen.getByRole("button", { name: "Start policy analysis" }));
     expect(screen.getByRole("alert")).toHaveTextContent(
       "The analysis was persisted, but automatic navigation failed.",
     );
@@ -160,7 +172,7 @@ describe("policy analysis entry", () => {
       );
     render(<PolicyAnalysisEntryView entry={entry} navigateToRun={navigateToRun} />);
 
-    await user.click(screen.getByRole("button", { name: "Start new analysis" }));
+    await user.click(screen.getByRole("button", { name: "Start policy analysis" }));
 
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(fetch).toHaveBeenLastCalledWith(
@@ -175,7 +187,7 @@ describe("policy analysis entry", () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("api unavailable"));
     render(<PolicyAnalysisEntryView entry={entry} navigateToRun={vi.fn()} />);
 
-    await user.click(screen.getByRole("button", { name: "Start new analysis" }));
+    await user.click(screen.getByRole("button", { name: "Start policy analysis" }));
 
     expect(screen.getByRole("alert")).toHaveTextContent(
       "The request outcome could not be confirmed. Recovery did not send another analysis request.",
@@ -233,7 +245,7 @@ describe("policy analysis entry", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Comparison becomes available after both policies have accepted, validated rules and completed assessments.",
+        /Both policies must have validated rules and completed assessments before comparison is available/,
       ),
     ).toBeInTheDocument();
     expect(

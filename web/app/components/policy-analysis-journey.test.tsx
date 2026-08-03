@@ -253,8 +253,24 @@ describe("policy analysis journey", () => {
   it("renders AI proposals, deterministic results, coverage, and grounded citations separately", () => {
     render(<PolicyAnalysisJourneyView initialJourney={journey} />);
 
-    expect(screen.getAllByText("AI-proposed values").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Deterministic conclusion").length).toBeGreaterThan(0);
+    expect(screen.getByText("AI suggested rules")).toBeInTheDocument();
+    expect(screen.getAllByText("System-calculated").length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole("heading", { name: "What did this analysis establish?" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "What policy are we evaluating?" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "What rules did ChangeOps identify?" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Who and what is affected?" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "What enterprise records were evaluated?" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Why are they affected?" })).toBeInTheDocument();
     expect(screen.getByText("Sarah Johnson")).toBeInTheDocument();
     expect(screen.getByText("Priya Shah")).toBeInTheDocument();
     expect(screen.getByText("Acme Expense")).toBeInTheDocument();
@@ -265,12 +281,21 @@ describe("policy analysis journey", () => {
     expect(screen.getByText(/Validated against the policy snapshot/)).toBeInTheDocument();
     expect(screen.getByTitle("impact-1")).toHaveTextContent("impact-1");
     expect(screen.getByText("No clarification required")).toBeInTheDocument();
-    const proposedActions = screen.getByRole("heading", { name: "Proposed actions" }).closest(
+    const proposedActions = screen.getByRole("heading", { name: "What should change?" }).closest(
       "section",
     );
     expect(proposedActions).not.toBeNull();
-    expect(within(proposedActions!).getByText("Deterministic proposal")).toBeInTheDocument();
+    expect(within(proposedActions!).getByText("System-proposed")).toBeInTheDocument();
     expect(within(proposedActions!).queryByText("AI proposal")).not.toBeInTheDocument();
+    expect(
+      screen.getByText("View exact policy provenance (1 records)").closest("details"),
+    ).not.toHaveAttribute("open");
+    expect(
+      screen.getByText("View persisted grounding and lineage").closest("details"),
+    ).not.toHaveAttribute("open");
+    expect(
+      screen.getAllByText("View deterministic reason codes")[0].closest("details"),
+    ).not.toHaveAttribute("open");
     expect(screen.getByRole("button", { name: "Create approval run" })).toBeEnabled();
   });
 
@@ -331,7 +356,12 @@ describe("policy analysis journey", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("[true]")).toBeInTheDocument();
     expect(screen.getByText("Clarification required")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Confirm true and resume" })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Confirm and resume analysis" }),
+    ).toBeEnabled();
+    expect(screen.getByText("View clarification contract").closest("details")).not.toHaveAttribute(
+      "open",
+    );
   });
 
   it("shows a terminal unsupported run without enabling approval", () => {

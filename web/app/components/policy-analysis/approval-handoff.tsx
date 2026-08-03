@@ -16,10 +16,10 @@ export function ApprovalHandoff({
     <section className="journey-card approval-handoff" aria-labelledby="approval-heading">
       <div>
         <p className="eyebrow">Human governance</p>
-        <h2 id="approval-heading">Continue to action approval</h2>
+        <h2 id="approval-heading">What needs approval?</h2>
         <p>
-          The workbench preserves lineage through the immutable assessment and proposed actions.
-          Approval, command preparation, and execution remain separate lifecycle states.
+          Open the workbench to review each persisted proposal against its deterministic context
+          and evidence. Approval records a decision; it does not execute the action.
         </p>
         {approvalRun && (
           <dl className="execution-summary">

@@ -170,21 +170,51 @@ export function PolicyAnalysisEntryView({
 
   return (
     <main className="analysis-shell">
-      <header className="analysis-hero">
+      <header className="landing-hero">
         <div>
-          <p className="eyebrow">ChangeOps · governed policy intelligence</p>
-          <h1>Trace a policy from language to controlled action</h1>
+          <p className="product-mark">ChangeOps</p>
+          <p className="eyebrow">Governed policy intelligence</p>
+          <h1>Understand a policy change before anyone acts.</h1>
           <p className="lede">
-            Inspect what AI proposed, what deterministic validation accepted, who and what was
-            affected, and which actions still require human approval.
+            ChangeOps identifies policy rules, calculates who and what is affected, and routes
+            proposed actions for human approval. Approval and execution remain separate.
           </p>
         </div>
         <div className="boundary-legend" aria-label="Decision boundaries">
-          <span className="badge ai_proposal">AI proposal</span>
-          <span className="badge deterministic">Deterministic conclusion</span>
-          <span className="badge human_input">Human input</span>
+          <span className="badge ai_proposal">AI suggests</span>
+          <span className="badge deterministic">System calculates</span>
+          <span className="badge human_input">Human decides</span>
         </div>
       </header>
+
+      <section className="journey-explainer" aria-labelledby="demo-journey-heading">
+        <div>
+          <p className="eyebrow">How this demonstration works</p>
+          <h2 id="demo-journey-heading">From policy language to governed action</h2>
+        </div>
+        <ol>
+          <li>
+            <span>1</span>
+            <strong>Identify policy rules</strong>
+            <small>AI proposes structured values.</small>
+          </li>
+          <li>
+            <span>2</span>
+            <strong>Calculate impact</strong>
+            <small>Deterministic code evaluates the enterprise.</small>
+          </li>
+          <li>
+            <span>3</span>
+            <strong>Review proposed actions</strong>
+            <small>A person records each decision.</small>
+          </li>
+          <li>
+            <span>4</span>
+            <strong>Execute explicitly</strong>
+            <small>Approval alone never performs an action.</small>
+          </li>
+        </ol>
+      </section>
 
       {entry.policies.length === 0 ? (
         <section className="empty-panel">
@@ -194,8 +224,18 @@ export function PolicyAnalysisEntryView({
       ) : (
         <section className="policy-entry-grid">
           <article className="journey-card policy-card">
-            <p className="eyebrow">Golden scenario</p>
-            <label htmlFor="policy-selector">Policy to analyze</label>
+            <div className="section-heading">
+              <div>
+                <p className="eyebrow">Start an analysis</p>
+                <h2>Choose a policy to analyze</h2>
+              </div>
+              <span className="quiet-label">Fictional demo</span>
+            </div>
+            <p className="section-intro">
+              Select a stored policy. ChangeOps will propose its rules, validate them, and calculate
+              operational impact before presenting any action for review.
+            </p>
+            <label htmlFor="policy-selector">Policy</label>
             <select
               id="policy-selector"
               value={selectedPolicyId}
@@ -228,20 +268,24 @@ export function PolicyAnalysisEntryView({
                     <dd>{policy.version}</dd>
                   </div>
                 </dl>
-                <blockquote className="policy-text">{policy.policy_text}</blockquote>
+                <details className="technical-disclosure policy-preview">
+                  <summary>Read the selected policy</summary>
+                  <blockquote className="policy-text">{policy.policy_text}</blockquote>
+                </details>
               </>
             )}
-            <button
-              type="button"
-              onClick={startAnalysis}
-              disabled={starting || !selectedPolicyId || persistedRun !== null}
-            >
-              {starting ? "Analyzing policy…" : "Start new analysis"}
-            </button>
-            <p className="honest-pending">
-              Analysis runs synchronously. This button waits for the authoritative workflow
-              response; it does not simulate progress.
-            </p>
+            <div className="primary-action-row">
+              <button
+                type="button"
+                onClick={startAnalysis}
+                disabled={starting || !selectedPolicyId || persistedRun !== null}
+              >
+                {starting ? "Analyzing policy…" : "Start policy analysis"}
+              </button>
+              <p className="honest-pending">
+                The page opens the persisted analysis when the synchronous workflow completes.
+              </p>
+            </div>
             <div aria-live="polite">
               {persistedRun && (
                 <p className="analysis-navigation-status">
@@ -275,11 +319,14 @@ export function PolicyAnalysisEntryView({
           <section className="journey-card" aria-labelledby="recent-runs-heading">
             <div className="section-heading">
               <div>
-                <p className="eyebrow">Durable workflow history</p>
+                <p className="eyebrow">Continue previous work</p>
                 <h2 id="recent-runs-heading">Recent analyses</h2>
               </div>
-              <span>{entry.recent_runs.length} runs</span>
+              <span className="quiet-label">{entry.recent_runs.length} runs</span>
             </div>
+            <p className="section-intro">
+              Each row opens the latest persisted state for that analysis.
+            </p>
             {entry.recent_runs.length === 0 ? (
               <p>No analysis has been started yet.</p>
             ) : (
@@ -287,9 +334,13 @@ export function PolicyAnalysisEntryView({
                 {entry.recent_runs.map((run) => (
                   <li key={run.id}>
                     <div>
-                      <strong>{humanize(run.status)}</strong>
+                      <strong>
+                        {entry.policies.find((item) => item.id === run.policy_change_id)?.title ??
+                          "Stored policy"}
+                      </strong>
                       <small>
-                        {humanize(run.current_step)} ·{" "}
+                        <span className={`status-dot status-${run.status}`} aria-hidden="true" />
+                        {humanize(run.status)} · {humanize(run.current_step)} ·{" "}
                         <time dateTime={run.updated_at}>{formatDateTime(run.updated_at)}</time>
                       </small>
                     </div>
@@ -306,14 +357,14 @@ export function PolicyAnalysisEntryView({
         <section className="journey-card comparison-entry" aria-labelledby="comparison-heading">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">Deterministic policy comparison</p>
+              <p className="eyebrow">Review a revision</p>
               <h2 id="comparison-heading">Compare policy versions</h2>
             </div>
-            <span className="badge deterministic">No AI comparison</span>
+            <span className="badge deterministic">System-calculated</span>
           </div>
-          <p>
-            Comparison becomes available after both policies have accepted, validated rules and
-            completed assessments.
+          <p className="section-intro">
+            See which accepted obligations and persisted operational outcomes differ. Both policies
+            must have validated rules and completed assessments before comparison is available.
           </p>
           <div className="comparison-selectors">
             <label>
@@ -364,8 +415,8 @@ export function PolicyAnalysisEntryView({
             </p>
           )}
           <p className="honest-pending">
-            Deterministic code compares accepted policy semantics and the two persisted assessment
-            outcomes. AI does not calculate the comparison.
+            Deterministic code performs the comparison. AI does not classify differences or
+            calculate impact deltas.
           </p>
           <div className="comparison-history">
             <h3>Recent comparisons</h3>

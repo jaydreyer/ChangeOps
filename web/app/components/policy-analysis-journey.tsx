@@ -104,29 +104,38 @@ export function PolicyAnalysisJourneyView({
       <header className="analysis-hero">
         <div>
           <Link href="/" className="back-link">
-            ← Policy analyses
+            ← All policy analyses
           </Link>
-          <p className="eyebrow">Policy analysis journey</p>
+          <p className="product-mark">ChangeOps</p>
+          <p className="eyebrow">Policy analysis</p>
           <h1>{policy.title}</h1>
           <p className="lede">
+            Review the accepted policy rules, persisted operational impact, and any proposed
+            actions before human approval.
+          </p>
+          <p className="reference-line">
             {policy.organization_name} · Effective {formatDate(policy.effective_date)}
           </p>
         </div>
-        <dl className="identifiers">
-          <div>
-            <dt>Analysis run</dt>
-            <dd>{run.id}</dd>
-          </div>
-          <div>
-            <dt>Status</dt>
-            <dd>
-              <span className={`badge status-${run.status}`}>{humanize(run.status)}</span>
-            </dd>
-          </div>
-        </dl>
+        <div className="analysis-status-panel">
+          <span className={`badge status-${run.status}`}>{humanize(run.status)}</span>
+          <strong>Current backend step</strong>
+          <span>{humanize(run.current_step)}</span>
+          <details className="technical-disclosure">
+            <summary>View analysis identity</summary>
+            <dl className="identifiers">
+              <div>
+                <dt>Analysis run</dt>
+                <dd>{run.id}</dd>
+              </div>
+            </dl>
+          </details>
+        </div>
       </header>
 
       <JourneyNavigation journey={initialJourney} />
+
+      <AnalysisOverview journey={initialJourney} />
 
       {run.failure_code && (
         <section className="failure-panel" aria-labelledby="analysis-failure-heading">
@@ -167,5 +176,47 @@ export function PolicyAnalysisJourneyView({
         onOpen={openApproval}
       />
     </main>
+  );
+}
+
+function AnalysisOverview({ journey }: { journey: PolicyAnalysisJourney }) {
+  const { extraction, assessment, run } = journey;
+  return (
+    <section className="analysis-overview" aria-labelledby="analysis-overview-heading">
+      <div className="overview-copy">
+        <p className="eyebrow">Current persisted outcome</p>
+        <h2 id="analysis-overview-heading">What did this analysis establish?</h2>
+        <p>
+          These values come directly from the accepted extraction and immutable assessment. Use
+          the sections below to inspect their supporting explanations and evidence.
+        </p>
+      </div>
+      <dl>
+        <div>
+          <dt>Rule validation</dt>
+          <dd>{extraction ? humanize(extraction.validation_outcome) : "Not available"}</dd>
+        </div>
+        <div>
+          <dt>Worker-trip outcomes</dt>
+          <dd>
+            {assessment
+              ? `${assessment.summary.affected_workers} affected · ${assessment.summary.unaffected_workers} cleared`
+              : "Not available"}
+          </dd>
+        </div>
+        <div>
+          <dt>Enterprise impacts</dt>
+          <dd>{assessment?.summary.enterprise_impacts ?? "Not available"}</dd>
+        </div>
+        <div>
+          <dt>Proposed actions</dt>
+          <dd>{assessment?.proposed_actions.length ?? "Not available"}</dd>
+        </div>
+        <div>
+          <dt>Workflow status</dt>
+          <dd>{humanize(run.status)}</dd>
+        </div>
+      </dl>
+    </section>
   );
 }

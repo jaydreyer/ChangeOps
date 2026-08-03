@@ -2,11 +2,20 @@
 
 ## Executive recommendation
 
-Build **three product slices** before AWS:
+Build **three product capabilities** before AWS:
 
-1. **Policy-version comparison**
-2. **Change-plan revision lineage**
-3. **Unified audit timeline**
+1. **Policy comparison**
+2. **Governed plan revision**
+3. **Unified audit**
+
+These capabilities will likely be implemented through **four vertical slices**:
+
+1. **Policy comparison foundation**
+2. **Enterprise impact delta**
+3. **Change-plan revision**
+4. **Audit timeline**
+
+The capability count and implementation-slice count are intentionally different. Policy comparison requires a trusted semantic-comparison foundation before enterprise impact delta can build on it.
 
 Treat a Jira-style execution action as **optional** and probably defer it until after the first AWS deployment.
 
@@ -263,7 +272,7 @@ This should be solved during AWS design, not preemptively with generic platform 
 
 # 3. Candidate ranking
 
-## 1. Policy-version comparison — Definitely build
+## 1. Policy comparison — Definitely build
 
 ### Product value: Very high
 
@@ -281,7 +290,7 @@ to:
 
 It demonstrates:
 
-- version lineage;
+- baseline/proposed lineage;
 - deterministic semantic diffing;
 - before-and-after impact calculation;
 - materiality classification;
@@ -476,7 +485,7 @@ A second action type alone is not sufficient justification.
 
 ## Required
 
-### A. Policy-version comparison
+### A. Policy comparison
 
 This should be the major differentiating feature.
 
@@ -542,11 +551,11 @@ Your original ordering was:
 5. audit or evaluation
 6. AWS
 
-I recommend:
+The three capabilities should be delivered through four likely vertical slices:
 
-1. **Comparison foundation**
-2. **Impact delta**
-3. **Plan revision**
+1. **Policy comparison foundation**
+2. **Enterprise impact delta**
+3. **Change-plan revision**
 4. **Audit timeline**
 5. **AWS architecture and Terraform**
 6. Optional Jira after deployment or immediately before AWS only if comparison proves the need
@@ -577,131 +586,49 @@ It also makes the AWS-deployed application much easier to demonstrate.
 
 ---
 
-# 7. Revised roadmap from current `main` through AWS
+# 7. Roadmap from current `main` through AWS
 
-## Phase 1 — Define policy lineage and deterministic rule comparison
+## Capability 1 — Policy comparison
 
-### PR 25 — Policy revision relationship and validated rule diff
+This capability is likely to require two vertical slices.
 
-Deliver:
+### Slice 1 — Policy comparison foundation
 
-- explicit baseline/current-policy relationship;
-- proposed-revision relationship;
-- deterministic rule comparator;
-- immutable comparison record;
-- added, removed, and modified rule changes;
-- dual policy provenance;
-- read API;
-- focused UI comparison view.
+Establish comparison between one baseline policy and one proposed revision using one immutable comparison aggregate. This slice intentionally does not introduce policy version numbering, current-version flags, supersession state, general revision management, or policy lifecycle administration.
 
-No impact delta yet.
+The first slice is governed by [`docs/milestone-5a-policy-comparison.md`](milestone-5a-policy-comparison.md). The roadmap intentionally does not repeat API design, table design, endpoint payloads, test lists, or other implementation details governed by that milestone.
 
-This is the smallest credible precursor slice.
+### Slice 2 — Enterprise impact delta
 
-## Phase 2 — Compute impact delta
+Extend the trusted policy comparison into before-and-after enterprise consequences. Deterministic code must continue to own the authoritative delta; AI may explain the completed, grounded delta but cannot alter it.
 
-### PR 26 — Comparison assessment and enterprise impact delta
+This is where the product becomes recognizably ChangeOps: it can explain not only what policy semantics changed, but what operational consequences changed because of them.
 
-Deliver:
+## Capability 2 — Governed plan revision
 
-- run deterministic assessment for each accepted ruleset;
-- compare immutable assessment outputs;
-- classify newly affected, no-longer-affected, and unchanged entities;
-- compare findings and enterprise impacts using semantic identity keys rather than database UUIDs;
-- expose reason and evidence for each delta;
-- add grounded AI interpretation of the deterministic delta only after the delta is complete.
+### Slice 3 — Change-plan revision
 
-This is where the product becomes recognizably ChangeOps.
+Close the existing `revision_requested` governance loop through immutable, human-directed plan revision with validated grounding and unambiguous approval lineage.
 
-## Phase 3 — Governed change-plan revision
+The product principle remains that humans provide revision intent and govern the result; they do not directly overwrite AI-generated historical artifacts. Detailed lifecycle and approval behavior belongs in the milestone that governs this slice.
 
-### PR 27 — Revision request and immutable plan versioning
+## Capability 3 — Unified audit
 
-Deliver:
+### Slice 4 — Audit timeline
 
-- immutable revision request;
-- structured revision intent;
-- plan-generation attempt linked to the prior plan;
-- new immutable change plan version;
-- grounding validation;
-- `supersedes` lineage;
-- read comparison between versions.
+Provide one ordered, product-facing projection over authoritative artifacts so reviewers can understand AI proposals, deterministic decisions, human actions, approvals, execution, and replay without learning the storage schema.
 
-### PR 28 — Effective plan selection and approval integration
+This remains a projection over authoritative records, not a move to event sourcing or a generic audit-event table.
 
-Deliver:
+## Optional execution validation
 
-- deterministic effective-plan selection;
-- approval-run creation tied to the selected plan lineage where appropriate;
-- prevent approval ambiguity when a newer revision exists;
-- UI controls for request revision, inspect versions, select effective plan, and continue to review.
+A Jira-style execution action remains conditional. Build it only if comparison produces a meaningful product need or reveals a real coupling defect in the current command abstraction.
 
-Do not rebuild action review unless revised plans materially change the deterministic proposed actions. The likely design is that change-plan revision changes interpretation and recommendations, while deterministic assessment actions remain separately governed.
+## AWS architecture and deployment
 
-That boundary must be confirmed during PR 27 design.
+After the four likely product slices, make the explicit AWS architecture decisions for hosting, PostgreSQL, authentication, secrets, migrations, observability, demo-data lifecycle, cost, and public safety. Terraform and deployment follow those decisions.
 
-## Phase 4 — Unified audit experience
-
-### PR 29 — Read-only audit timeline
-
-Deliver:
-
-- ordered artifact-backed timeline;
-- actor type: AI, deterministic system, human;
-- actor identity where applicable;
-- timestamp;
-- artifact type and identifier;
-- outcome;
-- links to existing journey or workbench details;
-- comparison and revision events included;
-- stable deterministic ordering.
-
-## Phase 5 — Optional execution validation
-
-### PR 30 — Jira-style create issue, only if justified
-
-This PR is conditional.
-
-Skip it if no meaningful product need emerges.
-
-If built, it must remain one operation:
-
-```text
-operational_remediation
-    → jira.create_issue
-```
-
-No adapter registry. No generic tool platform. No MCP yet.
-
-## Phase 6 — AWS architecture decision
-
-### Architecture PR
-
-Document and select:
-
-- hosting topology;
-- frontend/backend boundary;
-- PostgreSQL hosting;
-- authentication;
-- secrets;
-- migrations;
-- logs and traces;
-- demo-data lifecycle;
-- cost envelope;
-- public safety controls.
-
-This PR should contain ADRs and diagrams, not speculative infrastructure code.
-
-## Phase 7 — Terraform and deployment
-
-Likely deployment slices:
-
-1. foundational Terraform and network/database resources;
-2. API deployment and migrations;
-3. Next.js deployment and routing;
-4. authentication and trusted identity propagation;
-5. observability and deployment CI;
-6. public demo hardening and reviewer walkthrough.
+The local trusted-header boundary must be replaced for public deployment, but that remains AWS-phase work rather than pre-AWS product scope.
 
 ---
 
@@ -709,11 +636,11 @@ Likely deployment slices:
 
 ## Recommended next slice
 
-**Compare validated rules for a current policy and one proposed revision.**
+**Compare validated rules for one baseline policy and one proposed revision.**
 
 Do not start with complete impact-delta analysis.
 
-The current domain model needs a trustworthy policy-lineage and comparison aggregate first.
+The current domain model needs a trustworthy immutable comparison aggregate first.
 
 ## User-visible outcome
 
@@ -740,371 +667,7 @@ It also avoids embedding comparison logic inside UI code or AI prompts.
 
 ---
 
-# 9. Codex-ready implementation handoff
-
-## Title
-
-Implement deterministic policy-version comparison for validated international-travel rules
-
-## Goal
-
-Add the first vertical slice of policy-version comparison.
-
-A user must be able to compare one current international-travel policy with one proposed revision after each has an accepted validated extraction.
-
-The system must persist one immutable comparison artifact and expose a product-facing read view containing deterministic field-level semantic differences and provenance to both policy versions.
-
-Do not implement enterprise impact delta, plan revision, Jira, MCP, AWS, or Terraform in this PR.
-
-## Product behavior
-
-Given:
-
-- a baseline policy change;
-- a proposed revision;
-- one accepted extraction with resolved validated rules for each;
-
-the system must produce an immutable comparison that identifies:
-
-- added obligations;
-- removed obligations;
-- modified obligations;
-- unchanged obligations where useful for context;
-- operational materiality;
-- exact provenance to each policy source.
-
-Comparison must operate on validated typed rules, not raw text.
-
-The AI must not decide the semantic diff or materiality.
-
-## Supported scope
-
-Only support:
-
-```text
-policy_family = international_travel
-schema_version = 1
-```
-
-Both policies must:
-
-- belong to the same organization;
-- use the same supported policy family;
-- have accepted extraction attempts;
-- have fully resolved validated rules;
-- have no pending clarification;
-- be distinct policy records.
-
-Unsupported family or schema combinations must fail closed with stable error codes.
-
-## Data model
-
-Introduce a narrow immutable comparison aggregate.
-
-Suggested models:
-
-### `PolicyComparison`
-
-Fields:
-
-- `id`
-- `organization_id`
-- `baseline_policy_change_id`
-- `proposed_policy_change_id`
-- `baseline_extraction_attempt_id`
-- `proposed_extraction_attempt_id`
-- `schema_version`
-- `comparison_version`
-- `comparison_fingerprint`
-- `created_at`
-- `created_by`
-
-Constraints:
-
-- baseline and proposed policies must differ;
-- both policy records belong to the same organization;
-- extraction attempts belong to their referenced policy;
-- extraction attempts were accepted;
-- comparison rows are immutable;
-- unique semantic fingerprint prevents duplicate comparison artifacts.
-
-### `PolicyRuleDifference`
-
-Fields:
-
-- `id`
-- `policy_comparison_id`
-- `sequence`
-- `rule_key`
-- `change_type`
-- `materiality`
-- `baseline_value_json`
-- `proposed_value_json`
-- `baseline_provenance_json`
-- `proposed_provenance_json`
-- `reason_code`
-
-Closed values:
-
-```text
-change_type:
-- added
-- removed
-- modified
-- unchanged
-
-materiality:
-- operationally_material
-- non_material
-```
-
-Do not create generic arbitrary path expressions if explicit supported rule keys are clearer.
-
-## Domain design
-
-Create a pure domain comparator, independent from FastAPI and SQLAlchemy.
-
-Suggested input:
-
-```python
-@dataclass(frozen=True)
-class PolicyRuleVersion:
-    policy_change_id: str
-    extraction_attempt_id: UUID
-    rules: InternationalTravelPolicyRules
-    provenance: InternationalTravelRuleProvenance
-```
-
-Suggested output:
-
-```python
-@dataclass(frozen=True)
-class PolicyRuleDiff:
-    rule_key: InternationalTravelRuleKey
-    change_type: RuleChangeType
-    materiality: RuleMateriality
-    baseline_value: JsonValue | None
-    proposed_value: JsonValue | None
-    baseline_provenance: ProvenanceReference | None
-    proposed_provenance: ProvenanceReference | None
-    reason_code: str
-```
-
-Use an explicit comparator per supported semantic field.
-
-Do not perform a generic recursive JSON diff.
-
-## Rule identity
-
-Define an explicit closed set of comparable semantics, for example:
-
-- effective date;
-- covered worker countries;
-- covered employment types;
-- international-travel applicability;
-- required training course;
-- manager approval requirement;
-- nonrefundable booking restriction;
-- pre-effective-date booking exemption.
-
-The exact keys must match the current `InternationalTravelPolicyRules` model rather than inventing new policy concepts.
-
-## Materiality
-
-Materiality must be deterministic.
-
-Examples:
-
-- punctuation or source-span change with identical accepted semantic value: non-material;
-- changed effective date: operationally material;
-- changed employment-type coverage: operationally material;
-- changed course identifier after deterministic resolution: operationally material;
-- changed manager-approval requirement: operationally material;
-- changed exemption behavior: operationally material.
-
-Because the validated schema is semantic rather than textual, most accepted value changes will be material.
-
-Do not claim to distinguish all editorial wording changes. In this slice, raw-language differences with identical validated semantics should result in no material rule change.
-
-## Application service
-
-Create a synchronous service that:
-
-1. loads both policy records;
-2. verifies organization and family compatibility;
-3. loads the authoritative accepted extraction attempt for each;
-4. verifies no unresolved clarification blocks either ruleset;
-5. reconstructs the typed rule versions and provenance;
-6. executes the pure comparator;
-7. computes a canonical fingerprint;
-8. persists comparison and ordered differences in one transaction;
-9. reloads and returns the immutable aggregate.
-
-Repeated equivalent requests should return the existing comparison.
-
-## API
-
-Suggested endpoints:
-
-```http
-POST /api/v1/policy-comparisons
-GET /api/v1/policy-comparisons/{comparison_id}
-```
-
-Create request:
-
-```json
-{
-  "baseline_policy_change_id": "...",
-  "proposed_policy_change_id": "..."
-}
-```
-
-Do not accept rule values, extraction IDs, materiality, or actor assertions from the request body unless there is a clear product need.
-
-The backend should resolve authoritative accepted attempts.
-
-Stable errors should include:
-
-- `baseline_policy_not_ready`
-- `proposed_policy_not_ready`
-- `policy_comparison_family_mismatch`
-- `policy_comparison_organization_mismatch`
-- `policy_comparison_same_policy`
-- `policy_comparison_schema_unsupported`
-- `policy_comparison_lineage_inconsistent`
-
-## UI
-
-Add a focused comparison path to the policy-analysis entry or policy page.
-
-The first UI does not need policy search, arbitrary upload management, or a generic comparison dashboard.
-
-For seeded demo data, provide:
-
-- current policy card;
-- proposed revision card;
-- compare control;
-- summary counts;
-- ordered differences;
-- baseline and proposed values;
-- exact source excerpts;
-- materiality labels;
-- reason-code explanation.
-
-Do not combine impact delta into this UI yet.
-
-## Seed data
-
-Add one proposed revision of the existing international-travel policy.
-
-Choose changes that produce understandable semantic differences, such as:
-
-- an earlier effective date;
-- expanded contractor or geography coverage;
-- changed training requirement;
-- a modified booking or approval obligation.
-
-Keep the revision realistic and small enough that the reviewer can understand it quickly.
-
-Do not add another policy family.
-
-## Tests
-
-### Unit
-
-- identical rules produce no material differences;
-- each supported field change produces the correct diff;
-- change ordering is stable;
-- provenance stays attached to the correct version;
-- materiality is deterministic;
-- canonical fingerprints are stable;
-- source-span-only changes do not create semantic changes.
-
-### Integration
-
-- comparison persists atomically;
-- repeated creation is idempotent;
-- baseline and proposed records must differ;
-- cross-organization comparison is rejected;
-- unsupported schema is rejected;
-- nonaccepted extraction is rejected;
-- pending clarification is rejected;
-- historical comparison remains unchanged after source records change;
-- database immutability constraints reject update/delete where appropriate.
-
-### API
-
-- valid create returns `201` or existing resource according to current repository conventions;
-- retrieval returns stable ordering;
-- validation errors use stable codes;
-- request cannot inject authoritative comparison values.
-
-### Frontend
-
-- summary renders;
-- differences render in deterministic order;
-- provenance is visible;
-- material and unchanged states are not conflated;
-- error states are understandable.
-
-### Evaluation
-
-No LLM evaluation should be added for the deterministic comparator.
-
-Existing extraction evaluation fixtures should be extended only as needed to produce two accepted rulesets.
-
-## Documentation
-
-Update:
-
-- README
-- architecture
-- roadmap
-- decisions
-- demo scenario
-- new feature-expansion milestone document
-
-Add an ADR explaining:
-
-- typed semantic comparison rather than text diffing;
-- deterministic materiality;
-- immutable comparison aggregate;
-- impact delta intentionally deferred.
-
-## Explicit non-goals
-
-Do not implement:
-
-- enterprise impact delta;
-- AI-generated diff;
-- arbitrary document diffing;
-- generic JSON diff framework;
-- generic policy schema registry;
-- workflow graph for comparison;
-- change-plan revision;
-- second adapter;
-- MCP;
-- AWS;
-- Terraform;
-- event sourcing.
-
-## Acceptance criteria
-
-The slice is complete when a reviewer can:
-
-1. start from the two seeded policy versions;
-2. compare them;
-3. see deterministic semantic differences;
-4. inspect provenance to both policies;
-5. understand which differences are operationally material;
-6. repeat comparison without duplicate artifacts;
-7. verify historical comparison immutability;
-8. run all existing tests, evaluations, migration checks, frontend checks, and demo-reset behavior successfully.
-
----
-
-# 10. Conditions under which MCP becomes justified
+# 9. Conditions under which MCP becomes justified
 
 MCP becomes justified only when all of the following are true:
 
@@ -1135,37 +698,36 @@ Until that exists, the current explicit adapter interface is simpler and better.
 
 ---
 
-# 11. Estimated PR count before AWS
+# 10. Expected slices before AWS
 
-## Recommended minimum
+## Recommended product sequence
 
-Five PRs:
+Four likely vertical slices:
 
-1. comparison foundation;
-2. impact delta;
-3. plan revision foundation;
-4. effective-plan selection and approval integration;
-5. audit timeline.
+1. policy comparison foundation;
+2. enterprise impact delta;
+3. change-plan revision;
+4. audit timeline.
 
-Then begin AWS architecture work.
+Then begin AWS architecture work. A governing milestone may refine how a slice is packaged into pull requests without changing the roadmap's three-capability direction.
 
 ## With optional Jira
 
-Six PRs.
+One additional optional slice.
 
 ## With a small quality page
 
-Potentially six or seven, though I would fold the quality explanation into audit/documentation work rather than creating a standalone platform feature.
+Potentially one additional optional slice, though I would fold the quality explanation into audit/documentation work rather than creating a standalone platform feature.
 
 ## Expected total before the first Terraform implementation PR
 
-Approximately **6–7 PRs**, including one AWS architecture/ADR PR.
+Approximately **4 product slices** followed by one AWS architecture/ADR decision point. Pull-request count is an implementation-planning detail rather than a roadmap commitment.
 
 Do not target ten or more feature PRs before cloud work.
 
 ---
 
-# 12. Stop condition
+# 11. Stop condition
 
 The feature-expansion phase ends when all of these are true:
 

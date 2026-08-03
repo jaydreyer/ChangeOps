@@ -254,9 +254,22 @@ def test_pending_clarification_blocks_comparison(client) -> None:
         )
 
     response = _create_comparison(client)
+    entry = client.get("/api/v1/policy-analysis-entry")
 
     assert response.status_code == 409
-    assert response.json()["detail"]["code"] == "policy_comparison_lineage_inconsistent"
+    assert response.json()["detail"] == {
+        "code": "proposed_policy_not_ready",
+        "message": "The proposed policy has a pending clarification.",
+    }
+    assert entry.status_code == 200
+    proposed = next(
+        policy for policy in entry.json()["policies"] if policy["id"] == PROPOSED_POLICY_CHANGE_ID
+    )
+    assert proposed["comparison_readiness"] == {
+        "ready": False,
+        "status": "policy_not_ready",
+        "accepted_extraction_attempt_id": None,
+    }
 
 
 def test_cross_owned_extraction_attempt_is_rejected(client) -> None:

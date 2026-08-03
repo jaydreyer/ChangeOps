@@ -247,6 +247,11 @@ def _resolve_source(
             PolicyAnalysisClarification.status == "pending",
         )
     )
+    if pending is not None:
+        raise _not_ready(
+            side,
+            f"The {side} policy has a pending clarification.",
+        )
     if (
         run.organization_id != policy.organization_id
         or run.policy_change_id != policy.id
@@ -259,7 +264,6 @@ def _resolve_source(
         or attempt.validation_outcome != "accepted"
         or attempt.accepted_rules is None
         or attempt.candidate_rules is None
-        or pending is not None
     ):
         raise PolicyComparisonCreateError(
             "policy_comparison_lineage_inconsistent",

@@ -439,6 +439,18 @@ class PolicyComparisonDifference(Base):
             "material",
             name="ck_policy_comparison_differences_material",
         ),
+        CheckConstraint(
+            "(change_type = 'added' AND baseline_value IS NULL "
+            "AND proposed_value IS NOT NULL AND baseline_provenance IS NULL "
+            "AND proposed_provenance IS NOT NULL) "
+            "OR (change_type = 'removed' AND baseline_value IS NOT NULL "
+            "AND proposed_value IS NULL AND baseline_provenance IS NOT NULL "
+            "AND proposed_provenance IS NULL) "
+            "OR (change_type = 'modified' AND baseline_value IS NOT NULL "
+            "AND proposed_value IS NOT NULL AND baseline_provenance IS NOT NULL "
+            "AND proposed_provenance IS NOT NULL)",
+            name="ck_policy_comparison_differences_sides",
+        ),
         UniqueConstraint(
             "policy_comparison_id",
             "sequence",

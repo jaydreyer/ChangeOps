@@ -279,9 +279,16 @@ function Readiness({ policy }: { policy: PolicyAnalysisEntry["policies"][number]
     <small className={policy.comparison_readiness.ready ? "ready" : "not-ready"}>
       {policy.comparison_readiness.ready
         ? "Ready · accepted extraction validated"
-        : `Not ready · ${humanize(policy.comparison_readiness.status)}`}
+        : `Not ready · ${readinessLabel(policy.comparison_readiness.status)}`}
     </small>
   );
+}
+
+function readinessLabel(status: string) {
+  if (status === "policy_not_ready") {
+    return "analysis incomplete or clarification pending";
+  }
+  return humanize(status);
 }
 
 function humanize(value: string) {

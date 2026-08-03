@@ -112,4 +112,29 @@ describe("policy analysis entry", () => {
     );
     expect(push).toHaveBeenCalledWith("/policy-comparisons/comparison-1");
   });
+
+  it("presents pending clarification as policy readiness, not lineage integrity", () => {
+    const notReadyEntry = {
+      ...entry,
+      policies: entry.policies.map((policy) =>
+        policy.id === "policy-proposed"
+          ? {
+              ...policy,
+              comparison_readiness: {
+                ready: false,
+                status: "policy_not_ready",
+                accepted_extraction_attempt_id: null,
+              },
+            }
+          : policy,
+      ),
+    };
+
+    render(<PolicyAnalysisEntryView entry={notReadyEntry} />);
+
+    expect(
+      screen.getByText("Not ready · analysis incomplete or clarification pending"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Compare accepted rules" })).toBeDisabled();
+  });
 });

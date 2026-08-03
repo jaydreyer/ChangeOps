@@ -106,6 +106,37 @@ function workbench(status: "pending" | "approved" = "pending"): Workbench {
   };
 }
 
+function workbenchWithCompletedFirstItem(): Workbench {
+  const pending = workbench();
+  const completed = workbench("approved").items[0];
+  const nextPending = {
+    ...pending.items[0],
+    sequence: 1,
+    review: {
+      ...pending.items[0].review,
+      id: "review-2",
+      original_action: {
+        ...pending.items[0].review.original_action,
+        proposed_action_id: "action-2",
+        description: "Assign the next required training.",
+      },
+    },
+  };
+  return {
+    ...pending,
+    run: {
+      ...pending.run,
+      summary: {
+        ...pending.run.summary,
+        total: 2,
+        pending: 1,
+        approved: 1,
+      },
+    },
+    items: [completed, nextPending],
+  };
+}
+
 function preparation(
   prepared = false,
   executed = false,
@@ -216,19 +247,50 @@ describe("approval workbench", () => {
     refresh.mockReset();
   });
 
-  it("renders authoritative counts, provenance, a pending form, and execution notice", () => {
+  it("renders authoritative counts, provenance, guided review sections, and approval boundary", () => {
     render(<WorkbenchView initialWorkbench={workbench()} />);
 
-    expect(screen.getByText("Human Approval Workbench")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Review proposed actions" })).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "You are reviewing 1 proposed action. Approval records a decision; it does not execute the action.",
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByText("Pending", { selector: "dt" }).nextElementSibling).toHaveTextContent("1");
     expect(screen.getByText("AI proposal")).toBeInTheDocument();
     expect(screen.getAllByText("Deterministic conclusion").length).toBeGreaterThan(0);
     expect(screen.getByText("Policy source")).toBeInTheDocument();
-    expect(screen.getByText("Human decision")).toBeInTheDocument();
+    expect(screen.getAllByText("Human decision").length).toBeGreaterThan(0);
+    expect(screen.getByRole("heading", { name: "What is being proposed?" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Why is it being proposed?" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "What evidence supports it?" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Record your decision" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Record terminal decision" })).toBeInTheDocument();
+    expect(screen.getByText("View persisted evidence").closest("details")).not.toHaveAttribute(
+      "open",
+    );
+  });
+
+  it("keeps the first pending item open and preserves guided section order", () => {
+    const { container } = render(
+      <WorkbenchView initialWorkbench={workbenchWithCompletedFirstItem()} />,
+    );
+
+    const cards = container.querySelectorAll("details.review-card");
+    expect(cards).toHaveLength(2);
+    expect(cards[0]).not.toHaveAttribute("open");
+    expect(cards[1]).toHaveAttribute("open");
+
+    const currentCard = within(cards[1] as HTMLElement);
+    const proposed = currentCard.getByRole("heading", { name: "What is being proposed?" });
+    const why = currentCard.getByRole("heading", { name: "Why is it being proposed?" });
+    const evidence = currentCard.getByRole("heading", { name: "What evidence supports it?" });
+    const decision = currentCard.getByRole("heading", { name: "Record your decision" });
+    expect(proposed.compareDocumentPosition(why) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(why.compareDocumentPosition(evidence) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(
-      screen.getByText("Approval records a human decision. It does not execute the action."),
-    ).toBeInTheDocument();
+      evidence.compareDocumentPosition(decision) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("requires rationale before submitting", async () => {
@@ -288,7 +350,7 @@ describe("approval workbench", () => {
   it("renders a terminal decision, edited comparison, and unexecuted completion state", () => {
     render(<WorkbenchView initialWorkbench={workbench("approved")} />);
 
-    const summary = screen.getByText("Persisted human decision").closest("section");
+    const summary = screen.getByText("Recorded decision").closest("section");
     expect(summary).not.toBeNull();
     expect(within(summary!).getByText("Training is required.")).toBeInTheDocument();
     expect(within(summary!).getByText("Assign revised training.")).toBeInTheDocument();
@@ -334,11 +396,31 @@ describe("approval workbench", () => {
         initialPreparation={preparation()}
       />,
     );
-    expect(screen.getByText("Execution Preparation")).toBeInTheDocument();
+    expect(screen.getByText("Carry out approved actions")).toBeInTheDocument();
     expect(screen.getByText("Preparable").nextElementSibling).toHaveTextContent("1");
     expect(screen.getByText("Unsupported approved actions")).toBeInTheDocument();
     expect(screen.getByText("Review team travel")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Execute/ })).not.toBeInTheDocument();
+  });
+
+  it("places execution after completed approval reviews and shows authoritative stage fields", () => {
+    render(
+      <WorkbenchView
+        initialWorkbench={workbench("approved")}
+        initialPreparation={preparation()}
+      />,
+    );
+
+    const reviews = screen.getByRole("heading", { name: "Review each proposed action" });
+    const execution = screen.getByRole("heading", { name: "Carry out approved actions" });
+    expect(
+      reviews.compareDocumentPosition(execution) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(screen.getByText("Authorization").nextElementSibling).toHaveTextContent("Completed");
+    expect(screen.getByText("Commands").nextElementSibling).toHaveTextContent("Not prepared");
+    expect(screen.getByText("Execution request").nextElementSibling).toHaveTextContent(
+      "Not requested",
+    );
   });
 
   it("prepares commands and refreshes authoritative state", async () => {
@@ -374,15 +456,21 @@ describe("approval workbench", () => {
       />,
     );
 
-    expect(screen.getByText("Immutable prepared commands")).toBeInTheDocument();
-    expect(screen.getByText("Learning · Assign training")).toBeInTheDocument();
-    expect(screen.getByText("Assign revised training.", { selector: ".command-card p" })).toBeInTheDocument();
-    expect(screen.getByText(/abcdef012345…/)).toBeInTheDocument();
+    expect(
+      screen.getByText("Authorized operations awaiting an explicit request"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Assign revised training.", { selector: ".command-card strong" })).toBeInTheDocument();
+    expect(screen.getByText("abcdef0123456789abcdef0123456789").closest("details")).not.toHaveAttribute(
+      "open",
+    );
     expect(screen.getByText("Pending execution", { selector: "span" })).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Execute training assignment" }),
     ).toBeInTheDocument();
     expect(screen.getByText("international-travel-security")).toBeInTheDocument();
+    expect(screen.getByText("View command contract and lineage").closest("details")).not.toHaveAttribute(
+      "open",
+    );
     const unsupported = screen
       .getByText("Unsupported approved actions")
       .closest(".unsupported-list");
@@ -440,6 +528,47 @@ describe("approval workbench", () => {
     expect(screen.getAllByText(/assignment-1/)).toHaveLength(2);
     expect(
       screen.getByText(/already created the simulated training assignment/),
+    ).toBeInTheDocument();
+    for (const disclosure of screen.getAllByText("View result audit details")) {
+      expect(disclosure.closest("details")).not.toHaveAttribute("open");
+    }
+  });
+
+  it("renders an authoritative failed execution state without changing the execution control", () => {
+    const failed = preparation(true);
+    failed.execution_performed = true;
+    failed.commands[0] = {
+      ...failed.commands[0],
+      execution_state: "execution_failed",
+      execution_performed: true,
+      execution_results: [
+        {
+          id: "result-failed",
+          execution_command_id: "command-1",
+          status: "failed_validation",
+          outcome_code: "invalid_execution_command_payload",
+          message: "The assign-training command payload is malformed.",
+          command_idempotency_key: "abcdef0123456789abcdef0123456789",
+          attempted_by: "operator@example.com",
+          attempted_role: "admin",
+          created_at: "2026-08-02T12:05:00Z",
+          learning_assignment: null,
+        },
+      ],
+    };
+
+    render(
+      <WorkbenchView
+        initialWorkbench={workbench("approved")}
+        initialPreparation={failed}
+      />,
+    );
+
+    expect(screen.getByText("Execution failed", { selector: ".badge" })).toBeInTheDocument();
+    expect(screen.getByText("Failed validation")).toBeInTheDocument();
+    expect(screen.getByText("The assign-training command payload is malformed.")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Execute training assignment" }),
     ).toBeInTheDocument();
   });
 

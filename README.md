@@ -199,6 +199,13 @@ replay gets its own immutable `already_applied` result referencing the original 
 The workbench shows the worker, course, approval lineage, execution control, assignment, and audit
 history. Proposed actions and approval history remain unchanged.
 
+The guided approval view leads with the persisted review count, current approval state, and the
+explicit boundary that a decision does not execute an action. Each item presents its proposal,
+persisted deterministic explanation, evidence, and human decision separately; evidence, reason
+codes, identifiers, and lineage remain available in disclosures. After approval completes,
+execution appears as a distinct section that renders authoritative preparation, command, result,
+unsupported-action, and replay fields without deriving eligibility or transitions in the frontend.
+
 ## Deterministic policy comparison
 
 `POST /api/v1/policy-comparisons` accepts only baseline and proposed policy identifiers; reviewer

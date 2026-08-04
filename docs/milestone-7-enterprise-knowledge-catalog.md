@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed for review. Do not implement until this milestone is reviewed and approved.
+Approved for implementation after this planning revision merges.
 
 This document is based on repository `main` at commit `14cfb5d` and on the implementation,
 migrations, seed/reset behavior, tests, and product-facing read models at that commit. The
@@ -19,28 +19,32 @@ The first vertical slice explains the persisted enterprise context that the dete
 assessment already consumes. It does not create a second catalog system of record and does not
 change assessment behavior.
 
-The approved sequencing direction is:
+The approved delivery sequence is:
 
-1. **PR A — projection-first explorer:** expose the current catalog records and typed
-   relationships with honest missing-metadata states and no migration.
-2. **Next planned slice — bounded read-only Confluence integration:** give selected enterprise
-   documents real external identities and links after PR A validates the projection and reviewer
-   experience.
-3. **Later conditional provenance completion:** add only row-level object metadata and
-   relationship provenance that the validated explorer and Confluence slice demonstrate is still
-   necessary.
+1. **PR A — read-only explorer over existing typed tables:** prioritize documents, systems,
+   training courses, and policy dependencies, with honest missing-metadata states and no
+   migration.
+2. **PR B — narrow external document identity and read-only Confluence metadata:** persist and
+   display selected page identities, imported metadata, and external links without changing
+   relationships or assessment behavior.
+3. **PR C — relationship-origin provenance:** add only the narrowly required provenance for
+   existing typed relationships after the PR A and PR B reviewer experiences show what is still
+   missing.
 
-PR A is the Codex-ready first vertical slice in this document. The Confluence slice is separately
-bounded and must remain read-only. Any later provenance migration must not become a generalized
+PR A is the Codex-ready first vertical slice in this document. PR B is a named planned slice, not
+merely a deferred possibility. PR C must remain distinct from PR B: external document identity and
+relationship governance solve different product problems and must not be combined into a vague
+provenance-completion feature. None of the three PRs may introduce a generalized
 `catalog_objects` abstraction.
 
 ## Reviewer outcome
 
 After PR A, a reviewer can:
 
-- browse the existing documents, systems, training courses, workers, teams, and customer
-  commitments by category;
+- browse the existing documents, systems, and training courses by category;
 - open a persisted enterprise object using its existing stable identity;
+- see compact counts for workers, teams, and customer commitments as assessment context without
+  treating each as an equal catalog-detail destination;
 - distinguish stored fields, normalized display values, catalog-level demo context, and metadata
   that is not recorded;
 - inspect the typed relationships connected to the object;
@@ -122,6 +126,37 @@ These are true persisted source/catalog records for the current bounded product.
 is catalog-adjacent: it provides policy and rule context for dependencies, but the first browse
 experience should keep the main categories focused on the enterprise object types named in the
 product objective.
+
+### PR A experience prioritization
+
+Repository evidence does not justify equal full-detail experiences for every source type.
+
+PR A should provide full browse and detail experiences for:
+
+- enterprise documents;
+- enterprise systems;
+- training courses.
+
+It should make policy-system, policy-document, and policy-training dependencies first-class within
+those details and through policy-scoped rule-reference pages.
+
+Workers, teams, and customer commitments remain real authoritative assessment inputs, but full
+catalog-detail pages for them are deferred because:
+
+- the policy-analysis journey already explains their affected and cleared outcomes;
+- their current tables lack the owner, source-system, and lifecycle metadata expected of a useful
+  catalog detail;
+- worker and team relationships describe organizational assessment context more than enterprise
+  knowledge-source authority;
+- worker detail would expand the explorer toward personnel browsing without advancing the
+  flagship document-source and trusted-dependency story;
+- customer commitments are important downstream obligations, but PR A needs only to prove that
+  ChangeOps knows they exist, not reproduce their assessment experience.
+
+PR A should expose compact assessment-context counts for workers, teams, and customer commitments
+on the browse page. It may show stable names in a collapsed context summary if that improves
+comprehension, but it must not add dedicated detail routes, relationship graphs, or duplicate the
+existing impact journey for those types.
 
 ### Operational source facts
 
@@ -421,20 +456,17 @@ A migration is genuinely required only if the approved acceptance criteria deman
 The exact desired flagship value `Owner: Travel Operations` cannot be produced honestly from the
 current database.
 
-PR A should not trigger an immediate provenance migration. After PR A validates the catalog
-projection and reviewer experience, the next planned slice is the bounded read-only Confluence
-integration described below. A later provenance slice, if still necessary, should use narrow
-additions to the existing typed tables. The leading candidate is:
+PR A should not trigger an immediate relationship-provenance migration.
 
-- nullable `description` and `owner` on `enterprise_documents`;
-- explicit provenance columns on each of
-  `policy_system_dependencies`, `policy_document_dependencies`, and
-  `policy_training_dependencies`.
+PR B owns the narrow schema needed for external document identity and imported read-only
+Confluence metadata. It must not add relationship-governance fields merely because both concerns
+use the word provenance.
 
-The later provenance design must be reviewed against the actual PR A and Confluence screens before
-migration. It should duplicate a small closed provenance contract across the three typed
-dependency tables when necessary rather than replacing their real target foreign keys with a
-polymorphic abstraction.
+PR C, if narrowly required after PR A and PR B, owns relationship-origin provenance on the
+existing typed dependency tables. It should duplicate a small closed provenance contract across
+`policy_system_dependencies`, `policy_document_dependencies`, and
+`policy_training_dependencies` when necessary rather than replacing their real target foreign
+keys with a polymorphic abstraction.
 
 Do not add placeholder fields claiming `human_approved_ai` provenance without an immutable proposal
 and human decision aggregate. That category remains unrepresentable until the later proposal
@@ -459,16 +491,16 @@ PR A exposes two read resources:
 2. policy rule references — policy-scoped references resolved from persisted dependency rule
    codes, not standalone stored rules.
 
-Supported catalog object types:
+Supported full-detail catalog object types:
 
 ```text
 enterprise_document
 enterprise_system
 training_course
-worker
-team
-customer_commitment
 ```
+
+Workers, teams, and customer commitments are returned only in a compact
+`assessment_context_counts` projection. They are not valid PR A detail-route object types.
 
 Category-specific status projection is deliberately small:
 
@@ -477,9 +509,6 @@ Category-specific status projection is deliberately small:
 | Enterprise document | stored `published`, `draft`, or `archived` |
 | Enterprise system | normalized `active` or `inactive` from stored `active` boolean |
 | Training course | normalized `active` or `inactive` from stored `active` boolean |
-| Customer commitment | stored `active`, `completed`, or `cancelled` |
-| Worker | `not_recorded` |
-| Team | `not_recorded` |
 
 Normalized values must include `basis = normalized`; stored values use `basis = stored`; absent
 values use `basis = not_recorded`. Normalization is display behavior only.
@@ -491,14 +520,11 @@ Relationship projection is also closed:
 | Enterprise document | inverse policy-document dependencies |
 | Enterprise system | inverse policy-system dependencies |
 | Training course | inverse policy-training dependencies and related completion records only as counts, not browsable objects |
-| Worker | manager, direct reports, team membership, commitment assignments, and course-completion references |
-| Team | manager and worker memberships |
-| Customer commitment | worker assignments |
 
-Typed dependency and join-table relationships retain their persisted row ID. Direct foreign-key
-relationships such as `workers.manager_worker_id` and `teams.manager_worker_id` use a clearly
-marked projected relationship key based on the owning row and column; the API must not label that
-key as a stored relationship-row ID.
+Typed policy-dependency relationships retain their persisted row ID. PR A does not project
+worker-manager, team-membership, or commitment-assignment relationships into full catalog detail.
+Those relationships remain authoritative assessment inputs and continue to appear in assessment
+evidence and paths where applicable.
 
 ### Endpoints
 
@@ -522,7 +548,7 @@ Query parameters:
 | Name | Type | Required | Meaning | Example |
 | --- | --- | --- | --- | --- |
 | `organization_id` | string | yes | existing organization stable ID | `org-acme-global-manufacturing` |
-| `object_type` | closed string | no | category filter; absent returns all supported types | `enterprise_document` |
+| `object_type` | closed string | no | primary category filter; absent returns all three full-detail types | `enterprise_document` |
 
 Sorting is deterministic by object type order and existing stable object ID. PR A does not add
 pagination because the endpoint is deliberately bounded to the small demonstration catalog. It
@@ -541,10 +567,12 @@ Representative response:
     "label": "Seeded demonstration catalog",
     "record_level_origin": "not_recorded"
   },
-  "counts": {
+  "catalog_counts": {
     "enterprise_document": 4,
     "enterprise_system": 3,
-    "training_course": 1,
+    "training_course": 1
+  },
+  "assessment_context_counts": {
     "worker": 12,
     "team": 4,
     "customer_commitment": 2
@@ -584,6 +612,10 @@ Stable errors:
 
 Purpose: resolve one existing source record, its category-specific metadata, and its current typed
 relationships.
+
+PR A detail resolution supports only `enterprise_document`, `enterprise_system`, and
+`training_course`. Requests for workers, teams, or customer commitments return
+`422 unsupported_catalog_object_type`; those types remain assessment context in this slice.
 
 The service must verify that the record exists and return its stored `organization_id`. An optional
 `organization_id` query constraint may be accepted only if it rejects cross-organization records
@@ -762,10 +794,12 @@ The browse page should:
 
 - lead with the question `What enterprise knowledge does ChangeOps use?`;
 - state that the current catalog is fictional seeded demonstration data;
-- show category counts;
+- show primary catalog counts separately from compact assessment-context counts;
 - allow category selection with ordinary links or buttons;
 - show compact cards or rows with name, stable identity, available metadata, status, and
   relationship count;
+- show workers, teams, and customer commitments in a secondary assessment-context summary without
+  detail links;
 - label missing values `Not recorded`;
 - avoid search boxes, facets, pagination controls, and admin affordances.
 
@@ -774,9 +808,9 @@ Recommended category order:
 1. Documents
 2. Systems
 3. Training
-4. People
-5. Teams
-6. Customer commitments
+
+Workers, teams, and customer commitments belong in a visually secondary `Assessment context`
+section after those categories.
 
 ### Object detail page
 
@@ -788,6 +822,8 @@ The detail page should use the current calm reviewer hierarchy:
 4. trusted relationships with business explanation;
 5. `How ChangeOps uses this` explanation;
 6. technical identity and database-integrity detail in native `<details>` disclosure.
+
+Only documents, systems, and training courses receive this full detail experience in PR A.
 
 For the Manager Travel Approval Guide, business-visible content should include:
 
@@ -863,11 +899,11 @@ Do not use `trusted` as a synonym for `human approved`. In the current model, th
 trusted input because it is present in the typed source table and the analyzer consumes every
 applicable row.
 
-### Later provenance-slice representation
+### PR C relationship-origin representation
 
-If approved after the catalog and Confluence experiences are understood, the provenance slice
-should make current seeded and future human-curated/imported relationship origin explicit without
-weakening typed foreign keys.
+After PR A and PR B are understood, PR C should make current seeded and future
+human-curated/imported relationship origin explicit only where required, without weakening typed
+foreign keys.
 
 Minimum information under review:
 
@@ -884,8 +920,8 @@ The closed product categories are:
 - human-curated mapping;
 - human-approved AI proposal.
 
-Only categories supported by real persisted lineage may be returned. The provenance slice may
-implement seeded, imported, and human-curated metadata. `human-approved AI proposal` must remain
+Only categories supported by real persisted lineage may be returned. PR C may implement seeded,
+imported, and human-curated relationship-origin metadata. `human-approved AI proposal` must remain
 unavailable until a later proposal-and-decision aggregate exists.
 
 ## Seed and reset implications
@@ -916,14 +952,24 @@ The existing demo reset:
 Catalog pages should therefore render the same source records before and after reset. PR A tests
 must prove this explicitly.
 
-### Later provenance slice
+### PR B
 
-If approved:
+PR B should:
 
-- seed explicit document owner/description values rather than deriving them in the serializer;
-- seed relationship provenance only for rows the seed actually owns;
+- preserve stable seeded document IDs while adding or associating selected external Confluence
+  page identities;
+- keep fixture-backed import metadata deterministic in automated tests;
+- make explicit/manual imports idempotent;
+- preserve imported document metadata during ordinary workflow reset;
+- keep seed-only fallback metadata honest when Confluence is not configured.
+
+### PR C
+
+PR C should:
+
+- seed relationship-origin provenance only for rows the seed actually owns;
 - keep source-specific baseline/proposed relationship IDs;
-- make seed reruns idempotently refresh the same metadata;
+- make seed reruns idempotently refresh the same relationship provenance;
 - preserve provenance-bearing source rows during demo reset;
 - do not copy provenance into workflow tables merely for the catalog UI.
 
@@ -949,8 +995,10 @@ Cover:
 Cover:
 
 - exact seeded category counts;
+- separate primary catalog counts from worker, team, and commitment assessment-context counts;
 - list filtering by organization and type;
-- detail reads for every supported type;
+- detail reads for documents, systems, and training courses;
+- rejection of worker, team, and commitment detail requests;
 - flagship Manager Travel Approval Guide response;
 - both manager-guide dependency rows;
 - exact relationship IDs, rule code, type, classification, and explanation;
@@ -982,7 +1030,8 @@ Cover:
 Cover:
 
 - landing-page catalog entry point;
-- category counts and category selection;
+- primary category counts and category selection;
+- secondary worker, team, and commitment context counts without detail links;
 - seeded-demonstration context remains visible;
 - missing owner renders `Not recorded`;
 - document stored source system and status render correctly;
@@ -1036,7 +1085,7 @@ Milestone 7 PR A does not include:
 - a `catalog_objects` persistence abstraction;
 - a polymorphic relationship table;
 - metadata-schema builders;
-- background synchronization, workers, queues, or webhooks;
+- background or continuous synchronization, workers, queues, or webhooks;
 - MCP;
 - additional policy families;
 - catalog state versioning or catalog-state comparison;
@@ -1044,7 +1093,7 @@ Milestone 7 PR A does not include:
 - changes to analyzer input, rules, classifications, evidence, paths, actions, fingerprints, or
   comparison behavior.
 
-## What remains deferred to the Confluence slice
+## Planned PR B — External document identity and read-only Confluence metadata
 
 After PR A validates the catalog projection and reviewer experience, the next planned slice is a
 bounded read-only Confluence integration for selected enterprise documents.
@@ -1054,7 +1103,7 @@ insufficient reviewer, product, or architecture value. Missing metadata by itsel
 to broaden Confluence scope, and the Confluence slice must still receive its own reviewed
 implementation boundary before coding.
 
-The Confluence slice owns:
+PR B owns:
 
 - real Confluence page ID;
 - space key or ID;
@@ -1064,7 +1113,7 @@ The Confluence slice owns:
 - last-updated timestamp;
 - source fingerprint;
 - optional bounded excerpt or summary if separately justified;
-- explicit/manual read-only refresh;
+- explicit/manual metadata import or refresh into PostgreSQL using read-only Confluence access;
 - fixture-backed adapter tests;
 - external link from ChangeOps to the actual page.
 
@@ -1072,20 +1121,23 @@ It must replace or enrich selected seeded document source metadata. It must not 
 identity, invent relationships, or make Confluence authoritative for assessments before imported
 metadata is persisted in PostgreSQL.
 
-Still deferred after that slice:
+PR B must not add relationship-origin categories, relationship approval state, relationship
+editing, or AI relationship proposals. Existing typed dependency rows remain unchanged.
+
+PR B preserves these explicit non-goals:
 
 - broad crawling;
 - RAG and embeddings;
-- content-based automatic relationship creation;
+- automatic relationship creation;
 - Confluence editing/publishing;
-- webhooks and continuous sync;
+- webhooks and continuous synchronization;
 - arbitrary spaces or page inventories.
 
 ## Delivery recommendation
 
 ### PR A — Read-only catalog explorer
 
-Recommended and Codex-ready after milestone approval.
+Approved and Codex-ready after this planning PR merges.
 
 Scope:
 
@@ -1108,35 +1160,38 @@ Review gate:
 > Does the projection make the current enterprise-impact logic understandable while remaining
 > honest about missing row provenance and owner metadata?
 
-### Next planned slice — Bounded read-only Confluence integration
+### PR B — Narrow external document identity and read-only Confluence metadata
 
 Proceed after PR A review unless PR A demonstrates that real external document identity adds
 insufficient value.
 
 Scope remains limited to selected enterprise documents and the fields listed in
-`What remains deferred to the Confluence slice`. It is not part of PR A and requires its own
+`Planned PR B — external document identity and read-only Confluence metadata`. It requires its own
 implementation plan and review.
 
-### Later conditional slice — Narrow metadata and relationship provenance
+### PR C — Narrow relationship-origin provenance
 
 Recommended only if the validated PR A and Confluence experiences show that missing persisted
-object or relationship provenance still materially blocks the reviewer story.
+relationship origin still materially blocks the reviewer story.
 
 Likely scope:
 
-- narrow document owner/description additions;
 - narrow provenance additions to the three typed policy dependency tables;
 - canonical seed values;
 - read-projection enrichment;
 - migration round-trip, constraint, idempotency, reset, API, and UI tests;
 - a new ADR for the accepted provenance persistence decision.
 
-The provenance slice must receive a concrete schema review before coding. It must not add AI
-proposals, unrelated external imports, or a generic catalog layer.
+PR C must receive a concrete schema review before coding. It must not add AI proposals, Confluence
+import behavior, external document identity changes, unrelated external imports, or a generic
+catalog layer.
 
 ## Acceptance criteria for PR A
 
-- [ ] A reviewer can browse all six supported catalog categories.
+- [ ] A reviewer can browse documents, systems, and training courses as the three primary catalog
+      categories.
+- [ ] Workers, teams, and customer commitments are visible as compact assessment-context counts
+      without dedicated detail routes.
 - [ ] Existing stable object identities are visible and reused.
 - [ ] Stored names, descriptions, source systems, and statuses are shown where they exist.
 - [ ] Missing owner, description, source, status, and row-provenance values are labeled
@@ -1166,9 +1221,14 @@ proposals, unrelated external imports, or a generic catalog layer.
 PR A proves the model and traversal. The complete objective is met when a reviewer can also see
 persisted, honest row-level metadata for the required claims.
 
-Before declaring the entire enterprise-knowledge foundation complete, review PR A, then complete
-or explicitly stop the bounded Confluence slice under its decision gate. After that, decide
-whether a narrow provenance migration is necessary to satisfy:
+Before declaring the entire enterprise-knowledge foundation complete:
+
+1. review PR A;
+2. complete PR B, unless PR A demonstrates that real external document identity adds insufficient
+   value;
+3. decide and implement only the narrowly necessary PR C relationship-origin fields.
+
+PR C should address only requirements that remain unsatisfied, such as:
 
 - persisted Manager guide owner;
 - persisted relationship source category;
@@ -1214,7 +1274,7 @@ generic persistence, and the explicit non-goals above.
 ### Task
 
 Implement the read-only Enterprise Knowledge Catalog Explorer exactly within PR A scope after this
-milestone is approved.
+planning PR merges.
 
 ### Required inspection before editing
 
@@ -1232,7 +1292,8 @@ Re-read:
 ### Backend work
 
 1. Add a closed catalog schema module.
-2. Add a read-only projection service with explicit queries for each supported type.
+2. Add a read-only projection service with explicit detail queries for documents, systems, and
+   training courses plus compact worker, team, and commitment counts.
 3. Add a small closed policy rule-reference mapping for current rule codes.
 4. Resolve typed relationships in both directions for object detail.
 5. Keep baseline and proposed policy dependency rows distinct.
@@ -1252,17 +1313,19 @@ Re-read:
 4. Add `/catalog/[objectType]/[objectId]`.
 5. Add `/catalog/policy-rules/[policyChangeId]/[ruleCode]`.
 6. Add one secondary landing-page link into the catalog.
-7. Reuse current visual and progressive-disclosure patterns.
-8. Render `Not recorded` for null metadata.
-9. Keep technical IDs and integrity detail collapsed by default.
-10. Add stable loading/unavailable/error states.
-11. Add no edit, search, refresh, import, AI, relationship, or approval controls.
+7. Do not create worker, team, or customer-commitment detail pages in PR A.
+8. Reuse current visual and progressive-disclosure patterns.
+9. Render `Not recorded` for null metadata.
+10. Keep technical IDs and integrity detail collapsed by default.
+11. Add stable loading/unavailable/error states.
+12. Add no edit, search, refresh, import, AI, relationship, or approval controls.
 
 ### Required proof
 
 Automated proof must show:
 
-- exact category counts;
+- exact document, system, and training-course catalog counts;
+- exact worker, team, and commitment assessment-context counts without detail routes;
 - exact Manager guide metadata;
 - both Manager guide dependency rows;
 - the baseline `MANAGER_APPROVAL_REQUIRED` rule reference;
@@ -1297,14 +1360,12 @@ Stop and request review if implementation appears to require:
 - relationship writes or AI proposals;
 - search, crawling, RAG, embeddings, background work, or MCP.
 
-## Approval request
+## Approval record
 
-Approve or revise this milestone before product code begins.
+The repository analysis and projection-first architecture are approved.
 
-The specific decision requested is:
+The approved implementation sequence is:
 
-> Approve PR A as a no-migration read projection with explicit `Not recorded` provenance and owner
-> states. After PR A validates the projection and reviewer experience, proceed to the bounded
-> read-only Confluence slice unless PR A demonstrates that real external document identity adds
-> insufficient value. Evaluate any narrow provenance migration only after those experiences are
-> understood.
+1. PR A — read-only explorer over existing typed tables, with no migration;
+2. PR B — narrow external document identity plus read-only Confluence metadata import and links;
+3. PR C — relationship-origin provenance, only as narrowly required.

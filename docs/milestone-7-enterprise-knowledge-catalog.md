@@ -19,14 +19,19 @@ The first vertical slice explains the persisted enterprise context that the dete
 assessment already consumes. It does not create a second catalog system of record and does not
 change assessment behavior.
 
-The preferred delivery shape is:
+The approved sequencing direction is:
 
 1. **PR A — projection-first explorer:** expose the current catalog records and typed
    relationships with honest missing-metadata states and no migration.
-2. **PR B — narrow provenance completion, only after PR A review:** add only the row-level object
-   metadata and relationship provenance that the existing schema demonstrably cannot express.
+2. **Next planned slice — bounded read-only Confluence integration:** give selected enterprise
+   documents real external identities and links after PR A validates the projection and reviewer
+   experience.
+3. **Later conditional provenance completion:** add only row-level object metadata and
+   relationship provenance that the validated explorer and Confluence slice demonstrate is still
+   necessary.
 
-PR A is the Codex-ready first vertical slice in this document. PR B must not become a generalized
+PR A is the Codex-ready first vertical slice in this document. The Confluence slice is separately
+bounded and must remain read-only. Any later provenance migration must not become a generalized
 `catalog_objects` abstraction.
 
 ## Reviewer outcome
@@ -93,8 +98,8 @@ Used deterministically during impact assessment
 ```
 
 The current schema cannot honestly display `Owner: Travel Operations` or row-level relationship
-origin. Those values belong in a separately reviewed PR B migration, not in hard-coded serializer
-logic.
+origin. Those values belong in a separately reviewed later provenance migration, not in hard-coded
+serializer logic.
 
 ## Current catalog and domain model
 
@@ -416,17 +421,20 @@ A migration is genuinely required only if the approved acceptance criteria deman
 The exact desired flagship value `Owner: Travel Operations` cannot be produced honestly from the
 current database.
 
-If PR A proves the explorer and Gate A approves enrichment, PR B should use narrow additions to
-the existing typed tables. The leading candidate is:
+PR A should not trigger an immediate provenance migration. After PR A validates the catalog
+projection and reviewer experience, the next planned slice is the bounded read-only Confluence
+integration described below. A later provenance slice, if still necessary, should use narrow
+additions to the existing typed tables. The leading candidate is:
 
 - nullable `description` and `owner` on `enterprise_documents`;
 - explicit provenance columns on each of
   `policy_system_dependencies`, `policy_document_dependencies`, and
   `policy_training_dependencies`.
 
-The PR B design must be reviewed against actual PR A screens before migration. It should duplicate
-a small closed provenance contract across the three typed dependency tables when necessary rather
-than replacing their real target foreign keys with a polymorphic abstraction.
+The later provenance design must be reviewed against the actual PR A and Confluence screens before
+migration. It should duplicate a small closed provenance contract across the three typed
+dependency tables when necessary rather than replacing their real target foreign keys with a
+polymorphic abstraction.
 
 Do not add placeholder fields claiming `human_approved_ai` provenance without an immutable proposal
 and human decision aggregate. That category remains unrepresentable until the later proposal
@@ -855,10 +863,11 @@ Do not use `trusted` as a synonym for `human approved`. In the current model, th
 trusted input because it is present in the typed source table and the analyzer consumes every
 applicable row.
 
-### PR B representation
+### Later provenance-slice representation
 
-If approved, PR B should make current seeded and future human-curated/imported relationship origin
-explicit without weakening typed foreign keys.
+If approved after the catalog and Confluence experiences are understood, the provenance slice
+should make current seeded and future human-curated/imported relationship origin explicit without
+weakening typed foreign keys.
 
 Minimum information under review:
 
@@ -875,9 +884,9 @@ The closed product categories are:
 - human-curated mapping;
 - human-approved AI proposal.
 
-Only categories supported by real persisted lineage may be returned. PR B may implement seeded,
-imported, and human-curated metadata. `human-approved AI proposal` must remain unavailable until a
-later proposal-and-decision aggregate exists.
+Only categories supported by real persisted lineage may be returned. The provenance slice may
+implement seeded, imported, and human-curated metadata. `human-approved AI proposal` must remain
+unavailable until a later proposal-and-decision aggregate exists.
 
 ## Seed and reset implications
 
@@ -907,7 +916,7 @@ The existing demo reset:
 Catalog pages should therefore render the same source records before and after reset. PR A tests
 must prove this explicitly.
 
-### PR B
+### Later provenance slice
 
 If approved:
 
@@ -1037,7 +1046,15 @@ Milestone 7 PR A does not include:
 
 ## What remains deferred to the Confluence slice
 
-The later Confluence slice owns:
+After PR A validates the catalog projection and reviewer experience, the next planned slice is a
+bounded read-only Confluence integration for selected enterprise documents.
+
+That slice may be stopped only if PR A demonstrates that real external document identity adds
+insufficient reviewer, product, or architecture value. Missing metadata by itself is not a reason
+to broaden Confluence scope, and the Confluence slice must still receive its own reviewed
+implementation boundary before coding.
+
+The Confluence slice owns:
 
 - real Confluence page ID;
 - space key or ID;
@@ -1091,10 +1108,19 @@ Review gate:
 > Does the projection make the current enterprise-impact logic understandable while remaining
 > honest about missing row provenance and owner metadata?
 
-### PR B — Narrow metadata and relationship provenance
+### Next planned slice — Bounded read-only Confluence integration
 
-Recommended only if PR A review confirms that the missing fields materially block the reviewer
-story.
+Proceed after PR A review unless PR A demonstrates that real external document identity adds
+insufficient value.
+
+Scope remains limited to selected enterprise documents and the fields listed in
+`What remains deferred to the Confluence slice`. It is not part of PR A and requires its own
+implementation plan and review.
+
+### Later conditional slice — Narrow metadata and relationship provenance
+
+Recommended only if the validated PR A and Confluence experiences show that missing persisted
+object or relationship provenance still materially blocks the reviewer story.
 
 Likely scope:
 
@@ -1105,8 +1131,8 @@ Likely scope:
 - migration round-trip, constraint, idempotency, reset, API, and UI tests;
 - a new ADR for the accepted provenance persistence decision.
 
-PR B must receive a concrete schema review before coding. It must not add AI proposals, external
-imports, or a generic catalog layer.
+The provenance slice must receive a concrete schema review before coding. It must not add AI
+proposals, unrelated external imports, or a generic catalog layer.
 
 ## Acceptance criteria for PR A
 
@@ -1140,8 +1166,9 @@ imports, or a generic catalog layer.
 PR A proves the model and traversal. The complete objective is met when a reviewer can also see
 persisted, honest row-level metadata for the required claims.
 
-Before declaring the entire milestone complete, review PR A and decide whether PR B is necessary
-to satisfy:
+Before declaring the entire enterprise-knowledge foundation complete, review PR A, then complete
+or explicitly stop the bounded Confluence slice under its decision gate. After that, decide
+whether a narrow provenance migration is necessary to satisfy:
 
 - persisted Manager guide owner;
 - persisted relationship source category;
@@ -1277,5 +1304,7 @@ Approve or revise this milestone before product code begins.
 The specific decision requested is:
 
 > Approve PR A as a no-migration read projection with explicit `Not recorded` provenance and owner
-> states, then use its reviewer walkthrough to decide whether the narrow PR B migration is worth
-> adding.
+> states. After PR A validates the projection and reviewer experience, proceed to the bounded
+> read-only Confluence slice unless PR A demonstrates that real external document identity adds
+> insufficient value. Evaluate any narrow provenance migration only after those experiences are
+> understood.

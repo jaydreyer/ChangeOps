@@ -78,7 +78,7 @@ Remaining work must add a distinct product, architecture, deployment, or present
 
 ## Recommended remaining work
 
-- [x] Narrow Confluence-backed document source integration (live Acme page setup remains manual)
+- [x] Narrow Confluence-backed document source integration and live Acme page validation
 - [ ] Trusted relationship provenance and governance
 - [ ] Unified audit timeline
 - [ ] AWS deployment architecture decision
@@ -275,14 +275,21 @@ A Jira remediation task may include a link to the relevant Confluence page.
 
 ### Completion criteria
 
-- [ ] A small, coherent Acme Confluence knowledge base exists.
-- [ ] Catalog document records link to real Confluence pages after the documented live setup.
-- [ ] At least the Manager Travel Approval Guide exists as an actual page after manual setup.
+- [x] A small, coherent Acme Confluence knowledge base exists.
+- [x] The selected catalog document record links to its real Confluence page after live setup.
+- [x] The Manager Travel Approval Guide exists as an actual page after manual setup.
 - [x] ChangeOps can import or resolve bounded page metadata.
 - [x] Imported identity is stable and idempotent.
 - [x] Automated tests do not require live Confluence.
 - [x] CI uses mocked or fixture-based provider behavior.
 - [x] ChangeOps never edits Confluence.
+
+The live Acme space contains the Manager Travel Approval Guide plus bounded procedures, training,
+FAQ, and policy-reference context. Only the Manager Travel Approval Guide is wired into ChangeOps.
+The August 4, 2026 live walkthrough confirmed successful import, `already_current` idempotency, the
+external link, responsive presentation, and zero console errors. The adapter issues only bounded
+GET requests. The current local Atlassian credential nevertheless has update and delete permission,
+so least-privilege credential hardening remains open before a public demo.
 
 ---
 
@@ -551,7 +558,7 @@ Deploy the existing application reproducibly.
 - [ ] Demo reset cannot run against an unrecognized database.
 - [ ] Destructive actions are protected.
 - [ ] External Jira writes target only the dedicated demo project.
-- [ ] Confluence access is read-only.
+- [ ] Confluence credential access is restricted to read-only.
 - [ ] Credentials have minimal permissions.
 - [ ] Rate-limit and provider failures are understandable.
 - [ ] External calls use bounded timeouts.
@@ -725,7 +732,7 @@ Jira and Confluence REST integrations alone do not automatically justify MCP.
 2. [x] Inspect current catalog models and seeded relationships.
 3. [x] Define a narrow Enterprise Knowledge Catalog milestone.
 4. [x] Implement the read-only catalog explorer.
-5. [ ] Create the bounded Acme Confluence content set using the documented manual setup.
+5. [x] Create the bounded Acme Confluence content set using the documented manual setup.
 6. [x] Add read-only Confluence metadata import and links.
 7. [ ] Expose trusted relationship provenance.
 8. [ ] Decide whether AI-proposed relationship governance adds sufficient value.

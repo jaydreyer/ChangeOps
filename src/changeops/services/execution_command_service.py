@@ -1,6 +1,6 @@
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
@@ -11,6 +11,7 @@ from changeops.db.models import (
     ActionApprovalRunItem,
     ActionReview,
     AssessmentEnterpriseImpact,
+    Evidence,
     ExecutionCommand,
     ExecutionResult,
     PolicyComparison,
@@ -30,7 +31,6 @@ from changeops.domain.execution_command import (
     snapshot_effective_action,
 )
 from changeops.domain.jira_execution import jira_issue_description
-from changeops.services.action_approval_workbench_service import evidence_detail
 
 
 class ApprovalRunNotCompletedError(Exception):
@@ -389,16 +389,16 @@ def _map_effective_action(
         for difference in comparison.differences
     ]
     proposed = comparison.proposed_policy_snapshot
-    summary = f"Operational remediation: {impact.display_name} for {proposed['title']}"
+    summary = f"Update {impact.display_name}"
     description = jira_issue_description(
         business_summary=(
-            f"Implement the approved operational remediation for {proposed['title']} "
-            f"(effective {proposed['effective_date']})."
+            f"Update the source policy document to reflect the approved revision effective "
+            f"{_human_date(proposed['effective_date'])}."
         ),
         policy_changes=changes,
-        operational_impact=f"{impact.display_name}: {impact.explanation}",
-        deterministic_reason=f"{impact.reason_code}: {impact.explanation}",
-        evidence=[f"{item.label} — {evidence_detail(item)}" for item in impact.evidence],
+        operational_impact=impact.explanation,
+        deterministic_reason=f"{impact.explanation} (Reason: {impact.reason_code})",
+        evidence=[_jira_evidence_summary(item) for item in impact.evidence],
         command_id=str(command_id),
         comparison_id=str(comparison.id),
         baseline_assessment_id=str(delta.baseline_assessment_id),
@@ -424,3 +424,22 @@ def _map_effective_action(
         },
     )
     return map_effective_action(action, jira_command=candidate)
+
+
+def _jira_evidence_summary(evidence: Evidence) -> str:
+    snapshot = evidence.snapshot
+    if evidence.source_type == "enterprise_document":
+        return (
+            f"{snapshot['title']}, version {snapshot['version']}, "
+            f"published in {snapshot['source_system']}"
+        )
+    if evidence.source_type == "policy_change":
+        return f"Approved revision effective {_human_date(snapshot['effective_date'])}"
+    if evidence.source_type == "policy_document_dependency":
+        return "Primary policy-document dependency requires an update"
+    return evidence.label
+
+
+def _human_date(value: str) -> str:
+    parsed = date.fromisoformat(value)
+    return f"{parsed.strftime('%B')} {parsed.day}, {parsed.year}"

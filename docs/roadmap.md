@@ -689,8 +689,9 @@ Delivered behavior
 Milestone 7 PR B — Read-Only Confluence Document Identity
 
 Status: complete in code and live-validated against the environment-configured Acme Manager Travel
-Approval Guide. Credentials and the page ID remain uncommitted. Restricting the current local
-credential to view-only access remains an operational-hardening step before a public demo.
+Approval Guide. Credentials and the page ID remain uncommitted. The current local credential is
+broader than view-only access; that is an explicitly accepted environment limitation rather than a
+PR B blocker.
 
 Delivered behavior
 

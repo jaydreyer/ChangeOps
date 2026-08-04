@@ -289,7 +289,8 @@ FAQ, and policy-reference context. Only the Manager Travel Approval Guide is wir
 The August 4, 2026 live walkthrough confirmed successful import, `already_current` idempotency, the
 external link, responsive presentation, and zero console errors. The adapter issues only bounded
 GET requests. The current local Atlassian credential nevertheless has update and delete permission,
-so least-privilege credential hardening remains open before a public demo.
+which is an explicitly accepted limitation for the current demo environment. The operational
+hardening checklist remains honest about the credential permission boundary without blocking PR B.
 
 ---
 

@@ -378,9 +378,9 @@ The bounded Acme environment was live-validated on August 4, 2026 without commit
 credentials or page ID. The explicit refresh imported the Manager Travel Approval Guide and a
 second refresh returned `already_current`; the external link and responsive catalog detail were
 verified with zero browser console errors. The credential used for that local check reported
-broader page operations than view-only access, so replace or restrict it before using the public
-demo. Application code remains read-only regardless: the adapter implements only the two GET
-requests above.
+broader page operations than view-only access. That broader credential is an accepted limitation
+for the current demo environment rather than a PR B blocker. Application code remains read-only
+regardless: the adapter implements only the two GET requests above.
 
 Stop the stack while preserving database data:
 

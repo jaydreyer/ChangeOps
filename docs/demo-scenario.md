@@ -966,7 +966,7 @@ precise failure state.
 The live walkthrough confirmed an idempotent `already_current` refresh, the expected external link,
 responsive presentation, and zero browser console errors. The adapter itself remains read-only,
 but the currently configured local Atlassian credential reports page update and delete operations;
-replace or restrict that credential before using the public-demo environment.
+the broader credential is an explicitly accepted limitation for the current demo environment.
 
 Confluence is authoritative only for the imported page metadata. ChangeOps remains authoritative
 for its internal document identity, curated typed policy relationships, assessment behavior,

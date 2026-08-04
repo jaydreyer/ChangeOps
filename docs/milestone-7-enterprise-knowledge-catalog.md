@@ -5,8 +5,8 @@
 PR A is merged. PR B is implemented with fixture-backed verification and was live-validated
 against the bounded Acme Confluence knowledge base on August 4, 2026. Live credentials and page
 identifiers remain environment-only. The current local credential is broader than least privilege
-and must be replaced or restricted before a public demo. PR C relationship-origin provenance
-remains deferred.
+and is an explicitly accepted current-environment limitation, not a PR B blocker. PR C
+relationship-origin provenance remains deferred.
 
 This document is based on repository `main` at commit `14cfb5d` and on the implementation,
 migrations, seed/reset behavior, tests, and product-facing read models at that commit. The

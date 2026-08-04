@@ -2318,8 +2318,29 @@ dd {
 
 .catalog-usage,
 .assessment-context,
+.catalog-external-source,
 .catalog-rule-technical {
   margin-top: 2.5rem;
+}
+
+.catalog-external-source > a {
+  display: inline-flex;
+  margin-top: 1rem;
+  font-weight: 750;
+}
+
+.catalog-stale-notice,
+.catalog-unavailable-source {
+  margin-top: 1rem;
+  border-left: 4px solid #a45b22;
+  border-radius: 4px;
+  background: #fff4e8;
+  padding: 1rem;
+}
+
+.catalog-stale-notice p,
+.catalog-unavailable-source p {
+  margin-bottom: 0;
 }
 
 .catalog-rule-technical {

@@ -24,6 +24,8 @@ def catalog_detail_payload() -> dict:
                 "catalog_context": "seeded_demonstration",
             },
         },
+        "external_source_state": "not_imported",
+        "external_source": None,
         "relationships": [
             {
                 "relationship_id": "dependency-guide",

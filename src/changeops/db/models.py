@@ -147,6 +147,55 @@ class EnterpriseDocument(Base):
     status: Mapped[str] = mapped_column(String(30))
 
 
+class ConfluenceDocumentSource(Base):
+    __tablename__ = "confluence_document_sources"
+    __table_args__ = (
+        CheckConstraint(
+            "provider = 'confluence_cloud'",
+            name="ck_confluence_document_sources_provider",
+        ),
+        CheckConstraint(
+            "external_version > 0",
+            name="ck_confluence_document_sources_external_version",
+        ),
+        CheckConstraint(
+            "external_status IN ('current', 'draft', 'archived')",
+            name="ck_confluence_document_sources_external_status",
+        ),
+        CheckConstraint(
+            "last_refresh_result IN "
+            "('success', 'already_current', 'authentication_failure', "
+            "'permission_denied', 'page_not_found', 'provider_unavailable', "
+            "'validation_failure', 'ambiguous_response')",
+            name="ck_confluence_document_sources_last_refresh_result",
+        ),
+        UniqueConstraint(
+            "external_page_id",
+            name="uq_confluence_document_sources_external_page",
+        ),
+    )
+
+    document_id: Mapped[str] = mapped_column(
+        ForeignKey("enterprise_documents.id"),
+        primary_key=True,
+    )
+    provider: Mapped[str] = mapped_column(String(30))
+    external_page_id: Mapped[str] = mapped_column(String(100))
+    external_title: Mapped[str] = mapped_column(String(300))
+    canonical_url: Mapped[str] = mapped_column(Text)
+    space_id: Mapped[str] = mapped_column(String(100))
+    space_key: Mapped[str] = mapped_column(String(100))
+    external_version: Mapped[int] = mapped_column(Integer)
+    external_status: Mapped[str] = mapped_column(String(30))
+    source_updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    imported_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    refreshed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    source_fingerprint: Mapped[str] = mapped_column(String(64))
+    last_refresh_result: Mapped[str] = mapped_column(String(40))
+    last_refresh_message: Mapped[str] = mapped_column(Text)
+    last_refresh_attempted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
 class TrainingCourse(Base):
     __tablename__ = "training_courses"
 

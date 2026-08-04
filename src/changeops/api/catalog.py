@@ -5,6 +5,7 @@ from changeops.api.dependencies import SessionDependency
 from changeops.schemas.catalog import (
     CatalogBrowseResponse,
     CatalogObjectDetailResponse,
+    ConfluenceRefreshResponse,
     PolicyRuleReferenceResponse,
 )
 from changeops.services.catalog_projection_service import (
@@ -17,6 +18,13 @@ from changeops.services.catalog_projection_service import (
     get_catalog_browse,
     get_catalog_object_detail,
     get_policy_rule_reference,
+    serialize_external_document_source,
+)
+from changeops.services.confluence_document_service import (
+    ConfluenceDocumentNotFoundError,
+    ConfluenceNotConfiguredError,
+    ConfluenceRefreshError,
+    refresh_confluence_document,
 )
 
 router = APIRouter(prefix="/api/v1", tags=["enterprise-knowledge-catalog"])
@@ -71,6 +79,44 @@ def retrieve_catalog_object(
         ) from error
     except CatalogProjectionIntegrityError as error:
         raise _http_error(409, "catalog_projection_inconsistent", str(error)) from error
+
+
+@router.post(
+    "/catalog-objects/enterprise_document/{document_id}/confluence-refresh",
+    response_model=ConfluenceRefreshResponse,
+)
+def refresh_catalog_document_confluence_source(
+    document_id: str,
+    session: SessionDependency,
+) -> ConfluenceRefreshResponse:
+    try:
+        outcome = refresh_confluence_document(session, document_id)
+    except ConfluenceDocumentNotFoundError as error:
+        raise _http_error(
+            404,
+            "catalog_object_not_found",
+            "Catalog document was not found.",
+        ) from error
+    except ConfluenceNotConfiguredError as error:
+        raise _http_error(
+            409,
+            "confluence_not_configured",
+            "Confluence is not configured for this catalog document.",
+        ) from error
+    except ConfluenceRefreshError as error:
+        status_code = (
+            404
+            if error.code == "confluence_page_not_found"
+            else 409
+            if error.code == "confluence_validation_failure"
+            else 502
+        )
+        raise _http_error(status_code, error.code, error.message) from error
+    return ConfluenceRefreshResponse(
+        document_id=document_id,
+        result=outcome.result,
+        external_source=serialize_external_document_source(outcome.source),
+    )
 
 
 @router.get(

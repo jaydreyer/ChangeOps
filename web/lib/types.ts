@@ -741,6 +741,33 @@ export interface CatalogObjectDetail {
       catalog_context: "seeded_demonstration";
     };
   };
+  external_source_state: "imported" | "not_imported" | "not_applicable";
+  external_source: {
+    provider: "confluence_cloud";
+    provider_label: "Confluence Cloud";
+    external_page_id: string;
+    external_title: string;
+    canonical_url: string;
+    space_id: string;
+    space_key: string;
+    external_version: number;
+    external_status: "current" | "draft" | "archived";
+    source_updated_at: string;
+    imported_at: string;
+    refreshed_at: string;
+    source_fingerprint: string;
+    last_refresh_result:
+      | "success"
+      | "already_current"
+      | "authentication_failure"
+      | "permission_denied"
+      | "page_not_found"
+      | "provider_unavailable"
+      | "validation_failure"
+      | "ambiguous_response";
+    last_refresh_message: string;
+    last_refresh_attempted_at: string;
+  } | null;
   relationships: CatalogRelationship[];
   assessment_usage: {
     statement: string;

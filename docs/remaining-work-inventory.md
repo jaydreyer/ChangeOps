@@ -78,7 +78,7 @@ Remaining work must add a distinct product, architecture, deployment, or present
 
 ## Recommended remaining work
 
-- [ ] Narrow Confluence-backed document source
+- [x] Narrow Confluence-backed document source integration (live Acme page setup remains manual)
 - [ ] Trusted relationship provenance and governance
 - [ ] Unified audit timeline
 - [ ] AWS deployment architecture decision
@@ -276,13 +276,13 @@ A Jira remediation task may include a link to the relevant Confluence page.
 ### Completion criteria
 
 - [ ] A small, coherent Acme Confluence knowledge base exists.
-- [ ] Catalog document records link to real Confluence pages.
-- [ ] At least the Manager Travel Approval Guide exists as an actual page.
-- [ ] ChangeOps can import or resolve bounded page metadata.
-- [ ] Imported identity is stable and idempotent.
-- [ ] Automated tests do not require live Confluence.
-- [ ] CI uses mocked or fixture-based provider behavior.
-- [ ] ChangeOps never edits Confluence.
+- [ ] Catalog document records link to real Confluence pages after the documented live setup.
+- [ ] At least the Manager Travel Approval Guide exists as an actual page after manual setup.
+- [x] ChangeOps can import or resolve bounded page metadata.
+- [x] Imported identity is stable and idempotent.
+- [x] Automated tests do not require live Confluence.
+- [x] CI uses mocked or fixture-based provider behavior.
+- [x] ChangeOps never edits Confluence.
 
 ---
 
@@ -725,8 +725,8 @@ Jira and Confluence REST integrations alone do not automatically justify MCP.
 2. [x] Inspect current catalog models and seeded relationships.
 3. [x] Define a narrow Enterprise Knowledge Catalog milestone.
 4. [x] Implement the read-only catalog explorer.
-5. [ ] Create the bounded Acme Confluence content set.
-6. [ ] Add read-only Confluence metadata import and links.
+5. [ ] Create the bounded Acme Confluence content set using the documented manual setup.
+6. [x] Add read-only Confluence metadata import and links.
 7. [ ] Expose trusted relationship provenance.
 8. [ ] Decide whether AI-proposed relationship governance adds sufficient value.
 9. [ ] Implement the unified audit timeline.

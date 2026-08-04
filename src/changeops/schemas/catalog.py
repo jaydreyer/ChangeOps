@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
@@ -148,10 +149,46 @@ class AssessmentUsageResponse(StrictModel):
     changes_assessment_behavior: Literal[False]
 
 
+class ExternalDocumentSourceResponse(StrictModel):
+    provider: Literal["confluence_cloud"]
+    provider_label: Literal["Confluence Cloud"]
+    external_page_id: str
+    external_title: str
+    canonical_url: str
+    space_id: str
+    space_key: str
+    external_version: int
+    external_status: Literal["current", "draft", "archived"]
+    source_updated_at: datetime
+    imported_at: datetime
+    refreshed_at: datetime
+    source_fingerprint: str
+    last_refresh_result: Literal[
+        "success",
+        "already_current",
+        "authentication_failure",
+        "permission_denied",
+        "page_not_found",
+        "provider_unavailable",
+        "validation_failure",
+        "ambiguous_response",
+    ]
+    last_refresh_message: str
+    last_refresh_attempted_at: datetime
+
+
 class CatalogObjectDetailResponse(StrictModel):
     object: CatalogObjectResponse
+    external_source_state: Literal["imported", "not_imported", "not_applicable"]
+    external_source: ExternalDocumentSourceResponse | None
     relationships: list[CatalogRelationshipResponse]
     assessment_usage: AssessmentUsageResponse
+
+
+class ConfluenceRefreshResponse(StrictModel):
+    document_id: str
+    result: Literal["success", "already_current"]
+    external_source: ExternalDocumentSourceResponse
 
 
 class StructuredRuleReferenceResponse(StrictModel):

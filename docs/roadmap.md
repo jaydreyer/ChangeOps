@@ -686,7 +686,23 @@ Delivered behavior
 * no migration, runtime dependency, graph abstraction, search, or assessment behavior change is
   introduced.
 
+Milestone 7 PR B — Read-Only Confluence Document Identity
+
+Status: complete in code; live Acme page creation and environment configuration remain manual.
+
+Delivered behavior
+
+* one Confluence-specific, one-to-one external source row preserves the existing document ID;
+* only the Manager Travel Approval Guide has an explicit environment configuration boundary;
+* one manual refresh reads page and space metadata through Confluence Cloud REST API v2;
+* validated metadata and a source fingerprint are persisted idempotently;
+* failure outcomes are distinct and never overwrite last-known-good metadata;
+* the catalog detail shows unavailable, imported, and last-refresh-failed states plus the external
+  link;
+* demo reset preserves imports and fixture-backed CI requires no Confluence account;
+* typed relationships and deterministic assessment behavior remain unchanged.
+
 Next vertical slice
 
-Milestone 7 PR B is the separately planned narrow external document identity and read-only
-Confluence metadata slice. Relationship-origin provenance remains a later PR C decision.
+Relationship-origin provenance remains the separately reviewed Milestone 7 PR C decision. This PR
+does not pre-approve or implement it.

@@ -4,16 +4,15 @@ ChangeOps analyzes operational and policy changes, identifies affected people an
 
 ## Current milestone
 
-Milestone 6, Real Jira Execution Integration.
+Milestone 7 PR A, Enterprise Knowledge Catalog Explorer.
 
-The local application now starts with a baseline international-travel policy and one proposed
-revision. A reviewer analyzes both through the existing governed journey, then creates or retrieves
-an immutable deterministic comparison of their accepted typed rules and immutable assessments.
-The comparison shows stable added, removed, and modified obligations plus the workers, findings,
-and enterprise impacts whose operational status changed. Every delta item retains applicable
-assessment lineage, deterministic reasons, evidence snapshots, and relationship paths. Milestones
-0–5 remain intact. One explicitly approved `operational_remediation` action can now create a real
-Jira Cloud Task through the same immutable-command boundary used by the simulated Learning System.
+The local application now adds a read-only catalog explorer over the existing typed PostgreSQL
+documents, systems, training courses, and policy dependencies. A reviewer can browse stable source
+identities, inspect stored versus normalized metadata, follow policy-scoped rule references, and
+see why persisted dependency rows are deterministic assessment inputs while row-level origin
+provenance remains explicitly not recorded. Existing analysis, comparison, approval, Learning
+System, and Jira behavior remains unchanged. PR A adds no migration or external catalog source;
+Confluence remains the separately planned PR B.
 
 Milestone 0 is complete and preserved by the `v0.0.1-milestone-0` tag.
 
@@ -28,6 +27,7 @@ See:
 - `docs/milestone-5a-policy-comparison.md`
 - `docs/milestone-5b-enterprise-impact-delta.md`
 - `docs/milestone-6.md`
+- `docs/milestone-7-enterprise-knowledge-catalog.md`
 - `docs/demo-scenario.md`
 - `docs/decisions.md`
 - [Contributing and engineering standards](CONTRIBUTING.md)
@@ -340,44 +340,50 @@ Configure `OPENAI_API_KEY` in `.env`, then use this repeatable golden path:
    and web application healthy.
 2. Open <http://localhost:3000>. The landing page should show the baseline policy, proposed
    revision, no recent analysis runs, and both policies as not ready for comparison.
-3. Select the baseline policy and choose **Start new analysis**.
-4. On the journey page, inspect the AI-proposed structured values, deterministic validation, and
+3. Choose **Explore enterprise knowledge**. Confirm 4 documents, 3 systems, and 1 training course
+   appear as primary categories while 12 workers, 4 teams, and 2 customer commitments appear only
+   as assessment-context counts. Open **Manager Travel Approval Guide** and inspect its stored
+   Acme Knowledge source, published status, version 2, missing owner, and separate baseline and
+   proposed `instructs_manager` dependency rows. Follow the baseline
+   `MANAGER_APPROVAL_REQUIRED` reference and return to the document.
+4. Return to policy analysis, select the baseline policy, and choose **Start new analysis**.
+5. On the journey page, inspect the AI-proposed structured values, deterministic validation, and
    exact source quotes. The ordinary golden policy needs no clarification and is labeled
    **No clarification required**.
-5. Inspect the immutable assessment: 3 affected workers, 3 cleared workers, 6 findings, 18
+6. Inspect the immutable assessment: 3 affected workers, 3 cleared workers, 6 findings, 18
    enterprise impacts, and 13 deterministic proposed actions. Expand impacts to inspect persisted
    evidence and relationship paths.
-6. Choose **Generate grounded interpretation**. Each cited policy span is confirmed against the
+7. Choose **Generate grounded interpretation**. Each cited policy span is confirmed against the
    persisted policy snapshot; impact and evidence citations show readable labels while preserving
    their IDs, keys, source types, and reason codes.
-7. Choose **Create approval run**. In the workbench, approve the supported training assignments
+8. Choose **Create approval run**. In the workbench, approve the supported training assignments
    and record terminal decisions for the other recommendations. Approval completion does not mean
    execution.
-8. After the approval run completes, prepare execution commands. The workbench reports one
+9. After the approval run completes, prepare execution commands. The workbench reports one
    supported Learning System mapping type; the golden data produces two training commands while
    other approved action types remain explicitly unsupported.
-9. Execute a training assignment, then execute the same command again. The first result is
+10. Execute a training assignment, then execute the same command again. The first result is
    `succeeded`; replay is `already_applied` and reuses the same durable assignment.
-10. Inspect the workbench history and return to the analysis journey. Approval, command
+11. Inspect the workbench history and return to the analysis journey. Approval, command
     preparation, execution, and replay counts remain distinct.
-11. Return to the landing page, analyze the proposed revision, then select the baseline and
+12. Return to the landing page, analyze the proposed revision, then select the baseline and
     proposed records under **Compare policy versions**.
-12. Create the comparison. Confirm three ordered semantic differences—effective date modified,
+13. Create the comparison. Confirm three ordered semantic differences—effective date modified,
     contractor coverage removed, and Mexico exclusion added—with accepted provenance on every
     applicable side.
-13. Inspect the change summary and immutable enterprise impact delta. The golden revision shows
+14. Inspect the change summary and immutable enterprise impact delta. The golden revision shows
     three worker-trip outcomes no longer affected, six findings disappeared, and fourteen
     enterprise impacts removed. No worker-trip outcome, finding, or enterprise impact is
     introduced, and no worker-trip outcome remains affected. The three document impacts and
     policy-required course impact are unchanged and omitted from the delta. Detailed records start
     collapsed; open one item at a time to inspect authoritative before/after reasons, evidence,
     relationship paths, stable identity, and lineage.
-14. Open the proposed assessment's approval workbench. Approve its single
+15. Open the proposed assessment's approval workbench. Approve its single
     `operational_remediation` action for the primary policy document and record terminal decisions
     for the remaining recommendations.
-15. Prepare the immutable `jira.create_issue` command and inspect its title, comparison ID,
+16. Prepare the immutable `jira.create_issue` command and inspect its title, comparison ID,
     assessment lineage, and readable description before execution.
-16. Execute it once to create a Task in the configured Enterprise Change Management project, then
+17. Execute it once to create a Task in the configured Enterprise Change Management project, then
     execute it again. The replay is `already_applied`, links to the same Jira issue, and performs no
     second Jira request.
 

@@ -45,6 +45,8 @@ ChangeOps currently demonstrates:
 - reliable local demo reset;
 - focused evaluations and CI;
 - guided enterprise UX across the golden path.
+- read-only Enterprise Knowledge Catalog browse and detail views over the existing typed source
+  and dependency tables;
 
 The application already constitutes a credible end-to-end enterprise AI capstone.
 
@@ -72,10 +74,10 @@ Remaining work must add a distinct product, architecture, deployment, or present
 - [x] Comparison UX and progressive disclosure
 - [x] Real Jira Cloud issue creation
 - [x] Presentation and interview guide foundation
+- [x] Enterprise Knowledge Catalog Explorer (Milestone 7 PR A)
 
 ## Recommended remaining work
 
-- [ ] Enterprise Knowledge Catalog Explorer
 - [ ] Narrow Confluence-backed document source
 - [ ] Trusted relationship provenance and governance
 - [ ] Unified audit timeline
@@ -190,12 +192,19 @@ MANAGER_APPROVAL_REQUIRED
 
 ### Completion criteria
 
-- [ ] Existing seeded enterprise objects are visible through a coherent catalog UI.
+- [x] Existing seeded documents, systems, and training courses are visible through a coherent
+      catalog UI; workers, teams, and customer commitments remain compact assessment context.
 - [ ] Object ownership and source-system provenance are visible.
-- [ ] Trusted relationships can be inspected.
-- [ ] A reviewer can explain why the Manager Travel Approval Guide was considered affected.
-- [ ] Existing analysis behavior remains unchanged.
-- [ ] Demo reset remains safe and repeatable.
+- [x] Persisted typed relationship trust basis can be inspected separately from the explicitly
+      missing row-origin provenance.
+- [x] A reviewer can explain why the Manager Travel Approval Guide is deterministic assessment
+      input for both baseline and proposed policy scopes.
+- [x] Existing analysis behavior remains unchanged.
+- [x] Demo reset remains safe, repeatable, and preserves the catalog projection.
+
+PR A intentionally leaves the ownership/source-provenance criterion incomplete where the typed
+tables do not persist those facts. External document identity remains PR B; relationship-origin
+provenance remains a separate, later PR C decision.
 
 ---
 
@@ -712,10 +721,10 @@ Jira and Confluence REST integrations alone do not automatically justify MCP.
 
 ## Immediate sequence
 
-1. [ ] Add and approve this remaining-work inventory.
-2. [ ] Inspect current catalog models and seeded relationships.
-3. [ ] Define a narrow Enterprise Knowledge Catalog milestone.
-4. [ ] Implement the read-only catalog explorer.
+1. [x] Add and approve this remaining-work inventory.
+2. [x] Inspect current catalog models and seeded relationships.
+3. [x] Define a narrow Enterprise Knowledge Catalog milestone.
+4. [x] Implement the read-only catalog explorer.
 5. [ ] Create the bounded Acme Confluence content set.
 6. [ ] Add read-only Confluence metadata import and links.
 7. [ ] Expose trusted relationship provenance.

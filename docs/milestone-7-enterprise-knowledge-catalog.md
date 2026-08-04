@@ -2,8 +2,10 @@
 
 ## Status
 
-PR A is merged. PR B is implemented in code with fixture-backed verification; creating and
-configuring the real Acme Confluence page remains the documented manual environment step. PR C
+PR A is merged. PR B is implemented with fixture-backed verification and was live-validated
+against the bounded Acme Confluence knowledge base on August 4, 2026. Live credentials and page
+identifiers remain environment-only. The current local credential is broader than least privilege
+and is an explicitly accepted current-environment limitation, not a PR B blocker. PR C
 relationship-origin provenance remains deferred.
 
 This document is based on repository `main` at commit `14cfb5d` and on the implementation,

@@ -947,8 +947,8 @@ the first delivery may have succeeded.
 ## Milestone 7 PR B Read-Only Confluence Identity Extension
 
 The Manager Travel Approval Guide retains the stable ChangeOps identity
-`document-manager-travel-approval-guide`. When a reviewer has manually configured a real Acme
-Confluence page and explicitly refreshed it, the document detail additionally shows:
+`document-manager-travel-approval-guide`. The bounded Acme demo environment was live-validated on
+August 4, 2026: after an explicit refresh, the document detail shows:
 
 - source provider `Confluence Cloud`;
 - the validated external page ID;
@@ -957,10 +957,16 @@ Confluence page and explicitly refreshed it, the document detail additionally sh
 - source-updated and last-refreshed timestamps;
 - an **Open in Confluence** link.
 
-The repository and automated demo remain honest when no live page exists: the detail shows that
-Confluence metadata has not been imported, while fixture-backed tests prove the full boundary.
-`make demo-reset` preserves a successful import. A failed later refresh leaves the last-known-good
-metadata visible with the precise failure state.
+Credentials and the real page ID remain environment-only. The repository and automated demo stay
+honest when that configuration is absent: the detail shows that Confluence metadata has not been
+imported, while fixture-backed tests prove the full boundary. `make demo-reset` preserves a
+successful import. A failed later refresh leaves the last-known-good metadata visible with the
+precise failure state.
+
+The live walkthrough confirmed an idempotent `already_current` refresh, the expected external link,
+responsive presentation, and zero browser console errors. The adapter itself remains read-only,
+but the currently configured local Atlassian credential reports page update and delete operations;
+the broader credential is an explicitly accepted limitation for the current demo environment.
 
 Confluence is authoritative only for the imported page metadata. ChangeOps remains authoritative
 for its internal document identity, curated typed policy relationships, assessment behavior,

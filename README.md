@@ -374,6 +374,14 @@ To create the live fictional Acme content, use this bounded manual inventory:
 
 No code path creates, edits, publishes, searches, crawls, or deletes Confluence content.
 
+The bounded Acme environment was live-validated on August 4, 2026 without committing its
+credentials or page ID. The explicit refresh imported the Manager Travel Approval Guide and a
+second refresh returned `already_current`; the external link and responsive catalog detail were
+verified with zero browser console errors. The credential used for that local check reported
+broader page operations than view-only access. That broader credential is an accepted limitation
+for the current demo environment rather than a PR B blocker. Application code remains read-only
+regardless: the adapter implements only the two GET requests above.
+
 Stop the stack while preserving database data:
 
 ```bash

@@ -661,3 +661,32 @@ Next vertical slice
 Governed immutable change-plan revision is the recommended next product slice. AI explanation of
 the completed delta may be paired with that work only if a narrower milestone explicitly approves
 the explanation contract and keeps deterministic delta authoritative.
+
+⸻
+
+Milestone 7 PR A — Enterprise Knowledge Catalog Explorer
+
+Status: complete.
+
+Product capability
+
+Expose the existing typed enterprise documents, systems, training courses, and policy dependencies
+through a narrow read-only catalog and policy-scoped rule-reference experience.
+
+Delivered behavior
+
+* PostgreSQL source and dependency tables remain authoritative and retain their stable identities;
+* documents, systems, and training courses receive browse and detail experiences;
+* workers, teams, and customer commitments remain compact assessment-context counts;
+* baseline and proposed dependency rows remain distinct;
+* relationship trust basis, deterministic analyzer use, and missing row provenance are shown
+  separately;
+* unknown persisted rule codes remain visible without guessed structured mappings;
+* catalog GETs perform no writes and demo reset preserves the same projection;
+* no migration, runtime dependency, graph abstraction, search, or assessment behavior change is
+  introduced.
+
+Next vertical slice
+
+Milestone 7 PR B is the separately planned narrow external document identity and read-only
+Confluence metadata slice. Relationship-origin provenance remains a later PR C decision.

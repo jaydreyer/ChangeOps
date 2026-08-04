@@ -345,6 +345,14 @@ not a persistent scenario-management feature:
 
 - the landing page explains the governed journey before analysis begins, and the analysis page
   leads with reviewer questions while retaining authoritative technical detail in disclosures;
+- the landing page links to a read-only catalog with 4 documents, 3 systems, and 1 training course
+  as primary categories plus 12 workers, 4 teams, and 2 customer commitments as compact context;
+- the Manager Travel Approval Guide shows its stored stable identity, Acme Knowledge source,
+  published status, version 2, missing owner, and separate baseline/proposed
+  `instructs_manager` rows;
+- the baseline dependency follows to the policy-scoped `MANAGER_APPROVAL_REQUIRED` reference,
+  which links back to its connected typed catalog targets and distinguishes deterministic trust
+  basis from missing row-origin provenance;
 - the approval workbench opens the next pending item in persisted order, keeps evidence collapsed,
   and presents execution only after completed approval as a separate explicit operation;
 - the golden accepted extraction completes without clarification;

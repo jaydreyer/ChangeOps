@@ -1,11 +1,12 @@
 # ChangeOps Architecture
 
-This document describes the current implementation through Milestone 6: the completed
+This document describes the current implementation through Milestone 7 PR A: the completed
 policy-analysis and approval lifecycles, the integrated Next.js journey and workbench,
 deterministic preparation and explicit execution of learning-assignment and Jira create-issue
 commands, and immutable
 deterministic comparison of two accepted international-travel policy rulesets and their immutable
-enterprise impact assessments.
+enterprise impact assessments, plus the read-only Enterprise Knowledge Catalog Explorer over the
+existing typed source and dependency tables.
 
 ## High-level architecture
 
@@ -48,6 +49,7 @@ flowchart LR
         Comparator["Pure typed semantic comparator"]
         ImpactDelta["Enterprise impact delta service"]
         DeltaComparator["Pure stable-identity delta comparator"]
+        CatalogProjection["Read-only catalog projection"]
         ORM["SQLAlchemy models and sessions"]
     end
 
@@ -85,6 +87,7 @@ flowchart LR
     CommandPreparation --> CommandMapping
     CommandPreparation --> ORM
     Routes --> ExecutionService
+    Routes --> CatalogProjection
     Routes --> Comparison
     Comparison --> Comparator
     Comparison --> ImpactDelta
@@ -96,6 +99,7 @@ flowchart LR
     ExecutionService --> JiraAdapter
     LearningAdapter --> ORM
     JiraAdapter --> JiraCloud["Jira Cloud"]
+    CatalogProjection --> ORM
     ORM --> DB
     Migrate --> DB
     Seed --> DB
@@ -105,7 +109,7 @@ ChangeOps remains a synchronous modular monolith. The HTTP, application, domain,
 persistence code run in one Python process. PostgreSQL stores source, extraction, workflow,
 assessment, comparison, interpretation, review, approval-run, command, simulated
 learning-assignment, and execution-result data. The Next.js runtime provides the local analysis,
-comparison, and approval experiences. A configured
+comparison, approval, and enterprise-catalog experiences. A configured
 chat-model provider supports extraction and interpretation. Jira Cloud is the only real external
 side-effect target; command preparation and simulated Learning execution remain local.
 
@@ -144,6 +148,9 @@ The FastAPI application exposes:
 - `GET /api/v1/action-approval-runs/{run_id}/execution-commands`
 - `GET /api/v1/execution-commands/{command_id}`
 - `POST /api/v1/execution-commands/{command_id}/execute`
+- `GET /api/v1/catalog-objects?organization_id={organization_id}`
+- `GET /api/v1/catalog-objects/{object_type}/{object_id}`
+- `GET /api/v1/policy-changes/{policy_change_id}/rule-references/{rule_code}`
 
 The create response adds an input fingerprint, enterprise-impact summary, and categorized
 enterprise impacts. Existing worker results, findings, evidence, proposed actions, and unresolved
@@ -825,6 +832,28 @@ set of delta-, comparison-, and workflow-owned tables in one transaction. It pre
 and other catalog tables and requires an exact
 confirmation value, recognized local PostgreSQL host and database name, and the seeded organization
 marker. No database or volume is dropped.
+
+## Enterprise Knowledge Catalog read boundary
+
+The catalog is a current read projection, not another persistence model. Three GET routes query
+`enterprise_documents`, `enterprise_systems`, and `training_courses` explicitly and resolve their
+inverse policy dependency rows from the existing typed dependency tables. A policy-scoped rule
+reference is the persisted `policy_change_id` plus dependency `rule_code`; it is not presented as
+a standalone stored rule entity. A small closed adapter maps known codes to the current structured
+rule fields and leaves unknown codes visible without guessing.
+
+The projection preserves stable source and relationship IDs, deterministic row ordering, separate
+baseline and proposed dependency rows, foreign-key and semantic-uniqueness trust basis, and honest
+null owner/source/description fields. Dataset context is labeled as the seeded demonstration
+catalog, while creator/import/curation/approval provenance is separately labeled not recorded.
+Catalog reads never query assessment evidence or impact paths as current catalog authority and
+perform no writes. Workers, teams, and customer commitments appear only as organization-scoped
+assessment-context counts.
+
+Next.js server-renders `/catalog`, supported object details, and policy-rule-reference details with
+uncached API reads. Native `details` elements keep raw IDs and integrity basis collapsed by default.
+There is no search, administration, relationship editing, graph view, Confluence access, or new
+runtime dependency. PR A adds no migration and does not change assessment behavior.
 
 ## Policy-analysis journey read model
 

@@ -179,6 +179,9 @@ export function PolicyAnalysisEntryView({
             ChangeOps identifies policy rules, calculates who and what is affected, and routes
             proposed actions for human approval. Approval and execution remain separate.
           </p>
+          <Link href="/catalog" className="catalog-entry-link">
+            Explore enterprise knowledge →
+          </Link>
         </div>
         <div className="boundary-legend" aria-label="Decision boundaries">
           <span className="badge ai_proposal">AI suggests</span>

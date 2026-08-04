@@ -81,6 +81,10 @@ describe("policy analysis entry", () => {
     expect(screen.getByText("Read the selected policy").closest("details")).not.toHaveAttribute(
       "open",
     );
+    expect(screen.getByRole("link", { name: "Explore enterprise knowledge →" })).toHaveAttribute(
+      "href",
+      "/catalog",
+    );
     expect(screen.getByRole("link", { name: "Open analysis" })).toHaveAttribute(
       "href",
       "/policy-analyses/run-1",

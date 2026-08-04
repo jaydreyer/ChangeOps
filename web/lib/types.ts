@@ -643,3 +643,131 @@ export interface PolicyAnalysisJourney {
     replay_count: number;
   };
 }
+
+export type CatalogObjectType =
+  | "enterprise_document"
+  | "enterprise_system"
+  | "training_course";
+
+export interface CatalogStatus {
+  value: "published" | "draft" | "archived" | "active" | "inactive" | null;
+  basis: "stored" | "normalized" | "not_recorded";
+}
+
+interface CatalogObjectBase {
+  object_id: string;
+  display_name: string;
+  description: string | null;
+  owner: string | null;
+  source_system: string | null;
+  status: CatalogStatus;
+  relationship_count: number;
+}
+
+export interface CatalogDocument extends CatalogObjectBase {
+  object_type: "enterprise_document";
+  metadata: { document_type: "policy" | "procedure" | "guide" | "knowledge_article"; version: string };
+}
+
+export interface CatalogSystem extends CatalogObjectBase {
+  object_type: "enterprise_system";
+  metadata: { system_type: string };
+}
+
+export interface CatalogTrainingCourse extends CatalogObjectBase {
+  object_type: "training_course";
+  metadata: { course_code: string; completion_record_count: number };
+}
+
+export type CatalogObjectSummary = CatalogDocument | CatalogSystem | CatalogTrainingCourse;
+
+export interface CatalogBrowse {
+  organization: { id: string; name: string };
+  catalog_context: {
+    kind: "seeded_demonstration";
+    label: "Seeded demonstration catalog";
+    record_level_origin: "not_recorded";
+  };
+  catalog_counts: Record<CatalogObjectType, number>;
+  assessment_context_counts: {
+    worker: number;
+    team: number;
+    customer_commitment: number;
+  };
+  objects: CatalogObjectSummary[];
+}
+
+export interface CatalogRelationship {
+  relationship_id: string;
+  relationship_source_type:
+    | "policy_document_dependency"
+    | "policy_system_dependency"
+    | "policy_training_dependency";
+  relationship_type: string;
+  explanation: string;
+  impact_classification: "review_required" | "update_required" | null;
+  policy: { id: string; title: string; version: string };
+  source: {
+    object_type: "policy_rule_reference";
+    stable_key: string;
+    display_name: string;
+    href: string;
+  };
+  target: {
+    object_type: CatalogObjectType;
+    stable_key: string;
+    display_name: string;
+    href: string;
+  };
+  trust: {
+    state: "persisted_typed_relationship";
+    integrity: string[];
+    used_deterministically: true;
+  };
+  provenance: {
+    classification: "not_recorded";
+    creator: null;
+    owning_authority: null;
+    recorded_at: null;
+    approval: null;
+  };
+}
+
+export interface CatalogObjectDetail {
+  object: CatalogObjectSummary & {
+    organization_id: string;
+    record_provenance: {
+      classification: "not_recorded";
+      catalog_context: "seeded_demonstration";
+    };
+  };
+  relationships: CatalogRelationship[];
+  assessment_usage: {
+    statement: string;
+    changes_assessment_behavior: false;
+  };
+}
+
+export interface PolicyRuleReference {
+  stable_key: string;
+  policy: { id: string; title: string; version: string };
+  rule_code: string;
+  structured_rule_reference: {
+    field_path: string | null;
+    label: string | null;
+    mapping_status: "supported" | "unknown";
+  };
+  relationships: {
+    relationship_id: string;
+    relationship_type: string;
+    target_type: CatalogObjectType;
+    target_id: string;
+    target_name: string;
+    target_href: string;
+  }[];
+  authority_boundary: {
+    is_standalone_persisted_rule: false;
+    relationship_source: "persisted_dependency_rows";
+    assessment_use: "deterministic";
+  };
+}

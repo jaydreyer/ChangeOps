@@ -107,6 +107,8 @@ const detail: CatalogObjectDetail = {
       catalog_context: "seeded_demonstration",
     },
   },
+  external_source_state: "not_imported",
+  external_source: null,
   relationships: [
     relationship,
     {
@@ -161,6 +163,7 @@ describe("enterprise knowledge catalog views", () => {
     expect(screen.getByText("International Business Travel Approval and Security Training · 1")).toBeInTheDocument();
     expect(screen.getByText("Proposed International Business Travel Revision · proposed-draft")).toBeInTheDocument();
     expect(screen.getAllByText("Instructs Manager")).toHaveLength(2);
+    expect(screen.getByText("Confluence metadata has not been imported.")).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "Explain this policy rule" })[0]).toHaveAttribute(
       "href",
       "/catalog/policy-rules/policy-international-travel-2026-09/MANAGER_APPROVAL_REQUIRED",
@@ -169,6 +172,76 @@ describe("enterprise knowledge catalog views", () => {
       expect(summary.closest("details")).not.toHaveAttribute("open");
     }
     expect(screen.queryByRole("button", { name: /edit|import|approve|refresh|search/i })).not.toBeInTheDocument();
+  });
+
+  it("shows validated read-only Confluence identity and an external link", () => {
+    const imported: CatalogObjectDetail = {
+      ...detail,
+      external_source_state: "imported",
+      external_source: {
+        provider: "confluence_cloud",
+        provider_label: "Confluence Cloud",
+        external_page_id: "123456789",
+        external_title: "Manager Travel Approval Guide",
+        canonical_url: "https://acme.atlassian.net/wiki/spaces/TRAVEL/pages/123456789",
+        space_id: "987654321",
+        space_key: "TRAVEL",
+        external_version: 7,
+        external_status: "current",
+        source_updated_at: "2026-08-01T16:30:00Z",
+        imported_at: "2026-08-04T15:00:00Z",
+        refreshed_at: "2026-08-04T15:10:00Z",
+        source_fingerprint: "a".repeat(64),
+        last_refresh_result: "already_current",
+        last_refresh_message: "Confluence metadata is already current.",
+        last_refresh_attempted_at: "2026-08-04T15:10:00Z",
+      },
+    };
+
+    render(<CatalogObjectDetailView detail={imported} />);
+
+    expect(screen.getByText("Confluence Cloud")).toBeInTheDocument();
+    expect(screen.getByText("123456789")).toBeInTheDocument();
+    expect(screen.getByText("TRAVEL · 987654321")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open in Confluence" })).toHaveAttribute(
+      "href",
+      imported.external_source?.canonical_url,
+    );
+    expect(screen.getByText("Technical source details").closest("details")).not.toHaveAttribute(
+      "open",
+    );
+  });
+
+  it("shows last-known-good metadata as stale after a failed refresh", () => {
+    const stale: CatalogObjectDetail = {
+      ...detail,
+      external_source_state: "imported",
+      external_source: {
+        provider: "confluence_cloud",
+        provider_label: "Confluence Cloud",
+        external_page_id: "123456789",
+        external_title: "Manager Travel Approval Guide",
+        canonical_url: "https://acme.atlassian.net/wiki/spaces/TRAVEL/pages/123456789",
+        space_id: "987654321",
+        space_key: "TRAVEL",
+        external_version: 7,
+        external_status: "current",
+        source_updated_at: "2026-08-01T16:30:00Z",
+        imported_at: "2026-08-04T15:00:00Z",
+        refreshed_at: "2026-08-04T15:10:00Z",
+        source_fingerprint: "a".repeat(64),
+        last_refresh_result: "permission_denied",
+        last_refresh_message: "Confluence denied access to the configured page or space.",
+        last_refresh_attempted_at: "2026-08-04T16:10:00Z",
+      },
+    };
+
+    render(<CatalogObjectDetailView detail={stale} />);
+
+    expect(
+      screen.getByText("Last refresh failed; showing last-known-good metadata."),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/denied access/i)).toBeInTheDocument();
   });
 
   it("explains a policy-scoped rule and links back to each typed target", () => {

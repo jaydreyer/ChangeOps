@@ -318,6 +318,12 @@ def test_only_get_catalog_routes_are_registered(client) -> None:
     assert client.post("/api/v1/catalog-objects", json={}).status_code == 405
     assert client.put(MANAGER_GUIDE_URL, json={}).status_code == 405
     assert client.delete(MANAGER_RULE_URL).status_code == 405
+    assert (
+        client.post(
+            "/api/v1/catalog-objects/enterprise_document/missing/confluence-refresh"
+        ).status_code
+        == 404
+    )
 
 
 def _artifact_counts() -> dict[str, int]:

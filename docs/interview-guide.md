@@ -287,6 +287,8 @@ Evaluation follows architectural ownership:
 - Why is LangGraph needed if PostgreSQL stores the state?
 - How do comparisons behave when records have different UUIDs?
 - What changes when simulated integrations become real?
+- Why does ChangeOps preserve a separate document ID when a Confluence page ID exists?
+- What happens to imported metadata when Confluence is unavailable?
 
 ### What not to explain unless asked
 
@@ -320,6 +322,8 @@ Keep the main story at the level of **problem → evidence → decision → cont
 - [ ] At least one action is available for review.
 - [ ] Actor identity and role are set correctly.
 - [ ] The simulated Learning target and configured Jira project are in a known state.
+- [ ] The optional Confluence page is explicitly refreshed, or the honest not-imported state is
+      part of the walkthrough.
 - [ ] Browser zoom and window size make evidence readable.
 - [ ] A backup API response or screenshot is available.
 

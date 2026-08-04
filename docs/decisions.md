@@ -790,3 +790,57 @@ search, transition, update, or reconciliation path is added.
 - The system prefers missed automatic recovery over violating the no-duplicate requirement.
 - Jira remains an execution adapter and does not enter analysis, comparison, approval, or planning
   domain models.
+
+# ADR-0020 — Preserve ChangeOps Document Identity Beside a Narrow Confluence Source
+
+## Status
+
+Accepted
+
+## Context
+
+Milestone 7 PR B must prove that one ChangeOps enterprise document corresponds to a real
+Confluence Cloud page. The existing `enterprise_documents.id` is already referenced by typed
+policy dependencies, assessment fingerprints, evidence, impact paths, comparisons, and proposed
+actions. Replacing it with a provider identifier would make an external knowledge system
+authoritative for ChangeOps analysis and destabilize historical lineage.
+
+The repository has no configured live page. Automated verification must therefore use captured
+provider metadata and must not commit a placeholder page ID. The slice needs explicit refresh,
+safe failure behavior, and a visible external link, but no crawling, content ingestion, editing,
+relationship creation, or multi-provider platform.
+
+## Decision
+
+Add one Confluence-specific `confluence_document_sources` table with a one-to-one foreign key to
+`enterprise_documents`. It stores only validated page identity and metadata, import/refresh times,
+a canonical source fingerprint, and the latest safe refresh outcome. It stores neither policy
+relationships nor arbitrary provider JSON.
+
+Only the Manager Travel Approval Guide has a named environment page-ID mapping. A manual POST by
+stable ChangeOps document ID performs two read-only Confluence REST API v2 calls: get the page and
+get its owning space. The service validates the configured and returned identities before an
+idempotent insert/update. It updates no column on `enterprise_documents`.
+
+A first failed refresh persists no unvalidated identity. After a successful import, a later
+failure updates only outcome fields and retains all last-known-good metadata. The catalog detail
+projects both identities side by side. The assessment and relationship services never query the
+Confluence table.
+
+The implementation uses direct email/API-token authentication to match the existing bounded Jira
+configuration pattern. The configured account must have view-only access to the selected page and
+space. OAuth scope guidance for an equivalent app is limited to `read:page:confluence` and
+`read:space:confluence`.
+
+## Consequences
+
+- ChangeOps document, relationship, assessment, and audit identities remain stable if a page is
+  renamed, versioned, unavailable, or later moved between spaces.
+- Confluence remains authoritative only for the imported external page metadata.
+- Fixture-backed CI is deterministic and needs no live Atlassian credential.
+- Adding another document requires an explicit named configuration decision; arbitrary page
+  selection, search, crawling, and bulk synchronization are unavailable.
+- Retargeting a successfully imported document to a different page is rejected rather than
+  silently rewriting external identity.
+- Relationship-origin provenance is still absent. PR C remains a separate schema and governance
+  decision.

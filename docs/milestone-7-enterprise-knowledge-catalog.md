@@ -2,7 +2,9 @@
 
 ## Status
 
-Approved for implementation after this planning revision merges.
+PR A is merged. PR B is implemented in code with fixture-backed verification; creating and
+configuring the real Acme Confluence page remains the documented manual environment step. PR C
+relationship-origin provenance remains deferred.
 
 This document is based on repository `main` at commit `14cfb5d` and on the implementation,
 migrations, seed/reset behavior, tests, and product-facing read models at that commit. The

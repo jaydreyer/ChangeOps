@@ -1,0 +1,10 @@
+{
+  "id": "987654321",
+  "key": "TRAVEL",
+  "name": "Acme Travel Operations",
+  "type": "global",
+  "status": "current",
+  "_links": {
+    "base": "https://acme.atlassian.net"
+  }
+}

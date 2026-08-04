@@ -1,12 +1,12 @@
 # ChangeOps Architecture
 
-This document describes the current implementation through Milestone 7 PR A: the completed
+This document describes the current implementation through Milestone 7 PR B: the completed
 policy-analysis and approval lifecycles, the integrated Next.js journey and workbench,
 deterministic preparation and explicit execution of learning-assignment and Jira create-issue
 commands, and immutable
 deterministic comparison of two accepted international-travel policy rulesets and their immutable
-enterprise impact assessments, plus the read-only Enterprise Knowledge Catalog Explorer over the
-existing typed source and dependency tables.
+enterprise impact assessments, plus the read-only Enterprise Knowledge Catalog Explorer and its
+narrow persisted Confluence Cloud document-identity boundary.
 
 ## High-level architecture
 
@@ -50,6 +50,8 @@ flowchart LR
         ImpactDelta["Enterprise impact delta service"]
         DeltaComparator["Pure stable-identity delta comparator"]
         CatalogProjection["Read-only catalog projection"]
+        ConfluenceRefresh["Explicit Confluence metadata refresh"]
+        ConfluenceAdapter["Read-only Confluence Cloud adapter"]
         ORM["SQLAlchemy models and sessions"]
     end
 
@@ -88,6 +90,10 @@ flowchart LR
     CommandPreparation --> ORM
     Routes --> ExecutionService
     Routes --> CatalogProjection
+    Routes --> ConfluenceRefresh
+    ConfluenceRefresh --> ConfluenceAdapter
+    ConfluenceRefresh --> ORM
+    ConfluenceAdapter --> ConfluenceCloud["Confluence Cloud"]
     Routes --> Comparison
     Comparison --> Comparator
     Comparison --> ImpactDelta
@@ -111,7 +117,8 @@ assessment, comparison, interpretation, review, approval-run, command, simulated
 learning-assignment, and execution-result data. The Next.js runtime provides the local analysis,
 comparison, approval, and enterprise-catalog experiences. A configured
 chat-model provider supports extraction and interpretation. Jira Cloud is the only real external
-side-effect target; command preparation and simulated Learning execution remain local.
+side-effect target. Confluence Cloud is a read-only external metadata source; command preparation
+and simulated Learning execution remain local.
 
 ## Major runtime components
 
@@ -150,6 +157,7 @@ The FastAPI application exposes:
 - `POST /api/v1/execution-commands/{command_id}/execute`
 - `GET /api/v1/catalog-objects?organization_id={organization_id}`
 - `GET /api/v1/catalog-objects/{object_type}/{object_id}`
+- `POST /api/v1/catalog-objects/enterprise_document/{document_id}/confluence-refresh`
 - `GET /api/v1/policy-changes/{policy_change_id}/rule-references/{rule_code}`
 
 The create response adds an input fingerprint, enterprise-impact summary, and categorized
@@ -829,7 +837,7 @@ into the reviewer application because a pre-completed run obscures the start of 
 
 `make demo-reset` applies migrations, runs the idempotent catalog seed, then truncates the explicit
 set of delta-, comparison-, and workflow-owned tables in one transaction. It preserves both policy sources
-and other catalog tables and requires an exact
+and other catalog tables, including imported `confluence_document_sources`, and requires an exact
 confirmation value, recognized local PostgreSQL host and database name, and the seeded organization
 marker. No database or volume is dropped.
 
@@ -852,8 +860,39 @@ assessment-context counts.
 
 Next.js server-renders `/catalog`, supported object details, and policy-rule-reference details with
 uncached API reads. Native `details` elements keep raw IDs and integrity basis collapsed by default.
-There is no search, administration, relationship editing, graph view, Confluence access, or new
-runtime dependency. PR A adds no migration and does not change assessment behavior.
+There is no search, administration, relationship editing, or graph view. PR A added no migration
+and PR B does not change assessment behavior.
+
+## Read-only Confluence document identity boundary
+
+`confluence_document_sources` is a Confluence-specific one-to-one child of
+`enterprise_documents`; the existing string document primary key remains the catalog and
+assessment identity. The child stores only validated external page metadata: provider, page ID
+and title, canonical URL, space ID/key, version, status, source-updated time, import/refresh times,
+source fingerprint, and the latest safe refresh result. It is not a catalog registry and contains
+no policy relationships or arbitrary metadata JSON.
+
+Only `document-manager-travel-approval-guide` has an explicit environment mapping. The refresh
+request accepts its stable ChangeOps ID, resolves the configured page ID server-side, calls
+Confluence REST API v2 for that page and its owning space, validates both identities, and computes
+a canonical SHA-256 fingerprint. The first valid response inserts the child row. A matching
+fingerprint returns `already_current`; changed external metadata updates only the child row.
+
+Provider calls happen outside a database transaction. Persistence then locks the parent document
+before insert/update so concurrent successful refreshes cannot create duplicate identities.
+Authentication, permission, page-not-found, unavailable, validation, and ambiguous-response
+failures are distinct. If a last-known-good row exists, failure updates only its latest outcome
+fields; imported metadata and `refreshed_at` remain unchanged. A first-ever failure creates no
+unvalidated external identity.
+
+The catalog detail response projects imported metadata next to—never over—the existing ChangeOps
+document title, version, status, and stable ID. Relationships still come only from typed policy
+dependency tables, and the assessment loader never queries `confluence_document_sources`.
+Confluence cannot create relationships, findings, impacts, actions, approvals, or execution.
+
+The adapter uses only standard-library HTTPS GETs with a bounded timeout. Credentials and the one
+page ID are environment-only. Automated tests use captured Confluence page/space fixtures and
+mocked network behavior; CI requires no Atlassian account.
 
 ## Policy-analysis journey read model
 
@@ -897,10 +936,15 @@ Jira Cloud is the only real side-effect target. Its synchronous REST v3 adapter 
 credentials and configured project/Task identifiers. Automated tests inject or mock it; CI needs
 no Jira account or secret.
 
+Confluence Cloud is a read-only source. Its synchronous REST v2 adapter reads one configured page
+and that page's space using environment credentials. It never sends a write method, searches,
+crawls, polls, or changes ChangeOps relationships. Automated tests inject or mock it; CI needs no
+Confluence account or secret.
+
 There are no:
 
 - agents, tool-calling loops, embeddings, RAG, or vector-search components;
-- MCP or additional live enterprise integrations;
+- MCP or additional live enterprise integrations beyond the bounded Jira and Confluence adapters;
 - graph databases;
 - background workers or message queues;
 - Jira operations beyond create Task, including transitions and reconciliation;

@@ -4,15 +4,15 @@ ChangeOps analyzes operational and policy changes, identifies affected people an
 
 ## Current milestone
 
-Milestone 7 PR A, Enterprise Knowledge Catalog Explorer.
+Milestone 7 PR B, Read-Only Confluence Document Identity.
 
-The local application now adds a read-only catalog explorer over the existing typed PostgreSQL
-documents, systems, training courses, and policy dependencies. A reviewer can browse stable source
-identities, inspect stored versus normalized metadata, follow policy-scoped rule references, and
-see why persisted dependency rows are deterministic assessment inputs while row-level origin
-provenance remains explicitly not recorded. Existing analysis, comparison, approval, Learning
-System, and Jira behavior remains unchanged. PR A adds no migration or external catalog source;
-Confluence remains the separately planned PR B.
+The catalog explorer can now associate the selected Manager Travel Approval Guide with one real,
+read-only Confluence Cloud page. An explicit refresh validates the configured page identity,
+imports only bounded page and space metadata into PostgreSQL, and exposes the canonical external
+link without changing the stable ChangeOps document ID. Failed refreshes preserve last-known-good
+metadata. Existing relationships, assessment behavior, comparison, approval, Learning System, and
+Jira behavior remain unchanged. Relationship-origin provenance remains the separately deferred
+Milestone 7 PR C.
 
 Milestone 0 is complete and preserved by the `v0.0.1-milestone-0` tag.
 
@@ -325,6 +325,55 @@ Management project's Task workflow so its initial status is **To Do**; ChangeOps
 transitions. Secrets stay in `.env` and are never stored in commands or results. Project and issue
 type identifiers are configuration rather than hard-coded source values.
 
+### Optional read-only Confluence page
+
+The repository intentionally contains no live page ID or credential. To connect the flagship
+Manager Travel Approval Guide, first create or select that page in a dedicated Acme Confluence
+space, then configure:
+
+```dotenv
+CONFLUENCE_BASE_URL=https://your-domain.atlassian.net
+CONFLUENCE_EMAIL=changeops-reader@example.com
+CONFLUENCE_API_TOKEN=your-api-token
+CONFLUENCE_TIMEOUT_SECONDS=10
+CONFLUENCE_MANAGER_TRAVEL_APPROVAL_GUIDE_PAGE_ID=123456789
+```
+
+Use a dedicated account that can only view the selected page and its space. ChangeOps uses only
+Confluence Cloud REST API v2 `GET /wiki/api/v2/pages/{id}` and
+`GET /wiki/api/v2/spaces/{spaceId}`. Atlassian documents `read:page:confluence` and
+`read:space:confluence` as the corresponding granular OAuth scopes; the direct email/API-token
+configuration used here remains constrained by the account's Confluence permissions. See the
+[page API](https://developer.atlassian.com/cloud/confluence/rest/v2/api-group-page/),
+[space API](https://developer.atlassian.com/cloud/confluence/rest/v2/api-group-space/), and
+[basic-auth guidance](https://developer.atlassian.com/cloud/confluence/basic-auth-for-rest-apis/).
+Do not grant content write, delete, search, or space-administration permissions.
+
+After the API is running, import or refresh the configured page explicitly:
+
+```bash
+curl --fail --request POST \
+  http://localhost:8000/api/v1/catalog-objects/enterprise_document/document-manager-travel-approval-guide/confluence-refresh
+```
+
+The first successful response is `success`; an identical later response is `already_current`.
+Open <http://localhost:3000/catalog/enterprise_document/document-manager-travel-approval-guide>
+to inspect the external page ID, space, version, status, refresh state, and **Open in Confluence**
+link. Authentication, permission, not-found, unavailable, validation, and ambiguous-response
+failures have distinct stable codes. A failed refresh never overwrites imported metadata.
+
+To create the live fictional Acme content, use this bounded manual inventory:
+
+1. Required: **Manager Travel Approval Guide** in a space such as **Acme Travel Operations**.
+2. Optional only if later demo needs justify them: **International Travel Booking Procedures**
+   and **International Travel FAQ**.
+3. Copy the required page's numeric ID from its URL or page information into the environment
+   variable above. Do not add it to source control.
+4. Run the explicit refresh and verify that the returned title, space, and page ID match the
+   intended page before the reviewer walkthrough.
+
+No code path creates, edits, publishes, searches, crawls, or deletes Confluence content.
+
 Stop the stack while preserving database data:
 
 ```bash
@@ -345,7 +394,9 @@ Configure `OPENAI_API_KEY` in `.env`, then use this repeatable golden path:
    as assessment-context counts. Open **Manager Travel Approval Guide** and inspect its stored
    Acme Knowledge source, published status, version 2, missing owner, and separate baseline and
    proposed `instructs_manager` dependency rows. Follow the baseline
-   `MANAGER_APPROVAL_REQUIRED` reference and return to the document.
+   `MANAGER_APPROVAL_REQUIRED` reference and return to the document. If Confluence is configured
+   and explicitly refreshed, also confirm the read-only external page identity and open the page
+   in Confluence. Otherwise confirm the honest not-imported state.
 4. Return to policy analysis, select the baseline policy, and choose **Start new analysis**.
 5. On the journey page, inspect the AI-proposed structured values, deterministic validation, and
    exact source quotes. The ordinary golden policy needs no clarification and is labeled
@@ -497,7 +548,8 @@ make demo-reset
 ```
 
 This command preserves the fictional organization, people, trips, systems, documents, training,
-commitments, both policy sources, and the dependency catalog. It removes comparisons and their
+commitments, both policy sources, the dependency catalog, and successfully imported Confluence
+document metadata. It removes comparisons and their
 enterprise impact deltas, analysis
 runs, extraction attempts, clarifications, assessments, findings, evidence, impacts, proposed
 actions, interpretation attempts and plans, reviews, approval runs, commands, assignments, and
@@ -510,6 +562,19 @@ database or volume and is safe to repeat. Do not adapt the target for a shared o
 database.
 
 ## API
+
+Refresh the one configured read-only Confluence source by stable ChangeOps document ID:
+
+```http
+POST /api/v1/catalog-objects/enterprise_document/{document_id}/confluence-refresh
+```
+
+The existing document-detail read includes `external_source_state` and the last-known-good
+`external_source` metadata when available:
+
+```http
+GET /api/v1/catalog-objects/enterprise_document/{document_id}
+```
 
 Create an assessment for the seeded policy:
 

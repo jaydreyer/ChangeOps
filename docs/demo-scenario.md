@@ -943,3 +943,28 @@ the immutable success result. Repeating execution returns `already_applied`, ref
 receipt, and performs no second Jira request. A mocked ambiguous availability failure demonstrates
 the at-most-once safety rule: ChangeOps records the unavailable outcome and refuses to resend when
 the first delivery may have succeeded.
+
+## Milestone 7 PR B Read-Only Confluence Identity Extension
+
+The Manager Travel Approval Guide retains the stable ChangeOps identity
+`document-manager-travel-approval-guide`. When a reviewer has manually configured a real Acme
+Confluence page and explicitly refreshed it, the document detail additionally shows:
+
+- source provider `Confluence Cloud`;
+- the validated external page ID;
+- owning space key and ID;
+- Confluence page version and current/draft/archived status;
+- source-updated and last-refreshed timestamps;
+- an **Open in Confluence** link.
+
+The repository and automated demo remain honest when no live page exists: the detail shows that
+Confluence metadata has not been imported, while fixture-backed tests prove the full boundary.
+`make demo-reset` preserves a successful import. A failed later refresh leaves the last-known-good
+metadata visible with the precise failure state.
+
+Confluence is authoritative only for the imported page metadata. ChangeOps remains authoritative
+for its internal document identity, curated typed policy relationships, assessment behavior,
+workflow state, and audit lineage. The refresh does not change the Manager guide's two
+`instructs_manager` rows or any golden assessment fingerprint/count. No Confluence content,
+relationship origin, crawling, RAG, editing, publishing, background synchronization, or PR C
+provenance is included.

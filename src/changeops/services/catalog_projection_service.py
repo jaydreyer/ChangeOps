@@ -5,6 +5,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from changeops.db.models import (
+    ConfluenceDocumentSource,
     CustomerCommitment,
     EnterpriseDocument,
     EnterpriseSystem,
@@ -31,6 +32,7 @@ from changeops.schemas.catalog import (
     CatalogRelationshipResponse,
     CatalogStatusResponse,
     DocumentMetadataResponse,
+    ExternalDocumentSourceResponse,
     PolicyReferenceResponse,
     PolicyRuleReferenceResponse,
     RecordProvenanceResponse,
@@ -226,6 +228,11 @@ def get_catalog_object_detail(
         raise CatalogObjectNotFoundError(object_id)
 
     relationships = _relationships_for_object(session, object_type, record)
+    external_source = (
+        session.get(ConfluenceDocumentSource, record.id)
+        if object_type == "enterprise_document"
+        else None
+    )
     completion_count = (
         session.scalar(
             select(func.count())
@@ -251,11 +258,46 @@ def get_catalog_object_detail(
                 catalog_context="seeded_demonstration",
             ),
         ),
+        external_source_state=(
+            "imported"
+            if external_source is not None
+            else "not_imported"
+            if object_type == "enterprise_document"
+            else "not_applicable"
+        ),
+        external_source=(
+            serialize_external_document_source(external_source)
+            if external_source is not None
+            else None
+        ),
         relationships=relationships,
         assessment_usage=AssessmentUsageResponse(
             statement=ASSESSMENT_USAGE[object_type],
             changes_assessment_behavior=False,
         ),
+    )
+
+
+def serialize_external_document_source(
+    source: ConfluenceDocumentSource,
+) -> ExternalDocumentSourceResponse:
+    return ExternalDocumentSourceResponse(
+        provider="confluence_cloud",
+        provider_label="Confluence Cloud",
+        external_page_id=source.external_page_id,
+        external_title=source.external_title,
+        canonical_url=source.canonical_url,
+        space_id=source.space_id,
+        space_key=source.space_key,
+        external_version=source.external_version,
+        external_status=source.external_status,
+        source_updated_at=source.source_updated_at,
+        imported_at=source.imported_at,
+        refreshed_at=source.refreshed_at,
+        source_fingerprint=source.source_fingerprint,
+        last_refresh_result=source.last_refresh_result,
+        last_refresh_message=source.last_refresh_message,
+        last_refresh_attempted_at=source.last_refresh_attempted_at,
     )
 
 

@@ -168,6 +168,10 @@ export function CatalogObjectDetailView({ detail }: { detail: CatalogObjectDetai
         </div>
       </section>
 
+      {object.object_type === "enterprise_document" && (
+        <ExternalDocumentIdentity detail={detail} />
+      )}
+
       <section className="catalog-category" aria-labelledby="relationships-heading">
         <div className="section-heading">
           <div>
@@ -236,6 +240,62 @@ export function CatalogObjectDetailView({ detail }: { detail: CatalogObjectDetai
         </details>
       </section>
     </main>
+  );
+}
+
+function ExternalDocumentIdentity({ detail }: { detail: CatalogObjectDetail }) {
+  const source = detail.external_source;
+  return (
+    <section className="journey-card catalog-external-source" aria-labelledby="external-source-heading">
+      <p className="eyebrow">Read-only external source</p>
+      <h2 id="external-source-heading">Confluence document identity</h2>
+      {source ? (
+        <>
+          <div className="section-heading">
+            <p>
+              This ChangeOps document corresponds to a validated page in an external enterprise
+              knowledge system. ChangeOps preserves its own stable catalog identity.
+            </p>
+            <span className="badge deterministic">{humanize(source.external_status)}</span>
+          </div>
+          <dl className="catalog-fact-grid">
+            <Fact label="Source provider" value={source.provider_label} />
+            <Fact label="External page ID" value={source.external_page_id} technical />
+            <Fact label="Space" value={`${source.space_key} · ${source.space_id}`} />
+            <Fact label="Version" value={String(source.external_version)} />
+            <Fact label="Status" value={humanize(source.external_status)} />
+            <Fact label="Last refreshed" value={formatDateTime(source.refreshed_at)} />
+          </dl>
+          {!["success", "already_current"].includes(source.last_refresh_result) && (
+            <div className="catalog-stale-notice" role="status">
+              <strong>Last refresh failed; showing last-known-good metadata.</strong>
+              <p>{source.last_refresh_message}</p>
+            </div>
+          )}
+          <a href={source.canonical_url} target="_blank" rel="noreferrer">
+            Open in Confluence
+          </a>
+          <details className="technical-disclosure">
+            <summary>Technical source details</summary>
+            <dl className="catalog-technical-grid">
+              <Fact label="Imported title" value={source.external_title} />
+              <Fact label="Source updated" value={formatDateTime(source.source_updated_at)} />
+              <Fact label="First imported" value={formatDateTime(source.imported_at)} />
+              <Fact label="Last refresh result" value={humanize(source.last_refresh_result)} />
+              <Fact label="Source fingerprint" value={source.source_fingerprint} technical />
+            </dl>
+          </details>
+        </>
+      ) : (
+        <div className="catalog-unavailable-source" role="status">
+          <strong>Confluence metadata has not been imported.</strong>
+          <p>
+            The ChangeOps catalog record remains available. Configure the selected page and run
+            the explicit refresh API to validate and import its read-only external identity.
+          </p>
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -393,4 +453,12 @@ function humanize(value: string): string {
   return value
     .replaceAll("_", " ")
     .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function formatDateTime(value: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "UTC",
+  }).format(new Date(value));
 }

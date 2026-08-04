@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     jira_project_id_or_key: str | None = None
     jira_issue_type_id: str | None = None
     jira_timeout_seconds: float = 10.0
+    confluence_base_url: str | None = None
+    confluence_email: str | None = None
+    confluence_api_token: SecretStr | None = None
+    confluence_timeout_seconds: float = 10.0
+    confluence_manager_travel_approval_guide_page_id: str | None = None
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

@@ -27,6 +27,8 @@ WORKFLOW_TABLES = (
     "policy_comparison_differences",
     "policy_comparisons",
     "execution_results",
+    "jira_issues",
+    "jira_execution_deliveries",
     "simulated_learning_assignments",
     "execution_commands",
     "action_approval_run_transitions",

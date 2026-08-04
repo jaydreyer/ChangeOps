@@ -425,13 +425,25 @@ function ExecutionPreparationPanel({
                   <span>
                     {humanize(command.target_type)} · {command.target_identifier}
                   </span>
+                  <span>
+                    {humanize(command.system)} · {humanize(command.operation)}
+                  </span>
                 </div>
                 <span className="badge execution">{humanize(command.execution_state)}</span>
               </div>
-              <p>
-                Training:{" "}
-                <code>{String(command.parameters.course_identifier ?? "invalid command")}</code>
-              </p>
+              {command.system === "learning" ? (
+                <p>
+                  Training:{" "}
+                  <code>{String(command.parameters.course_identifier ?? "invalid command")}</code>
+                </p>
+              ) : (
+                <>
+                  <p>{String(command.parameters.summary ?? "Invalid Jira command")}</p>
+                  <small>
+                    Comparison <code>{String(command.parameters.comparison_id ?? "missing")}</code>
+                  </small>
+                </>
+              )}
               <button
                 type="button"
                 onClick={() => execute(command.id)}
@@ -441,7 +453,9 @@ function ExecutionPreparationPanel({
                   ? "Executing…"
                   : command.execution_state === "executed"
                     ? "Execute again safely"
-                    : "Execute training assignment"}
+                    : command.system === "jira"
+                      ? "Create Jira task"
+                      : "Execute training assignment"}
               </button>
               <details className="technical-disclosure command-technical">
                 <summary>View command contract and lineage</summary>
@@ -508,6 +522,15 @@ function ExecutionPreparationPanel({
                           {result.learning_assignment.worker_id} →{" "}
                           {result.learning_assignment.training_course_id} (
                           {humanize(result.learning_assignment.assignment_status)})
+                        </p>
+                      )}
+                      {result.jira_issue && (
+                        <p>
+                          Jira task{" "}
+                          <a href={result.jira_issue.browse_url} target="_blank" rel="noreferrer">
+                            {result.jira_issue.issue_key}
+                          </a>{" "}
+                          in {result.jira_issue.project_id_or_key}
                         </p>
                       )}
                       <details className="technical-disclosure inline-technical">
@@ -599,8 +622,8 @@ function ExecutionPreparationPanel({
         </div>
       )}
       <p className="execution-inline">
-        <strong>Execution is always explicit.</strong> Only supported prepared training commands
-        expose a control; approved actions without an automated mapping remain visible and
+        <strong>Execution is always explicit.</strong> Only supported prepared Learning and Jira
+        commands expose a control; approved actions without an automated mapping remain visible and
         inactive.
       </p>
     </section>

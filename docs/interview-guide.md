@@ -82,7 +82,7 @@ ChangeOps is a synchronous modular monolith in which PostgreSQL owns durable tru
 | **Deterministic services** | Validate rules, classify impacts, compare policies, calculate deltas, authorize transitions, and map commands | Known rules should be repeatable, testable, and explainable. |
 | **Immutable artifacts** | Preserve completed assessments, comparisons, deltas, evidence, and decisions | Historical conclusions must continue to mean what they meant when a decision was made. |
 | **Human approval** | Separates recommendation from authorization | Consequential enterprise actions require accountable human judgment. |
-| **Simulated enterprise systems** | Exercise the integration and execution boundary safely | The project demonstrates real governance properties without requiring privileged production integrations. |
+| **Execution adapters** | Apply approved commands to the simulated Learning System and real Jira Cloud | The same governance boundary supports durable local effects and one narrowly scoped external write. |
 
 ### Suggested walkthrough
 
@@ -213,9 +213,17 @@ The original action is never overwritten. Approval produces a separate decision 
 
 Execution begins only after approval. A preparation step maps the approved intent into a stable command with explicit lineage. The execution service validates that lineage again, invokes a governed adapter, and stores the result.
 
-Idempotency means the same command can be retried without duplicating the underlying action. The simulated learning system demonstrates this contract safely.
+Idempotency means replay cannot duplicate the underlying action. Learning uses a unique local
+assignment. Jira uses a durable at-most-once delivery gate because Create Issue has no unique
+client idempotency key: confirmed success replays locally, while an ambiguous lost response is not
+resent without an intentionally deferred reconciliation capability.
 
-**Emphasize:** the adapter is replaceable; the governance boundary is the real design.
+Jira is deliberately create-only. Updates and transitions would authorize different consequences,
+require new command semantics, and complicate replay and drift handling without strengthening this
+milestone's core proof.
+
+**Emphasize:** the adapter is replaceable; immutable authorization and honest failure semantics are
+the real design.
 
 ### Auditability
 
@@ -311,7 +319,7 @@ Keep the main story at the level of **problem → evidence → decision → cont
 - [ ] Analysis and comparison entry states are ready.
 - [ ] At least one action is available for review.
 - [ ] Actor identity and role are set correctly.
-- [ ] The simulated execution target is in a known state.
+- [ ] The simulated Learning target and configured Jira project are in a known state.
 - [ ] Browser zoom and window size make evidence readable.
 - [ ] A backup API response or screenshot is available.
 

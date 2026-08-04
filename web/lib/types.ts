@@ -134,8 +134,8 @@ export interface ExecutionCommand {
   assessment_id: string;
   sequence: number;
   schema_version: "execution-command-v1";
-  system: "learning";
-  operation: "assign_training";
+  system: "learning" | "jira";
+  operation: "assign_training" | "create_issue";
   target_type: string;
   target_identifier: string;
   parameters: Record<string, unknown>;
@@ -164,7 +164,13 @@ export interface SimulatedLearningAssignment {
 export interface ExecutionResult {
   id: string;
   execution_command_id: string;
-  status: "succeeded" | "already_applied" | "rejected_unsupported" | "failed_validation";
+  status:
+    | "succeeded"
+    | "already_applied"
+    | "rejected_unsupported"
+    | "failed_validation"
+    | "failed_authentication"
+    | "failed_unavailable";
   outcome_code: string;
   message: string;
   command_idempotency_key: string;
@@ -172,6 +178,18 @@ export interface ExecutionResult {
   attempted_role: "admin";
   created_at: string;
   learning_assignment: SimulatedLearningAssignment | null;
+  jira_issue: JiraIssue | null;
+}
+
+export interface JiraIssue {
+  id: string;
+  issue_id: string;
+  issue_key: string;
+  api_url: string;
+  browse_url: string;
+  project_id_or_key: string;
+  execution_command_id: string;
+  created_at: string;
 }
 
 export interface ExecutionPreparation {

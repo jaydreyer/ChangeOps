@@ -165,6 +165,7 @@ function preparation(
           attempted_role: "admin" as const,
           created_at: "2026-08-02T12:05:00Z",
           learning_assignment: assignment,
+          jira_issue: null,
         },
         ...(replay
           ? [
@@ -180,6 +181,7 @@ function preparation(
                 attempted_role: "admin" as const,
                 created_at: "2026-08-02T12:06:00Z",
                 learning_assignment: assignment,
+                jira_issue: null,
               },
             ]
           : []),
@@ -498,6 +500,44 @@ describe("approval workbench", () => {
     expect(within(unsupported as HTMLElement).queryByRole("button")).not.toBeInTheDocument();
   });
 
+  it("shows a prepared Jira task and its immutable external receipt", () => {
+    const jiraPreparation = preparation(true, true);
+    const command = jiraPreparation.commands[0];
+    command.system = "jira";
+    command.operation = "create_issue";
+    command.target_type = "enterprise_document";
+    command.target_identifier = "document-policy";
+    command.parameters = {
+      summary: "Operational remediation: International Business Travel Policy",
+      comparison_id: "comparison-1",
+    };
+    command.execution_results[0].learning_assignment = null;
+    command.execution_results[0].jira_issue = {
+      id: "jira-receipt-1",
+      issue_id: "10101",
+      issue_key: "ECM-42",
+      api_url: "https://acme.atlassian.net/rest/api/3/issue/10101",
+      browse_url: "https://acme.atlassian.net/browse/ECM-42",
+      project_id_or_key: "ECM",
+      execution_command_id: "command-1",
+      created_at: "2026-08-02T12:05:00Z",
+    };
+
+    render(
+      <WorkbenchView
+        initialWorkbench={workbench("approved")}
+        initialPreparation={jiraPreparation}
+      />,
+    );
+
+    expect(screen.getByText("Jira · Create issue")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Execute again safely" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "ECM-42" })).toHaveAttribute(
+      "href",
+      "https://acme.atlassian.net/browse/ECM-42",
+    );
+  });
+
   it("executes a supported command and reloads authoritative result state", async () => {
     const user = userEvent.setup();
     const execution = preparation(true, true).commands[0].execution_results[0];
@@ -573,6 +613,7 @@ describe("approval workbench", () => {
           attempted_role: "admin",
           created_at: "2026-08-02T12:05:00Z",
           learning_assignment: null,
+          jira_issue: null,
         },
       ],
     };

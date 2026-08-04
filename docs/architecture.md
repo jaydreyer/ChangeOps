@@ -1,8 +1,9 @@
 # ChangeOps Architecture
 
-This document describes the current implementation through Milestone 5B: the completed
+This document describes the current implementation through Milestone 6: the completed
 policy-analysis and approval lifecycles, the integrated Next.js journey and workbench,
-deterministic preparation and explicit execution of one learning-assignment command, and immutable
+deterministic preparation and explicit execution of learning-assignment and Jira create-issue
+commands, and immutable
 deterministic comparison of two accepted international-travel policy rulesets and their immutable
 enterprise impact assessments.
 
@@ -42,6 +43,7 @@ flowchart LR
         CommandMapping["Pure supported-action<br/>command mapping"]
         ExecutionService["Deterministic execution<br/>and lineage validation"]
         LearningAdapter["Simulated learning adapter"]
+        JiraAdapter["Jira Cloud create-issue adapter"]
         Comparison["Policy comparison service"]
         Comparator["Pure typed semantic comparator"]
         ImpactDelta["Enterprise impact delta service"]
@@ -91,7 +93,9 @@ flowchart LR
     Comparison --> ORM
     ExecutionService --> CommandMapping
     ExecutionService --> LearningAdapter
+    ExecutionService --> JiraAdapter
     LearningAdapter --> ORM
+    JiraAdapter --> JiraCloud["Jira Cloud"]
     ORM --> DB
     Migrate --> DB
     Seed --> DB
@@ -102,8 +106,8 @@ persistence code run in one Python process. PostgreSQL stores source, extraction
 assessment, comparison, interpretation, review, approval-run, command, simulated
 learning-assignment, and execution-result data. The Next.js runtime provides the local analysis,
 comparison, and approval experiences. A configured
-chat-model provider is the only external service used by extraction and interpretation; command
-preparation and simulated execution have no external dependency.
+chat-model provider supports extraction and interpretation. Jira Cloud is the only real external
+side-effect target; command preparation and simulated Learning execution remain local.
 
 ## Major runtime components
 
@@ -319,7 +323,7 @@ flowchart TD
     Adapter --> Result
 ```
 
-`learning.assign_training` is the only dispatch path. The adapter validates a closed payload,
+`learning.assign_training` remains the simulated dispatch path. The adapter validates a closed payload,
 requires a real worker and active course, and performs no AI call. PostgreSQL commits the assignment
 and successful result in one transaction. A row lock serializes requests for one command, while a
 unique `source_execution_command_id` constraint is the durable backstop. The first attempt appends
@@ -332,6 +336,27 @@ Commands remain immutable and `pending_execution`; they represent authorization,
 connector state. Simulated learning assignments represent enterprise state. Execution results
 represent append-only attempt history. Proposed actions remain immutable `not_executed` assessment
 artifacts, so execution never rewrites historical analysis or approval.
+
+### Jira Cloud create-issue execution
+
+`operational_remediation / enterprise_document` is the only Jira mapping. Command preparation
+requires exactly one immutable policy-comparison impact delta whose proposed assessment owns the
+approved action. Application code constructs a closed `jira.create_issue` command from the
+comparison, approved document impact, evidence, and non-secret configured Jira project and Task
+identifiers. The command snapshots a human-readable ADF description; Jira receives no domain
+objects and makes no approval or routing decision.
+
+Execution revalidates approval and comparison lineage before reserving a unique
+`jira_execution_deliveries` row. The reservation commits before the network call. Confirmed success
+creates one immutable `jira_issues` receipt and result; replay reuses that receipt without invoking
+Jira. Definitive authentication or validation responses permit a later explicit retry. A timeout,
+connection loss, unexpected response, or 5xx leaves `outcome_unknown`; subsequent requests append
+an unavailable result without resending. This at-most-once design is the smallest no-duplicate
+guarantee available without Jira search, synchronization, or provider-side unique idempotency.
+
+The adapter calls only `POST /rest/api/3/issue`. It does not update, delete, transition, comment,
+attach, search, poll, or synchronize. The Task workflow owns the initial **To Do** status. Email and
+API-token credentials remain environment-only.
 
 ### Policy extraction service
 
@@ -757,6 +782,11 @@ code and explanation, command idempotency key, execution actor, role, and timest
 checks outcome/assignment consistency and rejects update or delete. Replays add history without
 duplicating simulated enterprise state.
 
+`jira_execution_deliveries` is mutable delivery-control state, not audit history. It records
+whether the single permitted external delivery is reserved, safely retryable, ambiguous, or
+confirmed. `jira_issues` stores the immutable external receipt. Jira results link to that receipt;
+all attempts remain append-only in `execution_results`.
+
 ## Seeded demonstration catalog and reset
 
 The idempotent seed contains:
@@ -834,13 +864,17 @@ The assessment endpoints communicate only with PostgreSQL. Extraction and policy
 or retry operations additionally use LangChain Core and the configured `langchain-openai` chat
 model integration. LangGraph 1.0.8 provides the narrow orchestration runtime.
 
+Jira Cloud is the only real side-effect target. Its synchronous REST v3 adapter uses environment
+credentials and configured project/Task identifiers. Automated tests inject or mock it; CI needs
+no Jira account or secret.
+
 There are no:
 
 - agents, tool-calling loops, embeddings, RAG, or vector-search components;
-- MCP or live enterprise integrations;
+- MCP or additional live enterprise integrations;
 - graph databases;
 - background workers or message queues;
-- execution beyond the single simulated learning assignment;
+- Jira operations beyond create Task, including transitions and reconciliation;
 - production authentication or user-administration components.
 
 ## Quality and provider verification boundaries

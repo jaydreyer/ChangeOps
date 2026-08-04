@@ -195,9 +195,21 @@ def execute_execution_command(
     serialized = serialize_execution_result(outcome.result)
     if outcome.result.status == "already_applied":
         response.status_code = status.HTTP_200_OK
-    elif outcome.result.status in {"rejected_unsupported", "failed_validation"}:
+    elif outcome.result.status in {
+        "rejected_unsupported",
+        "failed_validation",
+        "failed_authentication",
+        "failed_unavailable",
+    }:
+        error_status = (
+            status.HTTP_503_SERVICE_UNAVAILABLE
+            if outcome.result.status == "failed_unavailable"
+            else status.HTTP_401_UNAUTHORIZED
+            if outcome.result.status == "failed_authentication"
+            else status.HTTP_422_UNPROCESSABLE_CONTENT
+        )
         raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            status_code=error_status,
             detail={
                 "code": outcome.result.outcome_code,
                 "message": outcome.result.message,

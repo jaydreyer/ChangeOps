@@ -1209,7 +1209,8 @@ class ExecutionCommand(Base):
             name="ck_execution_commands_schema_version",
         ),
         CheckConstraint(
-            "system = 'learning' AND operation = 'assign_training'",
+            "(system = 'learning' AND operation = 'assign_training') OR "
+            "(system = 'jira' AND operation = 'create_issue')",
             name="ck_execution_commands_supported_mapping",
         ),
         CheckConstraint(
@@ -1331,14 +1332,17 @@ class ExecutionResult(Base):
     __table_args__ = (
         CheckConstraint(
             "status IN "
-            "('succeeded', 'already_applied', 'rejected_unsupported', 'failed_validation')",
+            "('succeeded', 'already_applied', 'rejected_unsupported', 'failed_validation', "
+            "'failed_authentication', 'failed_unavailable')",
             name="ck_execution_results_status",
         ),
         CheckConstraint(
             "(status IN ('succeeded', 'already_applied') "
-            "AND simulated_learning_assignment_id IS NOT NULL) "
-            "OR (status IN ('rejected_unsupported', 'failed_validation') "
-            "AND simulated_learning_assignment_id IS NULL)",
+            "AND ((simulated_learning_assignment_id IS NOT NULL AND jira_issue_id IS NULL) OR "
+            "(simulated_learning_assignment_id IS NULL AND jira_issue_id IS NOT NULL))) "
+            "OR (status IN ('rejected_unsupported', 'failed_validation', "
+            "'failed_authentication', 'failed_unavailable') "
+            "AND simulated_learning_assignment_id IS NULL AND jira_issue_id IS NULL)",
             name="ck_execution_results_assignment_outcome",
         ),
         CheckConstraint(
@@ -1356,6 +1360,10 @@ class ExecutionResult(Base):
         ForeignKey("simulated_learning_assignments.id"),
         index=True,
     )
+    jira_issue_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("jira_issues.id"),
+        index=True,
+    )
     status: Mapped[str] = mapped_column(String(30))
     outcome_code: Mapped[str] = mapped_column(String(100))
     message: Mapped[str] = mapped_column(Text)
@@ -1365,6 +1373,45 @@ class ExecutionResult(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
     learning_assignment: Mapped[SimulatedLearningAssignment | None] = relationship()
+    jira_issue: Mapped["JiraIssue | None"] = relationship()
+
+
+class JiraExecutionDelivery(Base):
+    __tablename__ = "jira_execution_deliveries"
+    __table_args__ = (
+        CheckConstraint(
+            "state IN ('reserved', 'retryable_failure', 'outcome_unknown', 'succeeded')",
+            name="ck_jira_execution_deliveries_state",
+        ),
+    )
+
+    execution_command_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("execution_commands.id"), primary_key=True
+    )
+    state: Mapped[str] = mapped_column(String(30))
+    attempt_count: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class JiraIssue(Base):
+    __tablename__ = "jira_issues"
+    __table_args__ = (
+        UniqueConstraint("execution_command_id", name="uq_jira_issues_execution_command"),
+        UniqueConstraint("issue_id", name="uq_jira_issues_external_id"),
+        UniqueConstraint("issue_key", name="uq_jira_issues_external_key"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    execution_command_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("execution_commands.id"), index=True
+    )
+    issue_id: Mapped[str] = mapped_column(String(100))
+    issue_key: Mapped[str] = mapped_column(String(100))
+    api_url: Mapped[str] = mapped_column(Text)
+    browse_url: Mapped[str] = mapped_column(Text)
+    project_id_or_key: Mapped[str] = mapped_column(String(100))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class ActionApprovalRunTransition(Base):

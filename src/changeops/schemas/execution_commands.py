@@ -18,6 +18,19 @@ class SimulatedLearningAssignmentResponse(BaseModel):
     created_at: datetime
 
 
+class JiraIssueResponse(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    id: uuid.UUID
+    issue_id: str
+    issue_key: str
+    api_url: str
+    browse_url: str
+    project_id_or_key: str
+    execution_command_id: uuid.UUID
+    created_at: datetime
+
+
 class ExecutionResultResponse(BaseModel):
     model_config = ConfigDict(frozen=True)
 
@@ -28,6 +41,8 @@ class ExecutionResultResponse(BaseModel):
         "already_applied",
         "rejected_unsupported",
         "failed_validation",
+        "failed_authentication",
+        "failed_unavailable",
     ]
     outcome_code: str
     message: str
@@ -36,6 +51,7 @@ class ExecutionResultResponse(BaseModel):
     attempted_role: Literal["admin"]
     created_at: datetime
     learning_assignment: SimulatedLearningAssignmentResponse | None
+    jira_issue: JiraIssueResponse | None
 
 
 class ExecutionCommandResponse(BaseModel):
@@ -49,8 +65,8 @@ class ExecutionCommandResponse(BaseModel):
     assessment_id: uuid.UUID
     sequence: int
     schema_version: Literal["execution-command-v1"]
-    system: Literal["learning"]
-    operation: Literal["assign_training"]
+    system: Literal["learning", "jira"]
+    operation: Literal["assign_training", "create_issue"]
     target_type: str
     target_identifier: str
     parameters: dict[str, Any]

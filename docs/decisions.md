@@ -54,6 +54,7 @@ AI is intentionally not responsible for determining known enterprise relationshi
 
 ## Consequences
 
+
 ### Positive
 
 - Clear separation between deterministic and probabilistic reasoning.
@@ -750,3 +751,42 @@ matching is complete.
   engine or policy-family registry.
 - AI explanation of the completed delta remains possible later but cannot become authoritative.
 - Governed immutable change-plan revision is the recommended next product slice.
+
+# ADR-0019 — Use an At-Most-Once Jira Create Adapter
+
+## Status
+
+Accepted
+
+## Context
+
+Milestone 6 must create one real Jira Task while preserving immutable authorization, explicit
+execution, replay protection, and a strict no-duplicate guarantee. Jira Cloud Create Issue accepts
+issue properties but provides no unique client idempotency key. Titles and properties are not
+uniqueness constraints. The approved scope excludes search, synchronization, polling, and update.
+An ordinary retry after a lost response could therefore create a second issue.
+
+## Decision
+
+ChangeOps adds one closed mapping,
+`operational_remediation / enterprise_document → jira.create_issue`, beneath the existing immutable
+command boundary. Preparation snapshots one comparison-backed, human-readable ADF Task. A durable
+delivery gate is committed before the HTTP request. One command can own one immutable Jira receipt.
+
+Confirmed Jira success is replayed locally. Definitive no-side-effect authentication and validation
+responses may be retried explicitly. Ambiguous network and server failures are sealed as
+`outcome_unknown` and are never resent automatically. Every explicit request appends an immutable
+execution result. The mutable gate is delivery-control state, not audit history.
+
+The adapter uses only `POST /rest/api/3/issue`. Jira identifiers and credentials are environment
+configuration; secrets never enter commands. No registry, plugin framework, queue, worker, MCP,
+search, transition, update, or reconciliation path is added.
+
+## Consequences
+
+- Repeated and concurrent execution cannot create duplicate Jira issues through ChangeOps.
+- A crash or lost response can leave an issue outcome unknown and requires out-of-scope manual
+  reconciliation before any future product extension may resend.
+- The system prefers missed automatic recovery over violating the no-duplicate requirement.
+- Jira remains an execution adapter and does not enter analysis, comparison, approval, or planning
+  domain models.

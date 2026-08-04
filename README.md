@@ -4,7 +4,7 @@ ChangeOps analyzes operational and policy changes, identifies affected people an
 
 ## Current milestone
 
-Milestone 5B, Enterprise Impact Delta.
+Milestone 6, Real Jira Execution Integration.
 
 The local application now starts with a baseline international-travel policy and one proposed
 revision. A reviewer analyzes both through the existing governed journey, then creates or retrieves
@@ -12,7 +12,8 @@ an immutable deterministic comparison of their accepted typed rules and immutabl
 The comparison shows stable added, removed, and modified obligations plus the workers, findings,
 and enterprise impacts whose operational status changed. Every delta item retains applicable
 assessment lineage, deterministic reasons, evidence snapshots, and relationship paths. Milestones
-0–5 and the controlled execution workbench remain intact.
+0–5 remain intact. One explicitly approved `operational_remediation` action can now create a real
+Jira Cloud Task through the same immutable-command boundary used by the simulated Learning System.
 
 Milestone 0 is complete and preserved by the `v0.0.1-milestone-0` tag.
 
@@ -26,6 +27,7 @@ See:
 - `docs/milestone-4.md`
 - `docs/milestone-5a-policy-comparison.md`
 - `docs/milestone-5b-enterprise-impact-delta.md`
+- `docs/milestone-6.md`
 - `docs/demo-scenario.md`
 - `docs/decisions.md`
 - [Contributing and engineering standards](CONTRIBUTING.md)
@@ -163,7 +165,7 @@ reviewers and admins can use the idempotent explicit resume endpoint to reconcil
 Completed runs and no-op waiting resumes remain unchanged. Approval completion performs no
 execution; the separate controlled-execution boundary below requires another explicit request.
 
-## Controlled training execution
+## Controlled enterprise execution
 
 An authorized demonstration `admin` can prepare commands after an approval run completes.
 Preparation considers approved reviews only, reuses the existing effective-action overlay, and
@@ -198,6 +200,26 @@ learning adapter. A successful transaction commits both `simulated_learning_assi
 replay gets its own immutable `already_applied` result referencing the original assignment.
 The workbench shows the worker, course, approval lineage, execution control, assignment, and audit
 history. Proposed actions and approval history remain unchanged.
+
+The proposed policy's primary source-document remediation maps through a second closed route:
+
+```text
+operational_remediation / enterprise_document
+  → jira / create_issue
+```
+
+Preparation requires one immutable comparison whose impact delta names the approved assessment as
+the proposed side. It snapshots a human-readable Task summary and Atlassian Document Format
+description containing the business summary, semantic policy differences, operational impact,
+deterministic reason, evidence, command/comparison IDs, and assessment/extraction lineage. AI does
+not participate.
+
+Jira creation uses an at-most-once PostgreSQL delivery gate. Confirmed success persists one
+immutable Jira receipt and replay returns `already_applied` without another network call.
+Authentication and request-validation responses are definitive no-side-effect failures and may be
+retried explicitly. Timeouts, connection loss, and 5xx responses are treated as ambiguous and are
+never resent automatically, because Jira Create Issue has no unique client idempotency key and this
+milestone excludes search and reconciliation. This intentionally prioritizes no duplicate issues.
 
 The guided approval view leads with the persisted review count, current approval state, and the
 explicit boundary that a decision does not execute an action. Each item presents its proposal,
@@ -287,6 +309,22 @@ and model family and can be configured independently with `INTERPRETATION_MODEL_
 retries disabled; configure these bounds with `*_MODEL_TIMEOUT_SECONDS` and
 `*_MODEL_MAX_RETRIES`. The policy-analysis workflow still owns its one bounded fresh-attempt retry.
 
+To create Jira Tasks, also configure:
+
+```dotenv
+JIRA_BASE_URL=https://your-domain.atlassian.net
+JIRA_EMAIL=operator@example.com
+JIRA_API_TOKEN=your-api-token
+JIRA_PROJECT_ID_OR_KEY=your-project-id-or-key
+JIRA_ISSUE_TYPE_ID=your-task-issue-type-id
+JIRA_TIMEOUT_SECONDS=10
+```
+
+The account needs Browse Projects and Create Issues permission. Configure the Enterprise Change
+Management project's Task workflow so its initial status is **To Do**; ChangeOps does not perform
+transitions. Secrets stay in `.env` and are never stored in commands or results. Project and issue
+type identifiers are configuration rather than hard-coded source values.
+
 Stop the stack while preserving database data:
 
 ```bash
@@ -334,6 +372,14 @@ Configure `OPENAI_API_KEY` in `.env`, then use this repeatable golden path:
     policy-required course impact are unchanged and omitted from the delta. Detailed records start
     collapsed; open one item at a time to inspect authoritative before/after reasons, evidence,
     relationship paths, stable identity, and lineage.
+14. Open the proposed assessment's approval workbench. Approve its single
+    `operational_remediation` action for the primary policy document and record terminal decisions
+    for the remaining recommendations.
+15. Prepare the immutable `jira.create_issue` command and inspect its title, comparison ID,
+    assessment lineage, and readable description before execution.
+16. Execute it once to create a Task in the configured Enterprise Change Management project, then
+    execute it again. The replay is `already_applied`, links to the same Jira issue, and performs no
+    second Jira request.
 
 Analysis creation uses one long-running POST and never automatically repeats that mutation. Client
 timestamps render in a fixed timezone to keep server and browser markup stable. If the response is
@@ -649,8 +695,8 @@ and execution state in text. Approval may edit only description and due date. Ev
 followed by an authoritative server refresh. Proposed actions remain immutable `not_executed`
 assessment artifacts even when a separate command has execution results. Once the run completes,
 the same page shows execution eligibility, unsupported approvals, immutable commands, an explicit
-control for the one supported training-assignment operation, durable assignments, and immutable
-result history. Approval alone never invokes that control.
+controls for the supported Learning assignment and Jira create-Task operations, durable receipts,
+and immutable result history. Approval alone never invokes either control.
 
 Create operations return `201 Created`; run, extraction, and change-plan creates include a
 `Location` header.

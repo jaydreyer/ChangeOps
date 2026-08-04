@@ -1,16 +1,21 @@
 import uuid
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from changeops.config import get_settings
 from changeops.db.models import (
     ActionApprovalRun,
     ActionApprovalRunItem,
     ActionReview,
+    AssessmentEnterpriseImpact,
+    Evidence,
     ExecutionCommand,
     ExecutionResult,
+    PolicyComparison,
+    PolicyComparisonImpactDelta,
 )
 from changeops.domain.action_review import (
     EditedActionSnapshot,
@@ -19,11 +24,13 @@ from changeops.domain.action_review import (
 )
 from changeops.domain.execution_command import (
     ExecutionCommandCandidate,
+    ExecutionMappingResult,
     UnsupportedExecutionMapping,
     command_idempotency_key,
     map_effective_action,
     snapshot_effective_action,
 )
+from changeops.domain.jira_execution import jira_issue_description
 
 
 class ApprovalRunNotCompletedError(Exception):
@@ -96,7 +103,10 @@ def prepare_execution_commands(
                 .options(
                     selectinload(ExecutionCommand.execution_results).selectinload(
                         ExecutionResult.learning_assignment
-                    )
+                    ),
+                    selectinload(ExecutionCommand.execution_results).selectinload(
+                        ExecutionResult.jira_issue
+                    ),
                 )
             )
         }
@@ -106,7 +116,12 @@ def prepare_execution_commands(
                 continue
             decision = _approval_decision(review)
             effective = _effective_action(review)
-            mapping = map_effective_action(effective)
+            command_id = (
+                existing_by_review[item.action_review_id].id
+                if item.action_review_id in existing_by_review
+                else uuid.uuid4()
+            )
+            mapping = _map_effective_action(session, effective, command_id=command_id)
             if mapping.command is None:
                 continue
             key = command_idempotency_key(
@@ -119,6 +134,7 @@ def prepare_execution_commands(
                 continue
 
             command = ExecutionCommand(
+                id=command_id,
                 approval_run_id=run.id,
                 action_review_id=review.id,
                 action_review_decision_id=decision.id,
@@ -171,7 +187,10 @@ def get_execution_command_preparation(
             .options(
                 selectinload(ExecutionCommand.execution_results).selectinload(
                     ExecutionResult.learning_assignment
-                )
+                ),
+                selectinload(ExecutionCommand.execution_results).selectinload(
+                    ExecutionResult.jira_issue
+                ),
             )
         )
     }
@@ -186,8 +205,12 @@ def get_execution_command_preparation(
         approved_count += 1
         _approval_decision(review)
         effective = _effective_action(review)
-        mapping = map_effective_action(effective)
         persisted = commands_by_review.get(review.id)
+        mapping = _map_effective_action(
+            session,
+            effective,
+            command_id=persisted.id if persisted is not None else uuid.UUID(int=0),
+        )
         if mapping.command is not None:
             eligible_count += 1
             if persisted is not None:
@@ -230,7 +253,10 @@ def get_execution_command(
         .options(
             selectinload(ExecutionCommand.execution_results).selectinload(
                 ExecutionResult.learning_assignment
-            )
+            ),
+            selectinload(ExecutionCommand.execution_results).selectinload(
+                ExecutionResult.jira_issue
+            ),
         )
     )
     if command is None:
@@ -318,3 +344,102 @@ def _validate_existing(
         raise ExecutionCommandConflictError(
             "The approved review already has a command with different semantics."
         )
+
+
+def _map_effective_action(
+    session: Session,
+    action: OriginalActionSnapshot,
+    *,
+    command_id: uuid.UUID,
+) -> ExecutionMappingResult:
+    if action.action_type != "operational_remediation":
+        return map_effective_action(action)
+    settings = get_settings()
+    configured = (
+        settings.jira_project_id_or_key,
+        settings.jira_issue_type_id,
+    )
+    if not all(configured) or action.enterprise_impact_id is None:
+        return map_effective_action(action)
+    deltas = list(
+        session.scalars(
+            select(PolicyComparisonImpactDelta).where(
+                PolicyComparisonImpactDelta.proposed_assessment_id == action.assessment_id
+            )
+        )
+    )
+    if len(deltas) != 1:
+        return map_effective_action(action)
+    delta = deltas[0]
+    comparison = session.get(PolicyComparison, delta.policy_comparison_id)
+    impact = session.scalar(
+        select(AssessmentEnterpriseImpact)
+        .where(
+            AssessmentEnterpriseImpact.id == action.enterprise_impact_id,
+            AssessmentEnterpriseImpact.assessment_id == action.assessment_id,
+        )
+        .options(selectinload(AssessmentEnterpriseImpact.evidence))
+    )
+    if comparison is None or impact is None:
+        return map_effective_action(action)
+    changes = [
+        f"{difference.field_path.replace('_', ' ')}: "
+        f"{difference.change_type.replace('_', ' ')} "
+        f"({difference.baseline_value!s} → {difference.proposed_value!s})"
+        for difference in comparison.differences
+    ]
+    proposed = comparison.proposed_policy_snapshot
+    summary = f"Update {impact.display_name}"
+    description = jira_issue_description(
+        business_summary=(
+            f"Update the source policy document to reflect the approved revision effective "
+            f"{_human_date(proposed['effective_date'])}."
+        ),
+        policy_changes=changes,
+        operational_impact=impact.explanation,
+        deterministic_reason=f"{impact.explanation} (Reason: {impact.reason_code})",
+        evidence=[_jira_evidence_summary(item) for item in impact.evidence],
+        command_id=str(command_id),
+        comparison_id=str(comparison.id),
+        baseline_assessment_id=str(delta.baseline_assessment_id),
+        proposed_assessment_id=str(delta.proposed_assessment_id),
+        baseline_extraction_attempt_id=str(comparison.baseline_extraction_attempt_id),
+        proposed_extraction_attempt_id=str(comparison.proposed_extraction_attempt_id),
+    )
+    candidate = ExecutionCommandCandidate(
+        system="jira",
+        operation="create_issue",
+        target_type="enterprise_document",
+        target_identifier=action.target_identifier,
+        parameters={
+            "project_id_or_key": settings.jira_project_id_or_key,
+            "issue_type_id": settings.jira_issue_type_id,
+            "summary": summary,
+            "description": description,
+            "execution_command_id": str(command_id),
+            "comparison_id": str(comparison.id),
+            "baseline_assessment_id": str(delta.baseline_assessment_id),
+            "proposed_assessment_id": str(delta.proposed_assessment_id),
+            "target_identifier": action.target_identifier,
+        },
+    )
+    return map_effective_action(action, jira_command=candidate)
+
+
+def _jira_evidence_summary(evidence: Evidence) -> str:
+    snapshot = evidence.snapshot
+    if evidence.source_type == "enterprise_document":
+        return (
+            f"{snapshot['title']}, version {snapshot['version']}, "
+            f"published in {snapshot['source_system']}"
+        )
+    if evidence.source_type == "policy_change":
+        return f"Approved revision effective {_human_date(snapshot['effective_date'])}"
+    if evidence.source_type == "policy_document_dependency":
+        return "Primary policy-document dependency requires an update"
+    return evidence.label
+
+
+def _human_date(value: str) -> str:
+    parsed = date.fromisoformat(value)
+    return f"{parsed.strftime('%B')} {parsed.day}, {parsed.year}"

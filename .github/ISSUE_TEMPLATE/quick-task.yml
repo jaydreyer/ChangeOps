@@ -1,0 +1,24 @@
+name: Quick task
+description: A small, already-decided change
+title: ""
+labels:
+  - "status:ready"
+body:
+  - type: textarea
+    id: change
+    attributes:
+      label: Change
+      description: What needs to change?
+    validations:
+      required: true
+
+  - type: textarea
+    id: done
+    attributes:
+      label: Done when
+      description: List observable acceptance criteria.
+      placeholder: |
+        - [ ] Criterion one
+        - [ ] Criterion two
+    validations:
+      required: true

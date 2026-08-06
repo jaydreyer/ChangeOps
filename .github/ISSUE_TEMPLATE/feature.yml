@@ -1,0 +1,45 @@
+name: Feature
+description: A normal product or engineering feature
+title: ""
+labels:
+  - "type:feature"
+  - "status:needs-refinement"
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem exists today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: What should become possible?
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      placeholder: |
+        - [ ] Observable behavior one
+        - [ ] Observable behavior two
+        - [ ] Relevant failure path
+    validations:
+      required: true
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints
+      description: Security, compatibility, scope, architecture, or product constraints.
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Relevant context
+      description: Related files, docs, screenshots, issues, or decisions.

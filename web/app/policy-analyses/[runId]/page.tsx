@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { PolicyAnalysisJourneyView } from "@/app/components/policy-analysis-journey";
-import { getPolicyAnalysisJourney } from "@/lib/api";
+import { getAuditTimeline, getPolicyAnalysisJourney } from "@/lib/api";
 
 export default async function PolicyAnalysisPage({
   params,
@@ -10,7 +10,13 @@ export default async function PolicyAnalysisPage({
   const { runId } = await params;
   const result = await loadJourney(runId);
   if (result.journey) {
-    return <PolicyAnalysisJourneyView initialJourney={result.journey} />;
+    return (
+      <PolicyAnalysisJourneyView
+        initialJourney={result.journey}
+        initialTimeline={result.timeline}
+        timelineError={result.timelineMessage}
+      />
+    );
   }
   return (
     <main className="entry-shell">
@@ -29,11 +35,25 @@ export default async function PolicyAnalysisPage({
 async function loadJourney(runId: string) {
   try {
     const journey = await getPolicyAnalysisJourney(runId);
-    return { journey, message: "" };
+    try {
+      const timeline = await getAuditTimeline(runId);
+      return { journey, timeline, timelineMessage: "", message: "" };
+    } catch (caught) {
+      const timelineMessage =
+        caught instanceof Error ? caught.message.split("|").slice(1).join("|") : "";
+      return {
+        journey,
+        timeline: null,
+        timelineMessage: timelineMessage || "The audit timeline is temporarily unavailable.",
+        message: "",
+      };
+    }
   } catch (caught) {
     const message = caught instanceof Error ? caught.message.split("|").slice(1).join("|") : "";
     return {
       journey: null,
+      timeline: null,
+      timelineMessage: "",
       message: message || "The ChangeOps API is unavailable.",
     };
   }

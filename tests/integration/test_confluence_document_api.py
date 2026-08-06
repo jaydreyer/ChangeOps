@@ -283,7 +283,7 @@ def test_demo_reset_preserves_imported_confluence_identity(client, monkeypatch) 
     assert client.post(REFRESH_URL).status_code == 200
     before = client.get(DETAIL_URL).json()["external_source"]
 
-    with SessionLocal.begin() as session:
+    with SessionLocal() as session:
         reset_demo_workflows(session)
 
     assert client.get(DETAIL_URL).json()["external_source"] == before

@@ -1,6 +1,6 @@
 # ChangeOps Architecture
 
-This document describes the current implementation through Milestone 7 PR C: the completed
+This document describes the current implementation through the Unified Audit Timeline PR D: the completed
 policy-analysis and approval lifecycles, the integrated Next.js journey and workbench,
 deterministic preparation and explicit execution of learning-assignment and Jira create-issue
 commands, and immutable
@@ -136,6 +136,7 @@ The FastAPI application exposes:
 - `GET /api/v1/policy-analysis-runs/{run_id}`
 - `GET /api/v1/policy-analysis-entry`
 - `GET /api/v1/policy-analysis-runs/{run_id}/journey`
+- `GET /api/v1/policy-analysis-runs/{run_id}/audit-timeline`
 - `POST /api/v1/policy-comparisons`
 - `GET /api/v1/policy-comparisons/{comparison_id}`
 - `POST /api/v1/policy-analysis-runs/{run_id}/clarifications/{clarification_id}/answer`
@@ -910,6 +911,26 @@ The same read model summarizes approval and execution independently. Approval st
 approval run; execution eligibility, prepared-command count, executed-command count, result count,
 and replay count come from persisted commands and results. These values are derived for display and
 are never written back to the plan, assessment, or workflow.
+
+## Unified audit timeline read projection
+
+The policy-analysis page also loads one read-only audit timeline scoped by
+`policy_analysis_runs.id`. A dedicated application-layer projection service reads the existing
+PostgreSQL business artifacts and explicitly maps supported records into stable API entries.
+PostgreSQL remains authoritative; LangGraph coordinates workflow transitions but is not an audit
+system of record.
+
+This is deliberately not event sourcing. There is no `audit_events` table, generic event mapper,
+event bus, materialized projection, background worker, or timeline mutation endpoint. Each entry
+references one durable artifact, and transient graph traversal or log lines cannot create entries.
+Failed extraction and interpretation attempts, negative human decisions, execution failures, and
+successful replay prevention remain visible when their authoritative records exist.
+
+Ordering is oldest first. Equal timestamps use central causal precedence followed by artifact type,
+artifact ID, and entry key. Actor category, outcome, title, description, artifact destination, and
+ordering are backend responsibilities; the frontend does not infer them from ORM or artifact
+types. The complete repository inventory and mapping table are documented in
+[`docs/unified-audit-timeline.md`](unified-audit-timeline.md).
 
 ## Approval workbench read boundary
 

@@ -974,3 +974,18 @@ workflow state, and audit lineage. The refresh does not change the Manager guide
 `instructs_manager` rows or any golden assessment fingerprint/count. No Confluence content,
 relationship origin, crawling, RAG, editing, publishing, background synchronization, or PR C
 provenance is included.
+
+## Unified Audit Timeline PR D
+
+Open the completed international-travel policy analysis and review **Audit timeline** from oldest
+to newest. The seeded journey distinguishes the AI extraction attempt from deterministic
+validation and assessment, identifies each human decision, shows immutable command preparation
+separately from the explicit execution request, and closes with the simulated side effect or Jira
+issue plus any prevented replay.
+
+Every displayed event names the existing PostgreSQL artifact that proves it. The Jira artifact
+uses its persisted browse link; internal artifacts return to the relevant policy or approval
+detail section. `make demo-reset` deterministically reconstructs the two analyzed policy versions,
+their comparison and impact delta, the focused approval lifecycle, one immutable Jira command, the
+fictional `ECM-42` receipt, and a prevented replay so the flagship timeline is immediately
+demonstrable without external credentials.

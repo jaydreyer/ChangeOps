@@ -583,11 +583,11 @@ def test_demo_reset_removes_comparisons_and_preserves_both_sources(client) -> No
     _complete_both_policy_analyses(client)
     _create_comparison(client)
 
-    with SessionLocal.begin() as session:
+    with SessionLocal() as session:
         summary = reset_demo_workflows(session)
 
-    assert summary.policy_comparisons == 0
+    assert summary.policy_comparisons == 1
     with SessionLocal() as session:
-        assert session.scalar(select(func.count()).select_from(PolicyComparisonImpactDelta)) == 0
+        assert session.scalar(select(func.count()).select_from(PolicyComparisonImpactDelta)) == 1
         source_ids = set(session.scalars(select(text("id")).select_from(text("policy_changes"))))
     assert {POLICY_CHANGE_ID, PROPOSED_POLICY_CHANGE_ID} <= source_ids

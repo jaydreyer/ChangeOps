@@ -4,7 +4,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { parseApiError } from "@/lib/api";
-import type { AnalysisClarification, PolicyAnalysisJourney } from "@/lib/types";
+import type {
+  AnalysisClarification,
+  AuditTimeline as AuditTimelineType,
+  PolicyAnalysisJourney,
+} from "@/lib/types";
+import { AuditTimeline } from "./audit-timeline";
 import { ApprovalHandoff } from "./policy-analysis/approval-handoff";
 import { AssessmentSections } from "./policy-analysis/assessment-sections";
 import { ClarificationSection } from "./policy-analysis/clarification-section";
@@ -18,8 +23,12 @@ type Mutation = "clarification" | "interpretation" | "approval";
 
 export function PolicyAnalysisJourneyView({
   initialJourney,
+  initialTimeline = null,
+  timelineError = "",
 }: {
   initialJourney: PolicyAnalysisJourney;
+  initialTimeline?: AuditTimelineType | null;
+  timelineError?: string;
 }) {
   const router = useRouter();
   const [actor, setActor] = useState("reviewer@example.com");
@@ -139,6 +148,8 @@ export function PolicyAnalysisJourneyView({
       <JourneyNavigation journey={initialJourney} />
 
       <AnalysisOverview journey={initialJourney} />
+
+      <AuditTimeline timeline={initialTimeline} errorMessage={timelineError} />
 
       {run.failure_code && (
         <section className="failure-panel" aria-labelledby="analysis-failure-heading">

@@ -888,3 +888,539 @@ aggregate can support it.
   instead of introducing a generic or polymorphic relationship layer.
 - Imported, human-curated, or AI-backed relationship origins require separately reviewed lineage
   and schema changes; they cannot be claimed through serializer labels alone.
+
+# ADR-0022 — Deploy the Existing Modular Monolith as One ECS Fargate Service
+
+## Status
+
+Proposed
+
+## Date
+
+2026-08-06
+
+## Context
+
+ChangeOps is currently developed and verified as a local Docker Compose application. The deployed
+runtime consists of:
+
+- a standalone Next.js 16 server on Node.js 24;
+- a FastAPI/Uvicorn application on Python 3.12;
+- PostgreSQL 17, which owns source data, workflow state, immutable business artifacts, approval
+  and execution lineage, and the records projected by the Unified Audit Timeline;
+- synchronous calls from FastAPI to the configured OpenAI-compatible model provider;
+- an optional, synchronous, create-only Jira Cloud adapter;
+- an optional, synchronous, read-only Confluence Cloud adapter;
+- a one-shot Alembic migration command; and
+- idempotent fictional seed data plus a destructive workflow reset that is intentionally limited
+  to the recognized local Compose database.
+
+The Next.js server currently renders the application and proxies browser writes to FastAPI using
+`CHANGEOPS_API_BASE_URL`. Local demonstration routes accept `X-ChangeOps-Actor` and
+`X-ChangeOps-Role` as trusted headers for consequential review, preparation, and execution
+operations. The repository explicitly has no production authentication or user administration.
+Those browser-supplied headers are not an acceptable public deployment trust boundary.
+
+The product does not require independent frontend and backend scaling, background jobs, event
+delivery, cross-region availability, tenant isolation, or a high-availability service-level
+objective. Workflows are synchronous, PostgreSQL is authoritative, and explicit retry or resume
+already handles the product's meaningful recovery boundaries. A secure public portfolio
+deployment therefore needs managed compute, identity, secrets, persistence, ingress, migration,
+backup, and operator visibility—not a distributed-system redesign.
+
+This ADR is an architecture gate. It does not authorize Terraform, AWS resource creation,
+deployment, or application redesign.
+
+## Decision drivers
+
+1. Preserve the existing FastAPI, Next.js, PostgreSQL, Docker, and modular-monolith boundaries.
+2. Keep FastAPI off the public internet and preserve one trusted identity-propagation boundary.
+3. Preserve PostgreSQL-backed approval, execution, and immutable audit semantics.
+4. Permit the current synchronous model, Jira, and Confluence calls without adding a worker or
+   queue.
+5. Provide a repeatable, fail-closed Alembic deployment step.
+6. Use short-lived deployment credentials and runtime least privilege.
+7. Keep fixed monthly cost appropriate for a low-traffic public portfolio.
+8. Add availability or scaling components only when a product requirement justifies them.
+
+## Decision
+
+Deploy ChangeOps in one AWS Region, initially `us-east-1`, as one Amazon ECS service using the
+Fargate launch type. Each ECS task contains the existing Next.js and FastAPI images:
+
+- the **Next.js container** is the only container registered with the public Application Load
+  Balancer target group;
+- the **FastAPI container** listens only inside the task network namespace;
+- Next.js reaches FastAPI at `http://127.0.0.1:8000`; and
+- both containers scale and deploy together as one application unit.
+
+Run one task for the portfolio baseline. ECS may replace that task in either configured
+Availability Zone, but one desired task is not a high-availability guarantee. Increase the
+desired count to two only when an uptime requirement justifies the additional cost. Do not split
+the application into independently deployed services merely to demonstrate AWS services.
+
+Use Amazon RDS for PostgreSQL as the production database. The baseline is a small, encrypted,
+Single-AZ RDS PostgreSQL instance with 20 GiB of general-purpose SSD storage, automated backups,
+deletion protection, and no public address. Multi-AZ is the first availability upgrade if the
+portfolio later acquires an explicit recovery-time or uptime requirement; Aurora is not justified
+for the current workload.
+
+Use a public Application Load Balancer, AWS Certificate Manager, Route 53, and an Amazon Cognito
+user pool for ingress and authentication. The ALB terminates TLS and authenticates product routes
+against Cognito before forwarding to Next.js. Public self-registration is disabled. Users are
+invited into the closed `reviewer` or `admin` Cognito groups. The application remains publicly
+addressable, but product data and actions require a valid session.
+
+### Target topology
+
+```mermaid
+flowchart TB
+    Browser["Browser"]
+    DNS["Route 53 public DNS"]
+    Cognito["Amazon Cognito<br/>managed sign-in"]
+    ACM["ACM certificate"]
+
+    subgraph VPC["One VPC in two Availability Zones"]
+        ALB["Public Application Load Balancer<br/>HTTPS + Cognito authentication"]
+
+        subgraph Public["Public subnets"]
+            Task["One ECS Fargate task<br/>public address for outbound traffic"]
+            Web["Next.js container<br/>only ALB target"]
+            API["FastAPI container<br/>task-local only"]
+            Task --- Web
+            Task --- API
+            Web -->|"localhost:8000"| API
+        end
+
+        subgraph Isolated["Private isolated database subnets"]
+            RDS[("RDS PostgreSQL<br/>Single-AZ baseline")]
+        end
+
+        API -->|"TLS PostgreSQL"| RDS
+    end
+
+    Browser -->|"HTTPS"| DNS --> ALB
+    ACM -.-> ALB
+    ALB <-->|"OIDC"| Cognito
+    ALB --> Web
+    API -->|"HTTPS egress"| Providers["Model provider<br/>Jira Cloud<br/>Confluence Cloud"]
+    Secrets["Secrets Manager"] -.-> Task
+    ECR["Amazon ECR"] -.-> Task
+    Task --> Logs["CloudWatch Logs and metrics"]
+```
+
+The Fargate task runs in a public subnet and receives a public IPv4 address solely to make
+outbound HTTPS calls and pull runtime dependencies without a NAT Gateway. Its security group
+allows inbound traffic only from the ALB security group on the Next.js port. The FastAPI port is
+not registered with a target group and has no security-group ingress rule. RDS uses isolated
+subnets with no route to an internet gateway and accepts PostgreSQL only from the task security
+group.
+
+This public-subnet task placement is a deliberate portfolio-cost tradeoff, not a claim that the
+task is a public API. Moving tasks to private subnets with redundant NAT Gateways or the necessary
+VPC endpoints is appropriate only when a requirement forbids public task addresses or justifies
+the additional fixed cost.
+
+## Runtime choice: ECS Fargate over App Runner
+
+| Requirement | ECS on Fargate | AWS App Runner |
+|---|---|---|
+| Existing two-container deployment unit | One task definition can run Next.js and FastAPI together with task-local communication. | Optimized for one independently exposed web service; preserving the local proxy boundary would require a second hosting decision or service. |
+| Private FastAPI ingress | FastAPI has no load-balancer target or public listener. | An App Runner web service is an independently managed service endpoint; private ingress adds a different access model. |
+| RDS access | Security groups directly constrain task-to-RDS traffic. | A VPC connector can provide outbound access to RDS, but it does not solve the separate frontend-to-backend trust boundary. |
+| Alembic | The same backend task definition can run a one-off migration task with identical networking and secrets. | App Runner centers on long-running web services and does not provide the same general one-off ECS task primitive. |
+| Long synchronous requests | ALB timeout and ECS task sizing are explicit and can accommodate current bounded model calls. | Supported, but with less control over the combined frontend/backend runtime boundary. |
+| Cost control | One continuously running task has predictable compute cost; no NAT Gateway is required in this baseline. | Idle memory is billed and active CPU is billed by use, which can be attractive for a light service. |
+| Service lifecycle | Current, general-purpose AWS container platform. | AWS announced that App Runner stopped accepting new customers on April 30, 2026 and recommends ECS Express Mode for new container workloads. |
+
+App Runner would have been credible for a single public FastAPI service with minimal infrastructure
+control. It is not selected because ChangeOps benefits from keeping FastAPI private beside its
+Next.js proxy, needs a first-class one-off migration task, and is a new deployment after App
+Runner's new-customer cutoff. Plain ECS on Fargate is selected rather than ECS Express Mode so the
+two-container task, explicit ALB authentication, task-local API boundary, and migration task remain
+clear and directly controllable. Kubernetes, EKS, a service mesh, and microservices remain
+explicitly out of scope.
+
+## Frontend hosting
+
+Run the existing standalone Next.js image in the same ECS Fargate task as FastAPI. Do not add
+Amplify Hosting, S3/CloudFront static hosting, or a separate frontend App Runner service for this
+baseline.
+
+The current application uses server rendering, uncached server-side FastAPI reads, and a
+same-origin write proxy. Co-locating both containers:
+
+- preserves those behaviors without converting pages to a static application;
+- avoids exposing FastAPI;
+- avoids another deployment and identity boundary;
+- allows verified identity to be converted to the existing internal actor contract at one point;
+  and
+- keeps frontend and backend scaling aligned with the actual low-traffic workload.
+
+CloudFront can be added in front of the ALB only if measured latency, caching, or edge-protection
+requirements emerge. It is not required for the initial portfolio deployment.
+
+## HTTPS, DNS, and ingress
+
+- A Route 53 alias record maps the portfolio hostname to the public ALB.
+- An ACM regional certificate covers that hostname and is attached to the ALB HTTPS listener.
+- The port 80 listener performs only a permanent redirect to HTTPS.
+- The HTTPS listener applies Cognito authentication before forwarding to Next.js.
+- The ALB security group accepts ports 80 and 443 from the internet; the task security group
+  accepts the Next.js port only from the ALB security group.
+- TLS 1.2 or newer is required at the ALB. Security headers, including HSTS after domain
+  validation, are returned by Next.js or the ALB.
+- The ALB idle timeout must exceed the existing bounded 120-second model timeout; start at 180
+  seconds and revisit it if asynchronous product requirements are introduced.
+- AWS Shield Standard's default protection is sufficient for the low-risk baseline. AWS WAF is a
+  later option if observed abuse or a public unauthenticated surface justifies its cost.
+
+Only the ALB, Route 53 record, Cognito hosted sign-in endpoints, and the task's outbound-only public
+address are internet-routable. FastAPI and RDS are not public services.
+
+## Authentication and trusted identity propagation
+
+Cognito is the identity provider, while the ALB is the external authentication enforcement point.
+The user pool:
+
+- disables open self-sign-up;
+- uses managed sign-in with authorization-code flow;
+- sets user-pool MFA to required for every invited user and enables authenticator-app TOTP as the
+  baseline factor;
+- places users in a closed `reviewer` or `admin` group; and
+- uses short session and token lifetimes appropriate to a demonstration.
+
+The target application boundary is:
+
+1. The ALB authenticates the browser session with Cognito.
+2. The ALB forwards its signed OIDC claims header, subject header, and Cognito access token to
+   Next.js.
+3. Next.js verifies the ALB claims signature, expected signer ARN, client, issuer, and expiry, and
+   requires the signed `sub` to match the ALB subject header.
+4. Next.js separately validates the Cognito access-token signature, issuer, `client_id`,
+   `token_use`, and expiry, then maps the stable `sub` to actor identity and exactly one closed
+   `cognito:groups` value to the ChangeOps role.
+5. The same-origin proxy deletes any browser-provided `X-ChangeOps-Actor` and
+   `X-ChangeOps-Role`, creates those headers from verified claims, and sends them to FastAPI over
+   task-local loopback.
+6. FastAPI continues enforcing the existing deterministic role and lifecycle checks. It never
+   accepts a role from a request body.
+
+The task security group and lack of a FastAPI load-balancer target make Next.js the only network
+principal that can supply those headers in production. Local Compose may retain explicit
+demonstration headers. Before deployment, application work must implement and test the ALB-claim
+verification and header replacement; deploying the current pass-through proxy unchanged is
+prohibited.
+
+Use the immutable Cognito `sub`, not a mutable email address, as the authoritative actor identity
+stored with decisions and execution results. Email may be retained only as display context if a
+future schema explicitly snapshots it. Group-to-role mapping fails closed for missing, multiple,
+or unknown privileged groups.
+
+## Secrets and configuration
+
+Store secret values in AWS Secrets Manager, encrypted with the AWS-managed Secrets Manager key
+unless a later compliance requirement calls for a customer-managed key. Use separate secrets for:
+
+- the runtime SQLAlchemy `DATABASE_URL`, containing a least-privilege RDS application credential
+  and `sslmode=require`;
+- the migration `DATABASE_URL`, containing a separate schema-owner credential available only to
+  the one-off migration task;
+- the model-provider API key;
+- Jira email/API token when Jira execution is enabled; and
+- Confluence email/API token when Confluence refresh is enabled.
+
+The migration role owns the application schema and may perform the DDL required by versioned
+Alembic revisions. The runtime role does not own the schema, tables, triggers, or functions and
+has no `CREATE`, `ALTER`, `DROP`, trigger-disable, role-management, or blanket database-owner
+authority. Migrations grant it only the schema usage, table/sequence operations, and function
+execution required by reviewed application paths. Immutable artifact tables retain their
+database-enforced update/delete protections even from the runtime role. The RDS administrative
+credential remains a break-glass operator secret and is injected into neither ECS task.
+
+Inject the runtime secret only into the long-running FastAPI container. Inject the schema-owner
+secret only into the one-off migration task. Do not place secret values in task-definition
+environment fields, image layers, GitHub secrets, logs, commands, audit snapshots, or frontend
+variables.
+
+Non-secret configuration—including model names and timeouts, Jira base URL/project/issue type,
+Confluence base URL/page mapping, AWS Region, and Cognito/ALB identifiers—may remain ordinary ECS
+environment configuration. The application task definition's ECS execution role may read only the
+named runtime/provider secrets and ECR images. A separate migration task definition and ECS
+execution role may read only the migration database secret and backend image. The application task
+role receives no general AWS administrative permissions. Jira and Confluence remain disabled when
+their complete configuration is absent.
+
+Use dedicated, least-privilege portfolio Atlassian credentials if either integration is enabled.
+Jira remains create-Task only, and Confluence remains read-only for the one configured page and
+space. No real customer, Workday, Salesforce, or production enterprise credentials are permitted.
+
+## PostgreSQL, backups, and recovery
+
+RDS PostgreSQL is selected over self-hosted PostgreSQL because ChangeOps depends on relational
+constraints, transactions, triggers, row locks, and durable backups, while the portfolio does not
+benefit from operating a database server.
+
+Baseline database controls:
+
+- PostgreSQL major version compatible with the repository's PostgreSQL 17 development target;
+- Single-AZ `db.t4g.micro`-class starting size, subject to load validation;
+- 20 GiB encrypted general-purpose SSD storage with storage autoscaling capped to prevent surprise
+  cost;
+- private isolated DB subnets and no public accessibility;
+- security-group ingress on 5432 only from the ECS task security group;
+- TLS required by clients;
+- seven days of automated backup retention and point-in-time recovery;
+- deletion protection and a required final snapshot on intentional deletion; and
+- database logs and core metrics exported to CloudWatch within a short retention window.
+
+The portfolio recovery objectives are **RPO no worse than 24 hours** and **RTO within 4 hours**.
+Point-in-time recovery will normally provide a smaller RPO, but the conservative objective allows
+for operator detection and a low-cost Single-AZ baseline. Restore at least quarterly into a new
+database, run Alembic/current-head and audit-integrity checks, and record the result outside the
+application database.
+
+Recovery creates a new RDS instance and repoints a new ECS task definition after validation. It
+does not overwrite the damaged database in place. Restored workflow and Unified Audit Timeline
+behavior continue to derive from the same PostgreSQL business artifacts; CloudWatch logs are
+operational evidence, not a replacement audit source of truth.
+
+## Alembic migrations, seed, and demo reset
+
+GitHub Actions runs `alembic upgrade head` as a one-off Fargate task using the same backend image
+and RDS security-group path as the application, but the separate schema-owner database secret and
+migration task definition. The deployment sequence is:
+
+1. pass repository quality and migration checks;
+2. push immutable, commit-SHA-tagged images to ECR;
+3. register the candidate application and migration task definitions;
+4. run and wait for the one-off Alembic task;
+5. stop immediately if migration exits nonzero;
+6. update the ECS service only after migration succeeds; and
+7. wait for ALB health and ECS service stability before declaring deployment successful.
+
+Use the ECS rolling deployment controller with the deployment circuit breaker and automatic
+rollback enabled. With one desired task, set deployment percentages so ECS starts and health-checks
+the candidate before stopping the last healthy task. If the candidate cannot become healthy, ECS
+marks the deployment failed and rolls the service back to the last completed task definition.
+There is no automatic database downgrade.
+
+Do not run Alembic automatically in every application container, where concurrent startup could
+race. Schema changes must remain backward compatible with the previously running task for the
+entire rollout and rollback window. A destructive or backward-incompatible migration requires a
+separately reviewed expand/migrate/contract or maintenance plan, backup, and forward-recovery
+procedure; it cannot use the ordinary rolling path.
+
+The idempotent fictional catalog seed is a separate, explicitly invoked one-time bootstrap task,
+not part of every deployment. `make demo-reset` and `python -m changeops.demo_reset` are prohibited
+production operations. The production task receives neither
+`CHANGEOPS_DEMO_RESET_CONFIRMED` nor permission to launch arbitrary tasks. The existing reset code
+also rejects the RDS hostname, providing an independent application-level refusal. No public reset
+route will be introduced.
+
+## Logging, correlation, and observability
+
+Both containers write structured JSON to standard output. ECS sends those streams to separate
+CloudWatch log groups with 30-day retention. Logs must exclude authorization headers, OIDC claims,
+cookies, database URLs, provider payloads, policy source text, and secret values.
+
+At ingress, accept a syntactically valid request ID or generate a new UUID. Next.js returns it to
+the caller and forwards it to FastAPI as `X-Request-ID`. FastAPI includes the same value in every
+application log and outbound Jira, Confluence, and model-provider log record where supported.
+Business artifact IDs may be logged, but the Unified Audit Timeline continues to use persisted
+artifacts rather than logs as authority.
+
+Create a small CloudWatch dashboard and alarms for:
+
+- ALB unhealthy targets, 5xx responses, and abnormal response time;
+- ECS desired task count below one, deployment/circuit-breaker failure, task restarts, CPU, and
+  memory;
+- RDS CPU, free storage, connections, and database availability;
+- application error counts and migration-task failure; and
+- AWS monthly spend against a portfolio budget.
+
+One email notification path may be used for operational alarms and budget alerts. If implemented
+with SNS, that topic is operational notification plumbing only; it is never an application event
+bus or workflow dependency.
+
+## CI/CD identity and permissions
+
+GitHub Actions authenticates to AWS through GitHub's OIDC provider and
+`sts:AssumeRoleWithWebIdentity`. No long-lived AWS access key is created.
+
+The deploy-role trust policy is restricted to this repository, the protected production GitHub
+Environment, and the intended default-branch or release subject. The role may push only the two
+ECR repositories, register ChangeOps task definitions, run the named migration task, update the
+named ECS service, read deployment status and logs, and pass only the named ECS execution and task
+roles. It does not read application secret values or administer Cognito, RDS, IAM, or networking.
+
+The production GitHub Environment requires human approval. Deployment authorization is separate
+from ChangeOps human action approval: neither one implies the other.
+
+## Failure boundaries and operational responsibility
+
+| Boundary | Expected behavior | Owner/recovery |
+|---|---|---|
+| Cognito or ALB authentication unavailable | New sessions and authenticated requests fail closed; FastAPI is still unreachable directly. | AWS restores the managed service; maintainer checks configuration and status. |
+| Next.js or FastAPI process/task fails | The in-flight request fails. ECS replaces the task. Uncommitted database work rolls back. | ECS automatic replacement; maintainer investigates correlated logs. |
+| RDS unavailable | Reads and writes fail; no workflow or execution result is represented as successful. | Maintainer restores service or a validated backup; Single-AZ recovery may take hours. |
+| Model provider fails or times out | Existing explicit failed/retryable AI lifecycle behavior remains authoritative; deterministic persisted artifacts are not rewritten. | User retries only through supported product controls; maintainer checks provider/configuration. |
+| Confluence fails | Refresh reports its precise failure and retains last-known-good imported metadata. | Optional integration; maintainer rotates or disables configuration. |
+| Jira definitive failure | The immutable failure result remains visible and only explicitly safe retry behavior applies. | Maintainer corrects configuration; user initiates any allowed retry. |
+| Jira ambiguous delivery | The durable at-most-once gate remains `outcome_unknown`; no automatic resend occurs. | Manual reconciliation is required outside the current product scope. |
+| Migration fails | The ECS service is not updated and the deployment fails. | Maintainer inspects the one-off task, restores if needed, fixes forward, and reruns. |
+| Application deployment fails after migration | The ECS circuit breaker marks the deployment failed and restores the last completed task definition; the compatible migration remains applied. | Maintainer verifies rollback health, fixes forward, and never downgrades automatically. |
+| One Availability Zone fails | ALB remains regional, ECS can replace the task in another configured subnet, but Single-AZ RDS may be unavailable until AWS recovery. | Accept for portfolio RTO; adopt Multi-AZ only for a stronger requirement. |
+| Region fails | The portfolio is unavailable. | Restore from available backups after regional recovery; multi-region is out of scope. |
+
+AWS operates the managed control planes and underlying infrastructure. The repository maintainer
+owns user/group access, domain and certificate renewal visibility, secrets rotation, dependency
+patching and image rebuilds, migrations, alarm response, cost review, backup restore exercises,
+and application incident communication. ChangeOps application code remains responsible for
+approval enforcement, immutable records, truthful status, evidence, provenance, and audit
+projection semantics.
+
+## Rough monthly cost
+
+The following order-of-magnitude estimate uses public on-demand `us-east-1` prices checked on
+2026-08-06, 730 hours/month, one low-traffic task, one Single-AZ database, and no free-tier
+credits. It excludes domain registration, model-provider usage, Atlassian subscriptions, taxes,
+and meaningful internet data transfer.
+
+| Resource | Baseline assumption | Approximate monthly cost |
+|---|---|---:|
+| ECS Fargate | One Linux/x86 task, 1 vCPU and 2 GiB | $36 |
+| Application Load Balancer | ALB hours plus very low LCU usage | $17–23 |
+| RDS PostgreSQL | Small Single-AZ burstable instance plus 20 GiB storage/backups | $15–25 |
+| Public IPv4 | Two ALB addresses plus one task address | about $11 |
+| Secrets Manager | Five runtime/deployment secrets plus one break-glass database secret | about $3 |
+| Route 53 and ACM | One hosted zone; ACM certificate has no separate charge | about $1, plus domain |
+| ECR, CloudWatch, Cognito, backup/log growth, and low data transfer | Small portfolio usage | $3–10 |
+| **Expected baseline** | | **about $85–105/month** |
+
+A second ECS task and Multi-AZ RDS materially increase the baseline. Private task subnets with a
+NAT Gateway also add a significant fixed hourly charge, so they are intentionally not part of this
+cost-sensitive design. Configure an AWS Budget at $125/month and alarms at 80% and 100%. Recheck
+the AWS Pricing Calculator before implementation because prices and free tiers change.
+
+## Unified Audit Timeline implications
+
+Deployment does not add an event store, audit queue, log-derived timeline, or second source of
+truth. The Unified Audit Timeline remains a synchronous, read-only projection of existing
+PostgreSQL artifacts. Authentication adds a trusted source for future actor identities but does
+not change the timeline's artifact mapping. RDS backup, migration, and restore procedures must
+preserve all database constraints, triggers, immutable records, and artifact relationships on
+which that projection depends.
+
+CloudWatch answers operational questions such as “why is this request failing?” PostgreSQL and the
+timeline answer business-governance questions such as “what evidence, decision, command, and
+result exist?” Those responsibilities remain separate.
+
+## Consequences
+
+### Positive
+
+- The deployed application remains one modular monolith and one scaling unit.
+- FastAPI and RDS have no public ingress.
+- Trusted actor headers originate from verified identity at one server-side boundary.
+- Existing containers, synchronous workflows, PostgreSQL guarantees, and external-adapter
+  semantics remain recognizable.
+- One-off migrations and failed deployments have explicit, testable outcomes.
+- The design avoids NAT Gateways, Kubernetes, queues, service discovery, API Gateway, Lambda,
+  CloudFront, and a separate frontend platform.
+- Fixed cost is visible and bounded for a public portfolio.
+
+### Negative
+
+- One application task and Single-AZ RDS do not provide a high-availability SLA.
+- The task has a public address for outbound access, although security groups deny public inbound
+  traffic.
+- Frontend and backend cannot scale or deploy independently; no current requirement needs that.
+- ALB fixed cost is material relative to the application compute.
+- Production deployment is blocked until ALB-claim verification, trusted header replacement,
+  request correlation, structured logging, and a suitable web health endpoint are implemented and
+  tested in later issues.
+
+## Rejected alternatives
+
+### Microservices or separate ECS services
+
+There is no independent scaling, ownership, failure-isolation, or deployment requirement. A split
+would add network authentication, discovery, deployment ordering, and partial-failure modes while
+weakening the task-local trusted-header boundary.
+
+### App Runner
+
+App Runner's simple managed web-service experience is attractive, but it does not preserve the
+combined private API boundary as directly, is less suitable for the one-off migration task, and
+no longer accepts new customers as of this decision date.
+
+### Amplify Hosting for Next.js
+
+Amplify can host supported Next.js SSR applications, but a separate frontend runtime would require
+a public or separately connected FastAPI boundary and duplicate deployment/authentication
+concerns. The existing standalone Next.js container already fits the selected ECS task.
+
+### Lambda/API Gateway
+
+The application is already a containerized synchronous FastAPI service with PostgreSQL
+transactions and requests that may wait on bounded model-provider calls. Adapting it to functions
+would be an application redesign without a product requirement.
+
+### EKS, service mesh, queue, or event bus
+
+ChangeOps has no Kubernetes operational requirement and no asynchronous product workflow.
+PostgreSQL already owns durable workflow and approval state. EKS, a service mesh, SQS,
+EventBridge, Kafka, or a background worker would create unsupported operational and audit
+boundaries.
+
+### Self-hosted PostgreSQL or Aurora
+
+Self-hosting weakens managed backup and recovery for little savings after operational cost.
+Aurora's scaling and availability features are unnecessary for the expected load and budget.
+
+## Implementation prerequisites
+
+Separate, focused follow-up issues must implement and verify:
+
+1. ALB/Cognito claim verification and fail-closed role mapping in Next.js;
+2. replacement—not forwarding—of browser actor and role headers;
+3. request-ID propagation and secret-safe structured logs;
+4. a lightweight Next.js health endpoint that validates the intended service boundary;
+5. production container sizing and ALB timeout tests for the bounded synchronous path;
+6. infrastructure as code for the approved topology;
+7. OIDC deployment workflow, migration gating, and rollback evidence; and
+8. backup restore and audit-integrity runbooks.
+
+No AWS resource should be deployed until the authentication boundary is implemented. Terraform
+and deployment remain explicitly outside this ADR-only issue.
+
+## References
+
+Repository context:
+
+- [`docs/architecture.md`](architecture.md)
+- [`docs/product-brief.md`](product-brief.md)
+- [`docs/demo-scenario.md`](demo-scenario.md)
+- [`docs/interview-guide.md`](interview-guide.md)
+- [`docs/unified-audit-timeline.md`](unified-audit-timeline.md)
+- [`compose.yaml`](../compose.yaml)
+- [`Dockerfile`](../Dockerfile) and [`web/Dockerfile`](../web/Dockerfile)
+- [`alembic.ini`](../alembic.ini) and [`migrations/env.py`](../migrations/env.py)
+- [`.env.example`](../.env.example), [`src/changeops/config.py`](../src/changeops/config.py), and
+  [`web/app/api/[...path]/route.ts`](../web/app/api/%5B...path%5D/route.ts)
+
+AWS sources checked on 2026-08-06:
+
+- [AWS App Runner service notice](https://aws.amazon.com/apprunner/)
+- [AWS App Runner pricing](https://aws.amazon.com/apprunner/pricing/)
+- [AWS Fargate pricing](https://aws.amazon.com/fargate/pricing/)
+- [Elastic Load Balancing pricing](https://aws.amazon.com/elasticloadbalancing/pricing/)
+- [Amazon RDS for PostgreSQL pricing](https://aws.amazon.com/rds/postgresql/pricing/)
+- [ALB user authentication and signed claims](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/listener-authenticate-users.html)
+- [Amazon Cognito JWT verification](https://docs.aws.amazon.com/cognito/latest/developerguide/amazon-cognito-user-pools-using-tokens-verifying-a-jwt.html)
+- [Application Load Balancer HTTPS listeners](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/create-https-listener.html)
+- [RDS automated backups](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_WorkingWithAutomatedBackups.Enabling.html)
+- [GitHub OIDC trust-policy example](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Service-Application-Observability-for-AWS-GitHub-Action.html)
+- [AWS Secrets Manager pricing](https://aws.amazon.com/secrets-manager/pricing/)
+- [Route 53 pricing](https://aws.amazon.com/route53/pricing/)

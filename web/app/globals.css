@@ -2316,6 +2316,11 @@ dd {
   margin-top: 1rem;
 }
 
+.catalog-provenance-note {
+  color: var(--color-muted);
+  font-size: 0.88rem;
+}
+
 .catalog-usage,
 .assessment-context,
 .catalog-external-source,

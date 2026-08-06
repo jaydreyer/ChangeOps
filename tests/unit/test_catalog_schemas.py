@@ -52,7 +52,9 @@ def catalog_detail_payload() -> dict:
                     "href": "/catalog/enterprise_document/document-guide",
                 },
                 "trust": {
+                    "level": "trusted",
                     "state": "persisted_typed_relationship",
+                    "basis": "deterministic_enterprise_relationship",
                     "integrity": [
                         "policy_change_foreign_key",
                         "enterprise_document_foreign_key",
@@ -61,11 +63,14 @@ def catalog_detail_payload() -> dict:
                     "used_deterministically": True,
                 },
                 "provenance": {
-                    "classification": "not_recorded",
+                    "classification": "seeded_demonstration",
+                    "source_label": "Seeded demonstration data",
                     "creator": None,
-                    "owning_authority": None,
-                    "recorded_at": None,
+                    "owning_authority": "ChangeOps demonstration seed",
+                    "reference": "changeops.seed.relationships.v1",
+                    "recorded_at": "2026-08-06T00:00:00Z",
                     "approval": None,
+                    "ai_involvement": "none",
                 },
             }
         ],
@@ -82,7 +87,10 @@ def catalog_detail_payload() -> dict:
         (("object", "object_type"), "worker"),
         (("object", "record_provenance", "classification"), "seeded"),
         (("relationships", 0, "trust", "state"), "human_approved"),
+        (("relationships", 0, "trust", "level"), "human_approved"),
+        (("relationships", 0, "trust", "basis"), "human_approval"),
         (("relationships", 0, "provenance", "classification"), "human_curated"),
+        (("relationships", 0, "provenance", "ai_involvement"), "generated"),
     ],
 )
 def test_catalog_contract_rejects_unsupported_authority_claims(path, value) -> None:

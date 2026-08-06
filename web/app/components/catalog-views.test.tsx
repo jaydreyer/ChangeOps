@@ -81,7 +81,9 @@ const relationship = {
     href: "/catalog/enterprise_document/document-manager-travel-approval-guide",
   },
   trust: {
+    level: "trusted" as const,
     state: "persisted_typed_relationship" as const,
+    basis: "deterministic_enterprise_relationship" as const,
     integrity: [
       "policy_change_foreign_key",
       "enterprise_document_foreign_key",
@@ -90,11 +92,14 @@ const relationship = {
     used_deterministically: true as const,
   },
   provenance: {
-    classification: "not_recorded" as const,
+    classification: "seeded_demonstration" as const,
+    source_label: "Seeded demonstration data" as const,
     creator: null,
-    owning_authority: null,
-    recorded_at: null,
+    owning_authority: "ChangeOps demonstration seed",
+    reference: "changeops.seed.relationships.v1",
+    recorded_at: "2026-08-06T00:00:00Z",
     approval: null,
+    ai_involvement: "none" as const,
   },
 };
 
@@ -140,6 +145,11 @@ describe("enterprise knowledge catalog views", () => {
       screen.getByRole("heading", { name: "What enterprise knowledge does ChangeOps use?" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Seeded demonstration catalog")).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        "This is fictional demonstration data. Object-level origin is not recorded; seeded relationship origin is available on each object detail.",
+      ),
+    ).toBeInTheDocument();
     expect(screen.getByRole("navigation", { name: "Catalog categories" })).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Open Manager Travel Approval Guide details" }),
@@ -159,10 +169,21 @@ describe("enterprise knowledge catalog views", () => {
     render(<CatalogObjectDetailView detail={detail} />);
 
     expect(screen.getByRole("heading", { name: "Manager Travel Approval Guide" })).toBeInTheDocument();
-    expect(screen.getAllByText("Not recorded").length).toBeGreaterThan(1);
+    expect(screen.getByText("Not recorded")).toBeInTheDocument();
     expect(screen.getByText("International Business Travel Approval and Security Training · 1")).toBeInTheDocument();
     expect(screen.getByText("Proposed International Business Travel Revision · proposed-draft")).toBeInTheDocument();
     expect(screen.getAllByText("Instructs Manager")).toHaveLength(2);
+    expect(screen.getAllByRole("heading", { name: "Relationship Provenance" })).toHaveLength(2);
+    expect(screen.getAllByText("Seeded demonstration data")).toHaveLength(2);
+    expect(screen.getAllByText("Trusted")).toHaveLength(2);
+    expect(
+      screen.getAllByText("None — AI did not create or infer this relationship."),
+    ).toHaveLength(2);
+    expect(
+      screen.getAllByText(
+        "Manager Travel Approval Guide → MANAGER_APPROVAL_REQUIRED",
+      ),
+    ).toHaveLength(2);
     expect(screen.getByText("Confluence metadata has not been imported.")).toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: "Explain this policy rule" })[0]).toHaveAttribute(
       "href",
@@ -171,7 +192,9 @@ describe("enterprise knowledge catalog views", () => {
     for (const summary of screen.getAllByText(/Technical relationship details|Technical object identity/)) {
       expect(summary.closest("details")).not.toHaveAttribute("open");
     }
-    expect(screen.queryByRole("button", { name: /edit|import|approve|refresh|search/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /edit|import|approve|refresh|search/i }),
+    ).not.toBeInTheDocument();
   });
 
   it("shows validated read-only Confluence identity and an external link", () => {

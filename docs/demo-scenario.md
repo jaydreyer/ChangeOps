@@ -351,8 +351,8 @@ not a persistent scenario-management feature:
   published status, version 2, missing owner, and separate baseline/proposed
   `instructs_manager` rows;
 - the baseline dependency follows to the policy-scoped `MANAGER_APPROVAL_REQUIRED` reference,
-  which links back to its connected typed catalog targets and distinguishes deterministic trust
-  basis from missing row-origin provenance;
+  which links back to its connected typed catalog targets and distinguishes seeded row origin,
+  deterministic trust basis, and the explicit absence of AI involvement;
 - the approval workbench opens the next pending item in persisted order, keeps evidence collapsed,
   and presents execution only after completed approval as a separate explicit operation;
 - the golden accepted extraction completes without clarification;

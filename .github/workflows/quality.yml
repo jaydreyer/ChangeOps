@@ -113,7 +113,7 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Build migration image
-        run: docker compose build migrate
+        run: docker compose build migrate seed
 
       - name: Start an empty PostgreSQL database
         run: |
@@ -125,6 +125,9 @@ jobs:
 
       - name: Upgrade empty database to head
         run: docker compose run --rm --no-deps migrate alembic upgrade head
+
+      - name: Seed populated dependency rows
+        run: docker compose run --rm seed
 
       - name: Downgrade head by one revision
         run: docker compose run --rm --no-deps migrate alembic downgrade -1

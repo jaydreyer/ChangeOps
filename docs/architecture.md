@@ -1,12 +1,13 @@
 # ChangeOps Architecture
 
-This document describes the current implementation through Milestone 7 PR B: the completed
+This document describes the current implementation through Milestone 7 PR C: the completed
 policy-analysis and approval lifecycles, the integrated Next.js journey and workbench,
 deterministic preparation and explicit execution of learning-assignment and Jira create-issue
 commands, and immutable
 deterministic comparison of two accepted international-travel policy rulesets and their immutable
-enterprise impact assessments, plus the read-only Enterprise Knowledge Catalog Explorer and its
-narrow persisted Confluence Cloud document-identity boundary.
+enterprise impact assessments, plus the read-only Enterprise Knowledge Catalog Explorer, its
+narrow persisted Confluence Cloud document-identity boundary, and trusted origin metadata for
+deterministic policy dependencies.
 
 ## High-level architecture
 
@@ -853,15 +854,18 @@ rule fields and leaves unknown codes visible without guessing.
 The projection preserves stable source and relationship IDs, deterministic row ordering, separate
 baseline and proposed dependency rows, foreign-key and semantic-uniqueness trust basis, and honest
 null owner/source/description fields. Dataset context is labeled as the seeded demonstration
-catalog, while creator/import/curation/approval provenance is separately labeled not recorded.
-Catalog reads never query assessment evidence or impact paths as current catalog authority and
-perform no writes. Workers, teams, and customer commitments appear only as organization-scoped
-assessment-context counts.
+catalog. Each of the 12 seed-owned policy dependency rows also stores the closed provenance
+category `seeded_demonstration`, the demonstration-seed authority and reference, and the timestamp
+when that provenance metadata was recorded. These values describe row origin, not human approval
+or the original relationship creation time. Catalog reads never query assessment evidence or
+impact paths as current catalog authority and perform no writes. Workers, teams, and customer
+commitments appear only as organization-scoped assessment-context counts.
 
 Next.js server-renders `/catalog`, supported object details, and policy-rule-reference details with
 uncached API reads. Native `details` elements keep raw IDs and integrity basis collapsed by default.
-There is no search, administration, relationship editing, or graph view. PR A added no migration
-and PR B does not change assessment behavior.
+There is no search, administration, relationship editing, AI relationship generation, or graph
+view. The UI presents provenance separately from the deterministic trust basis and states that AI
+did not create or infer the seeded relationships. PR C does not change assessment behavior.
 
 ## Read-only Confluence document identity boundary
 

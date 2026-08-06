@@ -1,4 +1,6 @@
+import pytest
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from changeops.db.models import (
@@ -87,6 +89,52 @@ def test_seed_is_repeatable_without_duplicates() -> None:
             "commitment_assignments": 2,
         }
     )
+    with SessionLocal() as session:
+        dependency_rows = [
+            *session.scalars(select(PolicySystemDependency)),
+            *session.scalars(select(PolicyDocumentDependency)),
+            *session.scalars(select(PolicyTrainingDependency)),
+        ]
+        assert len(dependency_rows) == 12
+        assert {row.provenance_category for row in dependency_rows} == {"seeded_demonstration"}
+        assert {row.provenance_authority for row in dependency_rows} == {
+            "ChangeOps demonstration seed"
+        }
+        assert {row.provenance_reference for row in dependency_rows} == {
+            "changeops.seed.relationships.v1"
+        }
+        assert {row.provenance_recorded_at.isoformat() for row in dependency_rows} == {
+            "2026-08-06T00:00:00+00:00"
+        }
+
+
+@pytest.mark.parametrize(
+    ("model", "field_name", "invalid_value"),
+    [
+        (PolicySystemDependency, "provenance_category", "human_approved_ai"),
+        (PolicySystemDependency, "provenance_authority", " "),
+        (PolicySystemDependency, "provenance_reference", ""),
+        (PolicySystemDependency, "provenance_recorded_at", None),
+        (PolicyDocumentDependency, "provenance_category", "human_curated"),
+        (PolicyDocumentDependency, "provenance_authority", ""),
+        (PolicyDocumentDependency, "provenance_reference", " "),
+        (PolicyDocumentDependency, "provenance_recorded_at", None),
+        (PolicyTrainingDependency, "provenance_category", "imported_authoritative"),
+        (PolicyTrainingDependency, "provenance_authority", " "),
+        (PolicyTrainingDependency, "provenance_reference", ""),
+        (PolicyTrainingDependency, "provenance_recorded_at", None),
+    ],
+)
+def test_dependency_provenance_rejects_unsupported_or_incomplete_lineage(
+    model,
+    field_name: str,
+    invalid_value,
+) -> None:
+    with pytest.raises(IntegrityError), SessionLocal.begin() as session:
+        dependency = session.scalars(select(model).order_by(model.id)).first()
+        assert dependency is not None
+        setattr(dependency, field_name, invalid_value)
+        session.flush()
 
 
 def test_provider_free_demo_assessment_seed_is_stable_and_idempotent() -> None:

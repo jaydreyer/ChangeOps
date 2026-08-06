@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import UTC, date, datetime
 
 from sqlalchemy.orm import Session
 
@@ -25,6 +25,12 @@ ORGANIZATION_ID = "org-acme-global-manufacturing"
 POLICY_CHANGE_ID = "policy-international-travel-2026-09"
 PROPOSED_POLICY_CHANGE_ID = "policy-international-travel-proposed-2026-10"
 COURSE_IDENTIFIER = "international-travel-security"
+RELATIONSHIP_PROVENANCE = {
+    "provenance_category": "seeded_demonstration",
+    "provenance_authority": "ChangeOps demonstration seed",
+    "provenance_reference": "changeops.seed.relationships.v1",
+    "provenance_recorded_at": datetime(2026, 8, 6, tzinfo=UTC),
+}
 
 POLICY_TEXT = """Effective September 1, 2026, U.S.-based employees and contractors traveling
 internationally for business must complete the International Travel Security course before
@@ -549,12 +555,14 @@ def seed_database(session: Session) -> None:
         session.merge(
             PolicySystemDependency(
                 policy_change_id=POLICY_CHANGE_ID,
+                **RELATIONSHIP_PROVENANCE,
                 **dependency,
             )
         )
         session.merge(
             PolicySystemDependency(
                 policy_change_id=PROPOSED_POLICY_CHANGE_ID,
+                **RELATIONSHIP_PROVENANCE,
                 **{**dependency, "id": f"{dependency['id']}-proposed"},
             )
         )
@@ -562,12 +570,14 @@ def seed_database(session: Session) -> None:
         session.merge(
             PolicyDocumentDependency(
                 policy_change_id=POLICY_CHANGE_ID,
+                **RELATIONSHIP_PROVENANCE,
                 **dependency,
             )
         )
         session.merge(
             PolicyDocumentDependency(
                 policy_change_id=PROPOSED_POLICY_CHANGE_ID,
+                **RELATIONSHIP_PROVENANCE,
                 **{**dependency, "id": f"{dependency['id']}-proposed"},
             )
         )
@@ -579,6 +589,7 @@ def seed_database(session: Session) -> None:
             course_id=COURSE_IDENTIFIER,
             relationship_type="requires_course",
             explanation="The policy requires the International Travel Security course.",
+            **RELATIONSHIP_PROVENANCE,
         )
     )
     session.merge(
@@ -589,6 +600,7 @@ def seed_database(session: Session) -> None:
             course_id=COURSE_IDENTIFIER,
             relationship_type="requires_course",
             explanation="The policy requires the International Travel Security course.",
+            **RELATIONSHIP_PROVENANCE,
         )
     )
     for assignment in COMMITMENT_ASSIGNMENTS:

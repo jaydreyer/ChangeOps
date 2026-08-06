@@ -928,6 +928,11 @@ already handles the product's meaningful recovery boundaries. A secure public po
 deployment therefore needs managed compute, identity, secrets, persistence, ingress, migration,
 backup, and operator visibility—not a distributed-system redesign.
 
+The portfolio is expected to run only for a few planned demonstrations, not serve traffic
+continuously. An always-on estimate is useful as a ceiling but is not the selected operating
+profile. Fixed-cost resources must be removable between demo windows without weakening controls
+while the environment is live.
+
 This ADR is an architecture gate. It does not authorize Terraform, AWS resource creation,
 deployment, or application redesign.
 
@@ -940,7 +945,8 @@ deployment, or application redesign.
    queue.
 5. Provide a repeatable, fail-closed Alembic deployment step.
 6. Use short-lived deployment credentials and runtime least privilege.
-7. Keep fixed monthly cost appropriate for a low-traffic public portfolio.
+7. Keep the normal off-state cost below roughly $15/month and create billed runtime resources only
+   for planned demo windows.
 8. Add availability or scaling components only when a product requirement justifies them.
 
 ## Decision
@@ -954,22 +960,28 @@ Fargate launch type. Each ECS task contains the existing Next.js and FastAPI ima
 - Next.js reaches FastAPI at `http://127.0.0.1:8000`; and
 - both containers scale and deploy together as one application unit.
 
-Run one task for the portfolio baseline. ECS may replace that task in either configured
-Availability Zone, but one desired task is not a high-availability guarantee. Increase the
-desired count to two only when an uptime requirement justifies the additional cost. Do not split
-the application into independently deployed services merely to demonstrate AWS services.
+Run one task only during a planned demo window. ECS may replace that task in either configured
+Availability Zone, but one desired task is not a high-availability guarantee. Outside demo
+windows, set desired count to zero and delete the ALB so neither compute nor load-balancer hourly
+charges continue. Increase the desired count to two only when an uptime requirement justifies the
+additional cost. Do not split the application into independently deployed services merely to
+demonstrate AWS services.
 
-Use Amazon RDS for PostgreSQL as the production database. The baseline is a small, encrypted,
-Single-AZ RDS PostgreSQL instance with 20 GiB of general-purpose SSD storage, automated backups,
-deletion protection, and no public address. Multi-AZ is the first availability upgrade if the
-portfolio later acquires an explicit recovery-time or uptime requirement; Aurora is not justified
-for the current workload.
+Use Amazon RDS for PostgreSQL as the production database while a demo environment exists. The
+baseline is a small, encrypted, Single-AZ RDS PostgreSQL instance with 20 GiB of general-purpose
+SSD storage, automated backups, deletion protection, and no public address. For an off period of
+seven days or less, stop the instance; storage and backup charges continue, but DB instance-hour
+charges stop. For a longer off period, take and verify a final snapshot, then delete the instance
+through the controlled environment teardown. Restore that snapshot before the next demo. Multi-AZ
+is the first availability upgrade if the portfolio later acquires an explicit recovery-time or
+uptime requirement; Aurora is not justified for the current workload.
 
-Use a public Application Load Balancer, AWS Certificate Manager, Route 53, and an Amazon Cognito
-user pool for ingress and authentication. The ALB terminates TLS and authenticates product routes
-against Cognito before forwarding to Next.js. Public self-registration is disabled. Users are
-invited into the closed `reviewer` or `admin` Cognito groups. The application remains publicly
-addressable, but product data and actions require a valid session.
+During a demo window, use a public Application Load Balancer, AWS Certificate Manager, Route 53,
+and an Amazon Cognito user pool for ingress and authentication. The ALB terminates TLS and
+authenticates product routes against Cognito before forwarding to Next.js. Public
+self-registration is disabled. Users are invited into the closed `reviewer` or `admin` Cognito
+groups. The application is publicly addressable only while deliberately enabled, and product data
+and actions require a valid session.
 
 ### Target topology
 
@@ -1021,6 +1033,56 @@ task is a public API. Moving tasks to private subnets with redundant NAT Gateway
 VPC endpoints is appropriate only when a requirement forbids public task addresses or justifies
 the additional fixed cost.
 
+## On-demand demo lifecycle
+
+The selected production profile is a repeatable **off → demo-ready → off** lifecycle. It must be
+an infrastructure operation, never an application route.
+
+Before a demonstration:
+
+1. restore the latest verified RDS snapshot, or start the stopped instance if it has been stopped
+   for no more than seven days;
+2. for a restore, explicitly apply and validate the named DB subnet group, task-only security
+   group, no-public-access setting, snapshot encryption/KMS key, backup retention, deletion
+   protection, log exports, instance class, and storage-autoscaling cap before any credential or
+   migration is used;
+3. update the non-secret database endpoint configuration if the restored instance has a new
+   endpoint;
+4. run the gated Alembic migration task and the explicitly approved fictional seed/bootstrap task;
+5. create the ALB, listeners, target-group attachment, and Route 53 alias;
+6. register a new application task-definition revision from the reviewed template with the
+   recreated ALB signer ARN and other expected authentication identifiers plus the current
+   database endpoint, then set the ECS service desired count to one;
+7. wait for database, ECS, ALB, authentication, and application health checks; and
+8. run a short read, approval-boundary, and audit-timeline smoke check before sharing the URL.
+
+After a demonstration:
+
+1. revoke temporary demo users or sessions that should not persist;
+2. set ECS desired count to zero and wait for the task to stop;
+3. remove the Route 53 alias and delete the ALB so its hourly and public-IPv4 charges stop;
+4. create and verify a final RDS snapshot;
+5. stop RDS only for a known break of at most seven days; otherwise disable deletion protection
+   through the controlled teardown, verify that only the intended protection setting changed,
+   delete RDS, and retain the final snapshot; and
+6. confirm the remaining billable inventory and budget state.
+
+AWS automatically restarts an RDS instance after seven consecutive stopped days. RDS stop is
+therefore not a durable off state and must not be presented as one. The longer-term off state keeps
+only low-cost control and recovery artifacts: Route 53 hosted zone, ACM certificate, Cognito user
+pool, ECR images, Secrets Manager secrets, CloudWatch history, and the latest verified database
+snapshot. VPC, subnets, security groups, target group, and ECS service may remain because they have
+no material hourly charge, but the ALB, running tasks, public task address, and RDS instance do not.
+Retain the latest verified snapshot and its predecessor until the newer snapshot has passed a
+restore and audit-integrity check. Deleting an older retained snapshot is a separate
+human-approved retention action; the routine teardown role cannot do it.
+
+Startup and teardown require the protected production GitHub Environment and explicit operator
+approval. Teardown requires the exact environment identifier and a separate destructive
+confirmation. A teardown failure must leave deletion protection enabled or report the resource as
+still billable; it must never claim that the environment is off merely because the application URL
+is unavailable.
+
 ## Runtime choice: ECS Fargate over App Runner
 
 | Requirement | ECS on Fargate | AWS App Runner |
@@ -1028,9 +1090,9 @@ the additional fixed cost.
 | Existing two-container deployment unit | One task definition can run Next.js and FastAPI together with task-local communication. | Optimized for one independently exposed web service; preserving the local proxy boundary would require a second hosting decision or service. |
 | Private FastAPI ingress | FastAPI has no load-balancer target or public listener. | An App Runner web service is an independently managed service endpoint; private ingress adds a different access model. |
 | RDS access | Security groups directly constrain task-to-RDS traffic. | A VPC connector can provide outbound access to RDS, but it does not solve the separate frontend-to-backend trust boundary. |
-| Alembic | The same backend task definition can run a one-off migration task with identical networking and secrets. | App Runner centers on long-running web services and does not provide the same general one-off ECS task primitive. |
+| Alembic | The backend image can run in a separate one-off task definition with the same networking and a migration-only credential. | App Runner centers on long-running web services and does not provide the same general one-off ECS task primitive. |
 | Long synchronous requests | ALB timeout and ECS task sizing are explicit and can accommodate current bounded model calls. | Supported, but with less control over the combined frontend/backend runtime boundary. |
-| Cost control | One continuously running task has predictable compute cost; no NAT Gateway is required in this baseline. | Idle memory is billed and active CPU is billed by use, which can be attractive for a light service. |
+| Cost control | Desired count can be zero between demos, and the ALB can be removed; no NAT Gateway is required. | A service can be paused, but App Runner is unavailable to new customers and still creates a separate service boundary. |
 | Service lifecycle | Current, general-purpose AWS container platform. | AWS announced that App Runner stopped accepting new customers on April 30, 2026 and recommends ECS Express Mode for new container workloads. |
 
 App Runner would have been credible for a single public FastAPI service with minimal infrastructure
@@ -1075,8 +1137,9 @@ requirements emerge. It is not required for the initial portfolio deployment.
 - AWS Shield Standard's default protection is sufficient for the low-risk baseline. AWS WAF is a
   later option if observed abuse or a public unauthenticated surface justifies its cost.
 
-Only the ALB, Route 53 record, Cognito hosted sign-in endpoints, and the task's outbound-only public
-address are internet-routable. FastAPI and RDS are not public services.
+While the environment is live, only the ALB, Route 53 record, Cognito hosted sign-in endpoints,
+and the task's outbound-only public address are internet-routable. FastAPI and RDS are not public
+services. The application alias, ALB, and task address do not exist in the long-term off state.
 
 ## Authentication and trusted identity propagation
 
@@ -1122,10 +1185,8 @@ or unknown privileged groups.
 Store secret values in AWS Secrets Manager, encrypted with the AWS-managed Secrets Manager key
 unless a later compliance requirement calls for a customer-managed key. Use separate secrets for:
 
-- the runtime SQLAlchemy `DATABASE_URL`, containing a least-privilege RDS application credential
-  and `sslmode=require`;
-- the migration `DATABASE_URL`, containing a separate schema-owner credential available only to
-  the one-off migration task;
+- the least-privilege RDS runtime username/password;
+- the separate schema-owner username/password available only to the one-off migration task;
 - the model-provider API key;
 - Jira email/API token when Jira execution is enabled; and
 - Confluence email/API token when Confluence refresh is enabled.
@@ -1144,12 +1205,15 @@ environment fields, image layers, GitHub secrets, logs, commands, audit snapshot
 variables.
 
 Non-secret configuration—including model names and timeouts, Jira base URL/project/issue type,
-Confluence base URL/page mapping, AWS Region, and Cognito/ALB identifiers—may remain ordinary ECS
-environment configuration. The application task definition's ECS execution role may read only the
-named runtime/provider secrets and ECR images. A separate migration task definition and ECS
-execution role may read only the migration database secret and backend image. The application task
-role receives no general AWS administrative permissions. Jira and Confluence remain disabled when
-their complete configuration is absent.
+Confluence base URL/page mapping, database endpoint/port/name, AWS Region, and Cognito/ALB
+identifiers—may remain ordinary ECS environment configuration. A small follow-up configuration
+change must assemble the SQLAlchemy URL inside each backend or migration process from the
+non-secret endpoint values and its injected credential, always adding `sslmode=require`; a
+password-bearing complete URL is never stored in a task definition. The application task
+definition's ECS execution role may read only the named runtime/provider secrets and ECR images. A
+separate migration task definition and ECS execution role may read only the migration database
+secret and backend image. The application task role receives no general AWS administrative
+permissions. Jira and Confluence remain disabled when their complete configuration is absent.
 
 Use dedicated, least-privilege portfolio Atlassian credentials if either integration is enabled.
 Jira remains create-Task only, and Confluence remains read-only for the one configured page and
@@ -1239,6 +1303,10 @@ Create a small CloudWatch dashboard and alarms for:
 - application error counts and migration-task failure; and
 - AWS monthly spend against a portfolio budget.
 
+Availability and desired-count alarms are enabled only during a declared demo window so the
+intentional off state is not reported as an incident. Budget and unexpected-resource-spend alarms
+remain enabled continuously.
+
 One email notification path may be used for operational alarms and budget alerts. If implemented
 with SNS, that topic is operational notification plumbing only; it is never an application event
 bus or workflow dependency.
@@ -1254,8 +1322,23 @@ ECR repositories, register ChangeOps task definitions, run the named migration t
 named ECS service, read deployment status and logs, and pass only the named ECS execution and task
 roles. It does not read application secret values or administer Cognito, RDS, IAM, or networking.
 
-The production GitHub Environment requires human approval. Deployment authorization is separate
-from ChangeOps human action approval: neither one implies the other.
+A separate environment-lifecycle role is restricted to the same protected GitHub Environment and
+tagged ChangeOps resources. It may start, stop, restore, or delete only the named RDS instance and
+may use `ModifyDBInstance` only in the reviewed teardown path to disable deletion protection
+immediately before deletion. The workflow compares the DB configuration before and after that
+change and refuses any unrelated modification. It may create or delete only the named
+ALB/listeners and update only the application Route 53 alias.
+
+The lifecycle workflow may register a new revision of the named application task-definition family
+from an immutable reviewed template, changing only the non-secret database endpoint and expected
+ALB authentication identifiers, pass only the named ECS roles, and update only the named service
+task revision and desired count. It may create the named final snapshot but cannot delete retained
+snapshots. It cannot read secret values, change database contents, administer Cognito users, or
+modify IAM. Destructive teardown requires a distinct reviewed workflow and explicit confirmation.
+
+The production GitHub Environment requires human approval for deployment, startup, and teardown.
+Infrastructure authorization is separate from ChangeOps human action approval: neither one implies
+the other.
 
 ## Failure boundaries and operational responsibility
 
@@ -1270,6 +1353,9 @@ from ChangeOps human action approval: neither one implies the other.
 | Jira ambiguous delivery | The durable at-most-once gate remains `outcome_unknown`; no automatic resend occurs. | Manual reconciliation is required outside the current product scope. |
 | Migration fails | The ECS service is not updated and the deployment fails. | Maintainer inspects the one-off task, restores if needed, fixes forward, and reruns. |
 | Application deployment fails after migration | The ECS circuit breaker marks the deployment failed and restores the last completed task definition; the compatible migration remains applied. | Maintainer verifies rollback health, fixes forward, and never downgrades automatically. |
+| Demo startup fails | The URL is not shared and the environment never enters `demo-ready`; any created hourly resources remain explicitly reported for cleanup. | Maintainer fixes forward or runs the reviewed teardown and verifies billable inventory. |
+| Restored RDS controls differ from the baseline | Credentials, migrations, seed, and application startup remain blocked. | Maintainer corrects or replaces the restored instance, then repeats the full control validation. |
+| Demo teardown is incomplete | The environment is not represented as off while an ALB, task, public address, or RDS instance remains billable. | Maintainer completes cleanup manually and verifies Cost Explorer/resource inventory. |
 | One Availability Zone fails | ALB remains regional, ECS can replace the task in another configured subnet, but Single-AZ RDS may be unavailable until AWS recovery. | Accept for portfolio RTO; adopt Multi-AZ only for a stronger requirement. |
 | Region fails | The portfolio is unavailable. | Restore from available backups after regional recovery; multi-region is out of scope. |
 
@@ -1283,25 +1369,31 @@ projection semantics.
 ## Rough monthly cost
 
 The following order-of-magnitude estimate uses public on-demand `us-east-1` prices checked on
-2026-08-06, 730 hours/month, one low-traffic task, one Single-AZ database, and no free-tier
-credits. It excludes domain registration, model-provider usage, Atlassian subscriptions, taxes,
+2026-08-06, no free-tier credits, and five four-hour demo windows in one month. Allowing roughly
+eight RDS instance-hours per demo covers restore/startup, migration, smoke checks, and the live
+session. It excludes domain registration, model-provider usage, Atlassian subscriptions, taxes,
 and meaningful internet data transfer.
 
-| Resource | Baseline assumption | Approximate monthly cost |
+| Resource | On-demand demo assumption | Approximate monthly cost |
 |---|---|---:|
-| ECS Fargate | One Linux/x86 task, 1 vCPU and 2 GiB | $36 |
-| Application Load Balancer | ALB hours plus very low LCU usage | $17–23 |
-| RDS PostgreSQL | Small Single-AZ burstable instance plus 20 GiB storage/backups | $15–25 |
-| Public IPv4 | Two ALB addresses plus one task address | about $11 |
+| ECS Fargate | One Linux/x86 task, 1 vCPU and 2 GiB, about 20 hours total | about $1 |
+| Application Load Balancer | Created for about 20 hours, then deleted | under $1 |
+| RDS PostgreSQL compute | Small Single-AZ burstable instance, about 40 hours total | about $1–2 |
+| RDS snapshot/storage | One retained 20 GiB-class snapshot or stopped-instance storage, with a predecessor retained until restore verification | about $2–5 |
+| Public IPv4 | ALB and task addresses only during demo windows | under $1 |
 | Secrets Manager | Five runtime/deployment secrets plus one break-glass database secret | about $3 |
 | Route 53 and ACM | One hosted zone; ACM certificate has no separate charge | about $1, plus domain |
-| ECR, CloudWatch, Cognito, backup/log growth, and low data transfer | Small portfolio usage | $3–10 |
-| **Expected baseline** | | **about $85–105/month** |
+| ECR, CloudWatch, Cognito, and low data transfer | Small retained artifacts and demo usage | $1–4 |
+| **Expected on-demand month** | Five four-hour demos | **about $8–17/month** |
 
-A second ECS task and Multi-AZ RDS materially increase the baseline. Private task subnets with a
-NAT Gateway also add a significant fixed hourly charge, so they are intentionally not part of this
-cost-sensitive design. Configure an AWS Budget at $125/month and alarms at 80% and 100%. Recheck
-the AWS Pricing Calculator before implementation because prices and free tiers change.
+If the environment is left running continuously, the earlier always-on ceiling remains roughly
+**$85–105/month**. That is an exception and a cost-control failure for the selected profile, not
+the baseline. A second ECS task, Multi-AZ RDS, or private tasks with NAT Gateways also materially
+increase cost and require a new product justification.
+
+Configure an AWS Budget at $20/month with alerts at 50%, 80%, and 100%, plus a continuous check for
+unexpected ALB, running ECS task, public IPv4, or RDS instance hours outside declared demo windows.
+Recheck the AWS Pricing Calculator before implementation because prices and free tiers change.
 
 ## Unified Audit Timeline implications
 
@@ -1328,7 +1420,8 @@ result exist?” Those responsibilities remain separate.
 - One-off migrations and failed deployments have explicit, testable outcomes.
 - The design avoids NAT Gateways, Kubernetes, queues, service discovery, API Gateway, Lambda,
   CloudFront, and a separate frontend platform.
-- Fixed cost is visible and bounded for a public portfolio.
+- The normal off-state retains recovery and security configuration for roughly $8–17 in a month
+  with several demos rather than paying an always-on compute baseline.
 
 ### Negative
 
@@ -1336,7 +1429,10 @@ result exist?” Those responsibilities remain separate.
 - The task has a public address for outbound access, although security groups deny public inbound
   traffic.
 - Frontend and backend cannot scale or deploy independently; no current requirement needs that.
-- ALB fixed cost is material relative to the application compute.
+- The public portfolio URL is intentionally unavailable outside scheduled demo windows.
+- Restoring RDS and recreating ingress adds a cold-start period and a rehearsed operator runbook.
+- A failed or forgotten teardown can still incur the $85–105 always-on ceiling, so inventory and
+  budget verification are part of completion.
 - Production deployment is blocked until ALB-claim verification, trusted header replacement,
   request correlation, structured logging, and a suitable web health endpoint are implemented and
   tested in later issues.
@@ -1385,12 +1481,14 @@ Separate, focused follow-up issues must implement and verify:
 
 1. ALB/Cognito claim verification and fail-closed role mapping in Next.js;
 2. replacement—not forwarding—of browser actor and role headers;
-3. request-ID propagation and secret-safe structured logs;
-4. a lightweight Next.js health endpoint that validates the intended service boundary;
-5. production container sizing and ALB timeout tests for the bounded synchronous path;
-6. infrastructure as code for the approved topology;
-7. OIDC deployment workflow, migration gating, and rollback evidence; and
-8. backup restore and audit-integrity runbooks.
+3. separate database endpoint configuration from injected runtime and migration credentials;
+4. request-ID propagation and secret-safe structured logs;
+5. a lightweight Next.js health endpoint that validates the intended service boundary;
+6. production container sizing and ALB timeout tests for the bounded synchronous path;
+7. infrastructure as code for the approved topology;
+8. OIDC deployment workflow, migration gating, and rollback evidence;
+9. backup restore and audit-integrity runbooks; and
+10. reviewed demo startup/teardown workflows with billable-resource verification.
 
 No AWS resource should be deployed until the authentication boundary is implemented. Terraform
 and deployment remain explicitly outside this ADR-only issue.
@@ -1421,6 +1519,8 @@ AWS sources checked on 2026-08-06:
 - [Amazon Cognito JWT verification](https://docs.aws.amazon.com/cognito/latest/developerguide/amazon-cognito-user-pools-using-tokens-verifying-a-jwt.html)
 - [Application Load Balancer HTTPS listeners](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/create-https-listener.html)
 - [RDS automated backups](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_WorkingWithAutomatedBackups.Enabling.html)
+- [Stopping an RDS instance temporarily](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_StopInstance.html)
+- [Updating and deleting an ECS service](https://docs.aws.amazon.com/AmazonECS/latest/developerguide/delete-service.html)
 - [GitHub OIDC trust-policy example](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Service-Application-Observability-for-AWS-GitHub-Action.html)
 - [AWS Secrets Manager pricing](https://aws.amazon.com/secrets-manager/pricing/)
 - [Route 53 pricing](https://aws.amazon.com/route53/pricing/)

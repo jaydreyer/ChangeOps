@@ -413,7 +413,9 @@ def _relationships_for_object(
                     href=_frontend_object_href(object_type, record.id),
                 ),
                 trust=RelationshipTrustResponse(
+                    level="trusted",
                     state="persisted_typed_relationship",
+                    basis="deterministic_enterprise_relationship",
                     integrity=[
                         "policy_change_foreign_key",
                         spec.target_integrity,
@@ -421,7 +423,7 @@ def _relationships_for_object(
                     ],
                     used_deterministically=True,
                 ),
-                provenance=_missing_relationship_provenance(),
+                provenance=_relationship_provenance(dependency),
             )
         )
     return relationships
@@ -551,13 +553,16 @@ def _catalog_context() -> CatalogContextResponse:
     )
 
 
-def _missing_relationship_provenance() -> RelationshipProvenanceResponse:
+def _relationship_provenance(dependency) -> RelationshipProvenanceResponse:
     return RelationshipProvenanceResponse(
-        classification="not_recorded",
+        classification=dependency.provenance_category,
+        source_label="Seeded demonstration data",
         creator=None,
-        owning_authority=None,
-        recorded_at=None,
+        owning_authority=dependency.provenance_authority,
+        reference=dependency.provenance_reference,
+        recorded_at=dependency.provenance_recorded_at,
         approval=None,
+        ai_involvement="none",
     )
 
 

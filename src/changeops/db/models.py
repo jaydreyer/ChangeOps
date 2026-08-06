@@ -668,6 +668,18 @@ class PolicyChangeQuestion(Base):
 class PolicySystemDependency(Base):
     __tablename__ = "policy_system_dependencies"
     __table_args__ = (
+        CheckConstraint(
+            "provenance_category = 'seeded_demonstration'",
+            name="ck_policy_system_dependencies_provenance_category",
+        ),
+        CheckConstraint(
+            "length(btrim(provenance_authority)) > 0",
+            name="ck_policy_system_dependencies_provenance_authority",
+        ),
+        CheckConstraint(
+            "length(btrim(provenance_reference)) > 0",
+            name="ck_policy_system_dependencies_provenance_reference",
+        ),
         UniqueConstraint(
             "policy_change_id",
             "rule_code",
@@ -685,6 +697,10 @@ class PolicySystemDependency(Base):
     system_id: Mapped[str] = mapped_column(ForeignKey("enterprise_systems.id"), index=True)
     relationship_type: Mapped[str] = mapped_column(String(100))
     explanation: Mapped[str] = mapped_column(Text)
+    provenance_category: Mapped[str] = mapped_column(String(40))
+    provenance_authority: Mapped[str] = mapped_column(String(200))
+    provenance_reference: Mapped[str] = mapped_column(String(100))
+    provenance_recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class PolicyDocumentDependency(Base):
@@ -693,6 +709,18 @@ class PolicyDocumentDependency(Base):
         CheckConstraint(
             "impact_classification IN ('review_required', 'update_required')",
             name="ck_policy_document_dependencies_classification",
+        ),
+        CheckConstraint(
+            "provenance_category = 'seeded_demonstration'",
+            name="ck_policy_document_dependencies_provenance_category",
+        ),
+        CheckConstraint(
+            "length(btrim(provenance_authority)) > 0",
+            name="ck_policy_document_dependencies_provenance_authority",
+        ),
+        CheckConstraint(
+            "length(btrim(provenance_reference)) > 0",
+            name="ck_policy_document_dependencies_provenance_reference",
         ),
         UniqueConstraint(
             "policy_change_id",
@@ -715,11 +743,27 @@ class PolicyDocumentDependency(Base):
     relationship_type: Mapped[str] = mapped_column(String(100))
     impact_classification: Mapped[str] = mapped_column(String(30))
     explanation: Mapped[str] = mapped_column(Text)
+    provenance_category: Mapped[str] = mapped_column(String(40))
+    provenance_authority: Mapped[str] = mapped_column(String(200))
+    provenance_reference: Mapped[str] = mapped_column(String(100))
+    provenance_recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class PolicyTrainingDependency(Base):
     __tablename__ = "policy_training_dependencies"
     __table_args__ = (
+        CheckConstraint(
+            "provenance_category = 'seeded_demonstration'",
+            name="ck_policy_training_dependencies_provenance_category",
+        ),
+        CheckConstraint(
+            "length(btrim(provenance_authority)) > 0",
+            name="ck_policy_training_dependencies_provenance_authority",
+        ),
+        CheckConstraint(
+            "length(btrim(provenance_reference)) > 0",
+            name="ck_policy_training_dependencies_provenance_reference",
+        ),
         UniqueConstraint(
             "policy_change_id",
             "rule_code",
@@ -737,6 +781,10 @@ class PolicyTrainingDependency(Base):
     course_id: Mapped[str] = mapped_column(ForeignKey("training_courses.id"), index=True)
     relationship_type: Mapped[str] = mapped_column(String(100))
     explanation: Mapped[str] = mapped_column(Text)
+    provenance_category: Mapped[str] = mapped_column(String(40))
+    provenance_authority: Mapped[str] = mapped_column(String(200))
+    provenance_reference: Mapped[str] = mapped_column(String(100))
+    provenance_recorded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class CustomerCommitment(Base):

@@ -79,7 +79,7 @@ Remaining work must add a distinct product, architecture, deployment, or present
 ## Recommended remaining work
 
 - [x] Narrow Confluence-backed document source integration and live Acme page validation
-- [ ] Trusted relationship provenance and governance
+- [x] Trusted relationship provenance for seeded deterministic relationships
 - [ ] Unified audit timeline
 - [ ] AWS deployment architecture decision
 - [ ] Terraform implementation and AWS deployment
@@ -195,16 +195,17 @@ MANAGER_APPROVAL_REQUIRED
 - [x] Existing seeded documents, systems, and training courses are visible through a coherent
       catalog UI; workers, teams, and customer commitments remain compact assessment context.
 - [ ] Object ownership and source-system provenance are visible.
-- [x] Persisted typed relationship trust basis can be inspected separately from the explicitly
-      missing row-origin provenance.
+- [x] Persisted typed relationship trust basis can be inspected separately from seeded row-origin
+      provenance.
 - [x] A reviewer can explain why the Manager Travel Approval Guide is deterministic assessment
       input for both baseline and proposed policy scopes.
 - [x] Existing analysis behavior remains unchanged.
 - [x] Demo reset remains safe, repeatable, and preserves the catalog projection.
 
-PR A intentionally leaves the ownership/source-provenance criterion incomplete where the typed
-tables do not persist those facts. External document identity remains PR B; relationship-origin
-provenance remains a separate, later PR C decision.
+PR A intentionally left the ownership/source-provenance criterion incomplete where the typed
+tables did not persist those facts. PR B added external document identity, and PR C now records
+seeded relationship origin. Object ownership plus imported, curated, and AI-backed relationship
+lineage remain separate future decisions.
 
 ---
 
@@ -361,10 +362,10 @@ AI must never silently create authoritative relationships during policy analysis
 
 ### Completion criteria for the required slice
 
-- [ ] Relationship provenance is visible.
-- [ ] Seeded relationships are honestly labeled.
-- [ ] The reviewer can distinguish enterprise facts from AI recommendations.
-- [ ] Existing impact traversal continues to use only trusted relationships.
+- [x] Relationship provenance is visible.
+- [x] Seeded relationships are honestly labeled.
+- [x] The reviewer can distinguish enterprise facts from AI recommendations.
+- [x] Existing impact traversal continues to use only trusted relationships.
 
 ### Decision gate for AI proposals
 
@@ -735,7 +736,7 @@ Jira and Confluence REST integrations alone do not automatically justify MCP.
 4. [x] Implement the read-only catalog explorer.
 5. [x] Create the bounded Acme Confluence content set using the documented manual setup.
 6. [x] Add read-only Confluence metadata import and links.
-7. [ ] Expose trusted relationship provenance.
+7. [x] Expose trusted relationship provenance.
 8. [ ] Decide whether AI-proposed relationship governance adds sufficient value.
 9. [ ] Implement the unified audit timeline.
 10. [ ] Produce the AWS architecture decision.

@@ -4,15 +4,13 @@ ChangeOps analyzes operational and policy changes, identifies affected people an
 
 ## Current milestone
 
-Milestone 7 PR B, Read-Only Confluence Document Identity.
+Milestone 7 PR C, Trusted Relationship Provenance.
 
-The catalog explorer can now associate the selected Manager Travel Approval Guide with one real,
-read-only Confluence Cloud page. An explicit refresh validates the configured page identity,
-imports only bounded page and space metadata into PostgreSQL, and exposes the canonical external
-link without changing the stable ChangeOps document ID. Failed refreshes preserve last-known-good
-metadata. Existing relationships, assessment behavior, comparison, approval, Learning System, and
-Jira behavior remain unchanged. Relationship-origin provenance remains the separately deferred
-Milestone 7 PR C.
+The catalog explorer now records and exposes honest row-level origin for the 12 policy dependency
+rows owned by the deterministic demonstration seed. Each relationship detail separates its seeded
+source, owning authority, provenance timestamp, trust basis, and explicit absence of AI
+involvement. The existing typed foreign keys, relationship identities, assessment behavior,
+Confluence identity, comparison, approval, Learning System, and Jira behavior remain unchanged.
 
 Milestone 0 is complete and preserved by the `v0.0.1-milestone-0` tag.
 

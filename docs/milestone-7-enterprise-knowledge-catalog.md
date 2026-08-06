@@ -6,11 +6,17 @@ PR A is merged. PR B is implemented with fixture-backed verification and was liv
 against the bounded Acme Confluence knowledge base on August 4, 2026. Live credentials and page
 identifiers remain environment-only. The current local credential is broader than least privilege
 and is an explicitly accepted current-environment limitation, not a PR B blocker. PR C
-relationship-origin provenance remains deferred.
+relationship-origin provenance is implemented for the 12 canonical policy dependency rows owned
+by the demonstration seed.
 
-This document is based on repository `main` at commit `14cfb5d` and on the implementation,
-migrations, seed/reset behavior, tests, and product-facing read models at that commit. The
-implementation is the source of truth where older planning language differs.
+This document is based on repository `main` at commit `345018d` plus the PR C implementation,
+migrations, seed/reset behavior, tests, and product-facing read models. The implementation is the
+source of truth where older planning language differs.
+
+Sections explicitly scoped to PR A or PR B preserve the historical design and acceptance record
+from before relationship provenance existed. The current-state and PR C sections describe the
+implemented behavior: seeded origin is stored for all 12 canonical dependency rows; imported,
+human-curated, and AI-backed relationship lineage remains deferred.
 
 ## Product capability
 
@@ -31,9 +37,8 @@ The approved delivery sequence is:
 2. **PR B — narrow external document identity and read-only Confluence metadata:** persist and
    display selected page identities, imported metadata, and external links without changing
    relationships or assessment behavior.
-3. **PR C — relationship-origin provenance:** add only the narrowly required provenance for
-   existing typed relationships after the PR A and PR B reviewer experiences show what is still
-   missing.
+3. **PR C — relationship-origin provenance:** record and expose narrowly bounded provenance for
+   the existing seed-owned typed relationships without changing assessment behavior.
 
 PR A is the Codex-ready first vertical slice in this document. PR B is a named planned slice, not
 merely a deferred possibility. PR C must remain distinct from PR B: external document identity and
@@ -105,9 +110,9 @@ MANAGER_APPROVAL_REQUIRED
 Used deterministically during impact assessment
 ```
 
-The current schema cannot honestly display `Owner: Travel Operations` or row-level relationship
-origin. Those values belong in a separately reviewed later provenance migration, not in hard-coded
-serializer logic.
+The current schema still cannot honestly display `Owner: Travel Operations`. PR C now stores
+row-level seeded relationship origin separately from object ownership; imported, human-curated,
+and AI-backed relationship origin remains unavailable.
 
 ## Current catalog and domain model
 
@@ -340,16 +345,15 @@ For `document-manager-travel-approval-guide`:
 7. The persisted path is policy change → policy rule → enterprise document.
 8. The proposed action remains a separate immutable assessment artifact.
 
-The relationship is therefore trusted by the current analyzer because it is a persisted typed
-mapping with referential integrity and the analyzer consumes it deterministically. That is a
-trust basis, not row-origin provenance.
+The relationship is trusted by the current analyzer because it is a persisted typed mapping with
+referential integrity and the analyzer consumes it deterministically. PR C stores its seeded row
+origin separately; neither fact is evidence of human approval.
 
 ## Current provenance and the gaps
 
 ### Provenance that already exists
 
-The implementation already preserves several kinds of provenance, but none is relationship-origin
-provenance:
+The implementation preserves several kinds of provenance:
 
 - extraction attempts store model/provider/prompt/schema metadata and policy source-span
   provenance;
@@ -359,7 +363,7 @@ provenance:
 - assessment paths store the ordered relationship names used for one historical conclusion;
 - reviews, approvals, commands, and results store human and execution lineage.
 
-For dependency relationships themselves, the existing provenance-like fields are limited to:
+For dependency relationships, PR C adds required origin fields to the existing typed facts:
 
 - stable dependency ID;
 - policy ID;
@@ -368,15 +372,19 @@ For dependency relationships themselves, the existing provenance-like fields are
 - relationship type;
 - explanation;
 - document impact classification where applicable.
+- provenance category `seeded_demonstration`;
+- owning authority `ChangeOps demonstration seed`;
+- stable reference `changeops.seed.relationships.v1`;
+- the timestamp when provenance metadata was recorded.
 
-There is no relationship creator, owning authority, creation time, import reference, curation
-decision, approval record, or provenance category.
+There is no individual relationship creator, original creation time, import lineage, curation
+decision, approval record, or AI proposal/decision lineage.
 
 ### Missing information by requested source category
 
 | Category | What would be required for an honest claim | Current state |
 | --- | --- | --- |
-| Seeded demonstration data | row-level origin or an explicitly bounded dataset declaration tied to the canonical seed | dataset origin is evident from code and demo context, but not stored per row |
+| Seeded demonstration data | row-level origin tied to the canonical seed | stored on all 12 canonical dependency rows |
 | Imported authoritative metadata | source system type, external stable ID/URL, import batch or retrieval time, source version/fingerprint | absent |
 | Human-curated mapping | curator identity, authority/role, recorded time, rationale, lifecycle status | absent |
 | Human-approved AI proposal | immutable proposal, exact evidence, model metadata, reviewer decision, reviewer identity/time, accepted relationship lineage | entirely absent and intentionally deferred |
@@ -840,7 +848,7 @@ For the Manager Travel Approval Guide, business-visible content should include:
 - `instructs_manager`;
 - `review_required`;
 - the persisted explanation;
-- row-level provenance not recorded;
+- seeded row-level provenance (added by PR C; historically unavailable in PR A);
 - deterministic assessment use.
 
 ### Rule-reference detail page
@@ -905,9 +913,7 @@ applicable row.
 
 ### PR C relationship-origin representation
 
-After PR A and PR B are understood, PR C should make current seeded and future
-human-curated/imported relationship origin explicit only where required, without weakening typed
-foreign keys.
+PR C makes current seeded relationship origin explicit without weakening typed foreign keys.
 
 Minimum information under review:
 
@@ -924,9 +930,10 @@ The closed product categories are:
 - human-curated mapping;
 - human-approved AI proposal.
 
-Only categories supported by real persisted lineage may be returned. PR C may implement seeded,
-imported, and human-curated relationship-origin metadata. `human-approved AI proposal` must remain
-unavailable until a later proposal-and-decision aggregate exists.
+Only categories supported by real persisted lineage may be returned. The implemented category is
+`seeded demonstration data`. Imported, human-curated, and `human-approved AI proposal` categories
+remain unavailable until separately reviewed lineage and, for AI, a proposal-and-decision
+aggregate exist.
 
 ## Seed and reset implications
 
@@ -1162,7 +1169,7 @@ Migration: none.
 Review gate:
 
 > Does the projection make the current enterprise-impact logic understandable while remaining
-> honest about missing row provenance and owner metadata?
+> honest about object-owner gaps and the row-provenance gap that existed at PR A review?
 
 ### PR B — Narrow external document identity and read-only Confluence metadata
 
@@ -1175,10 +1182,10 @@ implementation plan and review.
 
 ### PR C — Narrow relationship-origin provenance
 
-Recommended only if the validated PR A and Confluence experiences show that missing persisted
-relationship origin still materially blocks the reviewer story.
+Implemented after the validated PR A and Confluence experiences showed that missing persisted
+relationship origin materially blocked the reviewer story.
 
-Likely scope:
+Implemented scope:
 
 - narrow provenance additions to the three typed policy dependency tables;
 - canonical seed values;
@@ -1186,9 +1193,22 @@ Likely scope:
 - migration round-trip, constraint, idempotency, reset, API, and UI tests;
 - a new ADR for the accepted provenance persistence decision.
 
-PR C must receive a concrete schema review before coding. It must not add AI proposals, Confluence
-import behavior, external document identity changes, unrelated external imports, or a generic
-catalog layer.
+PR C received a concrete schema review before coding. It adds no AI proposals, Confluence import
+behavior, external document identity changes, unrelated external imports, or generic catalog
+layer.
+
+## Acceptance criteria for PR C
+
+- [x] Seeded relationship provenance is persisted on all 12 canonical dependency rows.
+- [x] The Manager guide visibly shows relationship, policy scope, type, explanation, seeded
+      source, trusted level, and no AI involvement.
+- [x] Baseline and proposed policy dependency rows remain distinct.
+- [x] Trust basis remains separate from origin and human approval.
+- [x] Migration backfill is limited to canonical seed-owned IDs and round-trips with populated
+      rows.
+- [x] Seed reruns and demo reset preserve the same provenance.
+- [x] Existing deterministic assessment behavior and golden counts remain unchanged.
+- [x] Imported, human-curated, and AI-backed relationship provenance remains deferred.
 
 ## Acceptance criteria for PR A
 
@@ -1209,7 +1229,7 @@ catalog layer.
       `MANAGER_APPROVAL_REQUIRED`.
 - [ ] The rule-reference view explains that the rule is policy-scoped and not a standalone stored
       rule entity.
-- [ ] The relationship view distinguishes trust basis from missing row provenance.
+- [x] The relationship view distinguishes trust basis from seeded row provenance.
 - [ ] The relationship view explains its deterministic assessment use.
 - [ ] All catalog endpoints are read-only.
 - [ ] Catalog access creates no workflow or assessment artifact.

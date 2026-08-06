@@ -844,3 +844,47 @@ space. OAuth scope guidance for an equivalent app is limited to `read:page:confl
   silently rewriting external identity.
 - Relationship-origin provenance is still absent. PR C remains a separate schema and governance
   decision.
+
+# ADR-0021 — Store Seeded Relationship Origin on Existing Typed Dependencies
+
+## Status
+
+Accepted
+
+## Context
+
+The Enterprise Knowledge Catalog shows that policy dependencies are persisted typed rows consumed
+deterministically by impact analysis, but PR A could not honestly say who created those rows or
+whether AI inferred them. PR B added external Confluence document identity without changing that
+gap. The current demonstration has exactly 12 dependency rows, all owned by the idempotent seed.
+There is no relationship import, curation, AI proposal, or human decision workflow.
+
+## Decision
+
+Add the same four required origin fields to `policy_system_dependencies`,
+`policy_document_dependencies`, and `policy_training_dependencies`: provenance category, owning
+authority, stable source reference, and the timestamp when provenance metadata was recorded.
+Preserve the three typed target foreign keys and existing stable relationship IDs.
+
+The initial closed category is only `seeded_demonstration`. The migration backfills only the 12
+canonical seed-owned IDs and fails if an unexpected dependency row exists rather than falsely
+labeling it as seeded. The idempotent seed reapplies the same canonical values. The recorded
+timestamp is explicitly the provenance-recording instant, not a claim about original relationship
+creation time.
+
+The catalog response and UI keep origin separate from trust. `Trusted` means the row has typed
+foreign-key integrity, semantic uniqueness, and deterministic analyzer use; it does not mean human
+approval. The UI explicitly states that AI did not create or infer these relationships. No
+`human-approved AI proposal` category exists until a real immutable proposal and human-decision
+aggregate can support it.
+
+## Consequences
+
+- Reviewers can identify why an object is connected, where the row came from, and whether AI was
+  involved without reading code.
+- Relationship reads remain read-only, and impact analysis consumes the same fields and rows as
+  before.
+- The schema intentionally duplicates four bounded fields across three real dependency tables
+  instead of introducing a generic or polymorphic relationship layer.
+- Imported, human-curated, or AI-backed relationship origins require separately reviewed lineage
+  and schema changes; they cannot be claimed through serializer labels alone.

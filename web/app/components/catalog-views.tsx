@@ -44,8 +44,8 @@ export function CatalogBrowseView({ catalog }: { catalog: CatalogBrowse }) {
         <aside className="catalog-context-notice" aria-label="Catalog authority boundary">
           <strong>{catalog.catalog_context.label}</strong>
           <p>
-            This is fictional demonstration data. Individual row origin is not recorded in the
-            current catalog.
+            This is fictional demonstration data. Object-level origin is not recorded; seeded
+            relationship origin is available on each object detail.
           </p>
         </aside>
       </header>
@@ -162,7 +162,7 @@ export function CatalogObjectDetailView({ detail }: { detail: CatalogObjectDetai
         <div className="catalog-boundary-note">
           <strong>Catalog context: Seeded demonstration catalog</strong>
           <p>
-            This dataset context is known from the bounded demo. Row-level creator, import,
+            This dataset context is known from the bounded demo. Object-level creator, import,
             curation, and approval provenance are not recorded.
           </p>
         </div>
@@ -182,8 +182,8 @@ export function CatalogObjectDetailView({ detail }: { detail: CatalogObjectDetai
         </div>
         <p className="section-intro">
           Each connection is trusted as deterministic analyzer input because it is a persisted row
-          in a typed dependency table with enforced foreign keys. That is not evidence of human
-          approval or row origin.
+          in a typed dependency table with enforced foreign keys. Relationship origin is recorded
+          separately and does not imply human approval.
         </p>
         <div className="catalog-relationship-list">
           {detail.relationships.map((relationship) => {
@@ -191,18 +191,34 @@ export function CatalogObjectDetailView({ detail }: { detail: CatalogObjectDetai
             return (
               <article className="journey-card catalog-relationship" key={relationship.relationship_id}>
                 <div className="section-heading">
-                  <span className="badge deterministic">Persisted typed relationship</span>
+                  <span className="badge deterministic">Trusted enterprise relationship</span>
                   {relationship.impact_classification && (
                     <span className="quiet-label">{humanize(relationship.impact_classification)}</span>
                   )}
                 </div>
-                <h3>{humanize(relationship.relationship_type)}</h3>
-                <p>{relationship.explanation}</p>
+                <h3>Relationship Provenance</h3>
                 <dl className="catalog-relationship-summary">
-                  <Fact label="Policy scope" value={`${relationship.policy.title} · ${relationship.policy.version}`} />
-                  <Fact label="Policy-scoped rule" value={relationship.source.display_name} />
-                  <Fact label="Row-level provenance" value="Not recorded" />
+                  <Fact
+                    label="Relationship"
+                    value={`${relationship.target.display_name} → ${relationship.source.display_name}`}
+                  />
+                  <Fact
+                    label="Policy scope"
+                    value={`${relationship.policy.title} · ${relationship.policy.version}`}
+                  />
+                  <Fact label="Relationship type" value={humanize(relationship.relationship_type)} />
+                  <Fact label="Business explanation" value={relationship.explanation} />
+                  <Fact label="Source" value={relationship.provenance.source_label} />
+                  <Fact label="Trust level" value={humanize(relationship.trust.level)} />
+                  <Fact
+                    label="AI involvement"
+                    value="None — AI did not create or infer this relationship."
+                  />
                 </dl>
+                <p className="catalog-provenance-note">
+                  Recorded by {relationship.provenance.owning_authority} on{" "}
+                  {formatDateTime(relationship.provenance.recorded_at)}.
+                </p>
                 <Link href={`/catalog/policy-rules/${policyId}/${ruleCode}`}>
                   Explain this policy rule
                 </Link>
@@ -212,6 +228,9 @@ export function CatalogObjectDetailView({ detail }: { detail: CatalogObjectDetai
                     <Fact label="Relationship row" value={relationship.relationship_id} technical />
                     <Fact label="Policy-scoped identity" value={relationship.source.stable_key} technical />
                     <Fact label="Relationship type" value={relationship.relationship_type} technical />
+                    <Fact label="Provenance category" value={relationship.provenance.classification} technical />
+                    <Fact label="Provenance reference" value={relationship.provenance.reference} technical />
+                    <Fact label="Trust basis" value={relationship.trust.basis} technical />
                     <Fact label="Integrity basis" value={relationship.trust.integrity.join(", ")} technical />
                   </dl>
                 </details>

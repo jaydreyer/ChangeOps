@@ -106,7 +106,9 @@ class RelationshipEndpointResponse(StrictModel):
 
 
 class RelationshipTrustResponse(StrictModel):
+    level: Literal["trusted"]
     state: Literal["persisted_typed_relationship"]
+    basis: Literal["deterministic_enterprise_relationship"]
     integrity: list[
         Literal[
             "policy_change_foreign_key",
@@ -120,11 +122,14 @@ class RelationshipTrustResponse(StrictModel):
 
 
 class RelationshipProvenanceResponse(StrictModel):
-    classification: Literal["not_recorded"]
+    classification: Literal["seeded_demonstration"]
+    source_label: Literal["Seeded demonstration data"]
     creator: None
-    owning_authority: None
-    recorded_at: None
+    owning_authority: str
+    reference: str
+    recorded_at: datetime
     approval: None
+    ai_involvement: Literal["none"]
 
 
 class CatalogRelationshipResponse(StrictModel):

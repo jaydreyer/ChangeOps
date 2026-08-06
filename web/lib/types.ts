@@ -720,16 +720,21 @@ export interface CatalogRelationship {
     href: string;
   };
   trust: {
+    level: "trusted";
     state: "persisted_typed_relationship";
+    basis: "deterministic_enterprise_relationship";
     integrity: string[];
     used_deterministically: true;
   };
   provenance: {
-    classification: "not_recorded";
+    classification: "seeded_demonstration";
+    source_label: "Seeded demonstration data";
     creator: null;
-    owning_authority: null;
-    recorded_at: null;
+    owning_authority: string;
+    reference: string;
+    recorded_at: string;
     approval: null;
+    ai_involvement: "none";
   };
 }
 

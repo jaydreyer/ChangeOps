@@ -16,7 +16,11 @@ from changeops.db.models import (
 )
 from changeops.db.session import SessionLocal
 from changeops.services.demo_reset_service import reset_demo_workflows
-from changeops.services.seed_service import ORGANIZATION_ID, POLICY_CHANGE_ID
+from changeops.services.seed_service import (
+    ORGANIZATION_ID,
+    POLICY_CHANGE_ID,
+    RELATIONSHIP_PROVENANCE,
+)
 
 CATALOG_URL = f"/api/v1/catalog-objects?organization_id={ORGANIZATION_ID}"
 MANAGER_GUIDE_URL = (
@@ -107,7 +111,9 @@ def test_document_detail_preserves_flagship_metadata_and_policy_lineage(client) 
         "policy-international-travel-proposed-2026-10:MANAGER_APPROVAL_REQUIRED"
     )
     assert baseline["trust"] == {
+        "level": "trusted",
         "state": "persisted_typed_relationship",
+        "basis": "deterministic_enterprise_relationship",
         "integrity": [
             "policy_change_foreign_key",
             "enterprise_document_foreign_key",
@@ -116,23 +122,28 @@ def test_document_detail_preserves_flagship_metadata_and_policy_lineage(client) 
         "used_deterministically": True,
     }
     assert baseline["provenance"] == {
-        "classification": "not_recorded",
+        "classification": "seeded_demonstration",
+        "source_label": "Seeded demonstration data",
         "creator": None,
-        "owning_authority": None,
-        "recorded_at": None,
+        "owning_authority": "ChangeOps demonstration seed",
+        "reference": "changeops.seed.relationships.v1",
+        "recorded_at": "2026-08-06T00:00:00Z",
         "approval": None,
+        "ai_involvement": "none",
     }
     assert body["assessment_usage"]["changes_assessment_behavior"] is False
     assert "deterministic enterprise analyzer" in body["assessment_usage"]["statement"]
 
 
 def test_system_and_training_details_normalize_status_without_inventing_metadata(client) -> None:
-    system = client.get("/api/v1/catalog-objects/enterprise_system/system-travel-request").json()[
-        "object"
-    ]
-    course = client.get(
+    system_detail = client.get(
+        "/api/v1/catalog-objects/enterprise_system/system-travel-request"
+    ).json()
+    course_detail = client.get(
         "/api/v1/catalog-objects/training_course/international-travel-security"
-    ).json()["object"]
+    ).json()
+    system = system_detail["object"]
+    course = course_detail["object"]
 
     assert system["status"] == {"value": "active", "basis": "normalized"}
     assert system["description"] == "Collects travel requests and manager approvals."
@@ -148,6 +159,14 @@ def test_system_and_training_details_normalize_status_without_inventing_metadata
         "completion_record_count": 6,
     }
     assert system["relationship_count"] == 2
+    assert {
+        relationship["provenance"]["classification"]
+        for relationship in system_detail["relationships"] + course_detail["relationships"]
+    } == {"seeded_demonstration"}
+    assert {
+        relationship["provenance"]["ai_involvement"]
+        for relationship in system_detail["relationships"] + course_detail["relationships"]
+    } == {"none"}
     assert course["relationship_count"] == 2
 
 
@@ -184,6 +203,7 @@ def test_unknown_persisted_rule_code_stays_visible_without_guessing(client) -> N
                 system_id="system-expense-management",
                 relationship_type="future_mapping",
                 explanation="A controlled fixture for an unknown mapping.",
+                **RELATIONSHIP_PROVENANCE,
             )
         )
 
@@ -267,6 +287,7 @@ def test_catalog_fails_closed_on_cross_organization_relationship_endpoint(client
                 system_id="system-controlled-integrity-fixture",
                 relationship_type="fixture_relationship",
                 explanation="Exists only to verify fail-closed organization resolution.",
+                **RELATIONSHIP_PROVENANCE,
             )
         )
 

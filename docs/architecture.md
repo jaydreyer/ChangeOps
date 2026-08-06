@@ -9,6 +9,21 @@ enterprise impact assessments, plus the read-only Enterprise Knowledge Catalog E
 narrow persisted Confluence Cloud document-identity boundary, and trusted origin metadata for
 deterministic policy dependencies.
 
+## AWS infrastructure definition
+
+ADR-0022's approved AWS topology is implemented as Terraform under
+[`infra/terraform`](../infra/terraform/README.md). It preserves the modular-monolith boundary: one
+ECS Fargate service runs standalone Next.js and FastAPI containers in one task, only Next.js is an
+ALB target, PostgreSQL remains private RDS, and a separate one-off task definition owns the Alembic
+execution boundary.
+
+Terraform defaults to the declared off state: ECS desired count zero with no ALB or application
+alias. Enabling a demo creates Cognito-authenticated TLS ingress and exactly one task. Applying
+the infrastructure remains prohibited until ADR-0022's authentication, trusted-header,
+database-configuration, logging, health, and sizing prerequisites are implemented and tested.
+Deployment, migrations, database-role bootstrap, seed, and operational lifecycle workflows remain
+separate follow-up work.
+
 ## High-level architecture
 
 ```mermaid

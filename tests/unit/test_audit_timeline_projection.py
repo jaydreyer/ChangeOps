@@ -169,9 +169,7 @@ def test_clarification_interpretation_and_change_plan_mappings_preserve_attempts
     assert answered.actor_category == AuditActorCategory.HUMAN
     assert any(entry.event_type == AuditEventType.INTERPRETATION_FAILED for entry in entries)
     assert any(entry.event_type == AuditEventType.CHANGE_PLAN_CREATED for entry in entries)
-    failed_entries = [
-        entry for entry in entries if entry.artifact.artifact_id == str(failed.id)
-    ]
+    failed_entries = [entry for entry in entries if entry.artifact.artifact_id == str(failed.id)]
     assert all(entry.artifact.href is None for entry in failed_entries)
 
 
@@ -270,9 +268,7 @@ def test_review_approval_command_execution_and_side_effect_mappings_are_attribut
     assert by_type[AuditEventType.EXECUTION_COMMAND_PREPARED].actor_category == (
         AuditActorCategory.DETERMINISTIC_SYSTEM
     )
-    assert by_type[AuditEventType.EXECUTION_REPLAY_PREVENTED].outcome == (
-        AuditOutcome.PREVENTED
-    )
+    assert by_type[AuditEventType.EXECUTION_REPLAY_PREVENTED].outcome == (AuditOutcome.PREVENTED)
     assert by_type[AuditEventType.EXECUTION_FAILED].outcome == AuditOutcome.FAILED
     assert by_type[AuditEventType.SIMULATED_SIDE_EFFECT_CREATED].actor_category == (
         AuditActorCategory.EXTERNAL_SYSTEM
@@ -282,8 +278,7 @@ def test_review_approval_command_execution_and_side_effect_mappings_are_attribut
 
 def test_decision_outcomes_distinguish_rejection_deferral_and_revision_request() -> None:
     reviews = [
-        record(id=uuid.uuid4(), proposed_action_id=uuid.uuid4(), created_at=NOW)
-        for _ in range(4)
+        record(id=uuid.uuid4(), proposed_action_id=uuid.uuid4(), created_at=NOW) for _ in range(4)
     ]
     decisions = [
         record(
@@ -337,9 +332,7 @@ def test_comparison_and_delta_mappings_use_authoritative_lineage_and_detail_rout
         AuditEventType.COMPARISON_CREATED,
         AuditEventType.IMPACT_DELTA_CREATED,
     ]
-    assert all(
-        entry.artifact.href == f"/policy-comparisons/{comparison.id}" for entry in entries
-    )
+    assert all(entry.artifact.href == f"/policy-comparisons/{comparison.id}" for entry in entries)
 
 
 def test_equal_timestamp_order_uses_causal_precedence_then_artifact_identity() -> None:

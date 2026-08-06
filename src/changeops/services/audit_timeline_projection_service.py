@@ -104,9 +104,7 @@ def get_audit_timeline(
         )
     )
     change_plans = list(
-        session.scalars(
-            select(ChangePlan).where(ChangePlan.policy_analysis_run_id == run.id)
-        )
+        session.scalars(select(ChangePlan).where(ChangePlan.policy_analysis_run_id == run.id))
     )
     attempt_ids = [attempt.id for attempt in attempts]
     comparisons = (
@@ -145,9 +143,7 @@ def get_audit_timeline(
     jira_issues: list[JiraIssue] = []
     if assessment is not None:
         reviews = list(
-            session.scalars(
-                select(ActionReview).where(ActionReview.assessment_id == assessment.id)
-            )
+            session.scalars(select(ActionReview).where(ActionReview.assessment_id == assessment.id))
         )
         review_ids = [review.id for review in reviews]
         if review_ids:
@@ -161,9 +157,7 @@ def get_audit_timeline(
     if approval is not None:
         commands = list(
             session.scalars(
-                select(ExecutionCommand).where(
-                    ExecutionCommand.approval_run_id == approval.id
-                )
+                select(ExecutionCommand).where(ExecutionCommand.approval_run_id == approval.id)
             )
         )
         command_ids = [command.id for command in commands]
@@ -277,11 +271,7 @@ def map_extraction_attempts(
 ) -> list[AuditTimelineEntry]:
     entries: list[AuditTimelineEntry] = []
     for attempt in attempts:
-        href = (
-            _anchor(run_href, "extraction-heading")
-            if linked_attempt_id == attempt.id
-            else None
-        )
+        href = _anchor(run_href, "extraction-heading") if linked_attempt_id == attempt.id else None
         metadata = _compact_metadata(
             model_provider=attempt.model_provider,
             model_identifier=attempt.model_identifier,
@@ -424,11 +414,7 @@ def map_interpretation_attempts(
     entries: list[AuditTimelineEntry] = []
     linked_ids = linked_attempt_ids or set()
     for attempt in attempts:
-        href = (
-            _anchor(run_href, "interpretation-heading")
-            if attempt.id in linked_ids
-            else None
-        )
+        href = _anchor(run_href, "interpretation-heading") if attempt.id in linked_ids else None
         entries.append(
             _entry(
                 key=f"policy_interpretation_attempt:{attempt.id}:attempted",
@@ -632,9 +618,7 @@ def map_approval_run(
             key=f"action_approval_run:{approval.id}:{approval.status}",
             occurred_at=approval.completed_at or approval.updated_at,
             actor=AuditActorCategory.DETERMINISTIC_SYSTEM,
-            event=(
-                AuditEventType.APPROVAL_FAILED if failed else AuditEventType.APPROVAL_COMPLETED
-            ),
+            event=(AuditEventType.APPROVAL_FAILED if failed else AuditEventType.APPROVAL_COMPLETED),
             title="Approval failed" if failed else "Approval completed",
             description=(
                 approval.failure_message

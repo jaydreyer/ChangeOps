@@ -148,6 +148,11 @@ A reviewer should be able to determine:
 * what was executed;
 * what result was returned.
 
+The Unified Audit Timeline presents that complete policy-change journey in one chronological,
+read-only view. It labels AI-assisted, deterministic, human, and external-system activity and links
+every entry to the persisted artifact that proves it. The timeline is a projection over the
+existing source records, not a second audit source of truth.
+
 Least-privilege access
 
 Users and tools should receive only the permissions required for their assigned role and action.

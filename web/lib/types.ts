@@ -644,6 +644,44 @@ export interface PolicyAnalysisJourney {
   };
 }
 
+export type AuditActorCategory =
+  | "ai_assisted"
+  | "deterministic_system"
+  | "human"
+  | "external_system";
+
+export type AuditOutcome =
+  | "succeeded"
+  | "failed"
+  | "rejected"
+  | "requested"
+  | "completed"
+  | "prevented"
+  | "recorded";
+
+export interface AuditTimelineEntry {
+  entry_key: string;
+  occurred_at: string;
+  actor_category: AuditActorCategory;
+  actor_identity: string | null;
+  event_type: string;
+  title: string;
+  description: string;
+  outcome: AuditOutcome;
+  artifact: {
+    artifact_type: string;
+    artifact_id: string;
+    href: string | null;
+  };
+  metadata: Record<string, unknown>;
+}
+
+export interface AuditTimeline {
+  subject_type: "policy_analysis_run";
+  subject_id: string;
+  entries: AuditTimelineEntry[];
+}
+
 export type CatalogObjectType =
   | "enterprise_document"
   | "enterprise_system"

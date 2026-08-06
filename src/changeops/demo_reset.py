@@ -5,7 +5,7 @@ from changeops.services.demo_reset_service import reset_from_environment
 
 def main() -> None:
     settings = get_settings()
-    with SessionLocal.begin() as session:
+    with SessionLocal() as session:
         summary = reset_from_environment(session, settings.database_url)
     print(
         "Demo reset complete: "

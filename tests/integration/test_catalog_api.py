@@ -328,7 +328,7 @@ def test_demo_reset_preserves_the_same_catalog_projection(client) -> None:
     before = client.get(CATALOG_URL).json()
     before_detail = client.get(MANAGER_GUIDE_URL).json()
 
-    with SessionLocal.begin() as session:
+    with SessionLocal() as session:
         reset_demo_workflows(session)
 
     assert client.get(CATALOG_URL).json() == before

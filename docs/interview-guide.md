@@ -267,7 +267,8 @@ Evaluation follows architectural ownership:
 6. Move from impact to a proposed action.
 7. Approve the action with a clear rationale.
 8. Prepare, inspect, and execute the command.
-9. End on the execution result and audit chain.
+9. Open the unified audit timeline and end on the execution result, Jira receipt, and prevented
+   replay in one ordered chain.
 
 ### Where to pause
 
@@ -289,6 +290,9 @@ Evaluation follows architectural ownership:
 - What changes when simulated integrations become real?
 - Why does ChangeOps preserve a separate document ID when a Confluence page ID exists?
 - What happens to imported metadata when Confluence is unavailable?
+- Why is the audit timeline a read projection instead of an event store?
+- How are events with equal timestamps ordered?
+- Why do failed attempts and prevented replays remain visible?
 
 ### What not to explain unless asked
 

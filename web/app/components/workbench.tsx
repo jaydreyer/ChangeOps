@@ -351,7 +351,7 @@ function ExecutionPreparationPanel({
   }
 
   return (
-    <section className="preparation-panel" aria-labelledby="preparation-heading">
+    <section id="execution" className="preparation-panel" aria-labelledby="preparation-heading">
       <div className="section-heading">
         <div>
           <p className="eyebrow">Separate controlled operation</p>

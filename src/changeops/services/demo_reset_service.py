@@ -15,6 +15,7 @@ from changeops.db.models import (
     PolicyComparison,
     SimulatedLearningAssignment,
 )
+from changeops.services.demo_audit_timeline_seed_service import seed_demo_audit_timeline
 from changeops.services.seed_service import ORGANIZATION_ID, seed_database
 
 DEMO_RESET_CONFIRMATION = "reset-changeops-local-demo"
@@ -82,11 +83,14 @@ def validate_demo_reset_target(database_url: str, confirmation: str | None) -> N
 
 
 def reset_demo_workflows(session: Session) -> DemoResetSummary:
-    marker = session.get(Organization, ORGANIZATION_ID)
-    if marker is None:
-        raise DemoResetSafetyError("The seeded demo organization marker is missing.")
-    session.execute(text(f"TRUNCATE TABLE {', '.join(WORKFLOW_TABLES)}"))
-    seed_database(session)
+    session.rollback()
+    with session.begin():
+        marker = session.get(Organization, ORGANIZATION_ID)
+        if marker is None:
+            raise DemoResetSafetyError("The seeded demo organization marker is missing.")
+        session.execute(text(f"TRUNCATE TABLE {', '.join(WORKFLOW_TABLES)}"))
+        seed_database(session)
+    seed_demo_audit_timeline(session)
     return _summary(session)
 
 

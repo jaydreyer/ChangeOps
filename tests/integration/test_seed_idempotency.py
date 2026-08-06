@@ -157,18 +157,18 @@ def test_demo_reset_removes_workflow_history_preserves_catalog_and_is_repeatable
     with SessionLocal() as session:
         seed_demo_assessment(session)
 
-    with SessionLocal.begin() as session:
+    with SessionLocal() as session:
         first = reset_demo_workflows(session)
-    with SessionLocal.begin() as session:
+    with SessionLocal() as session:
         second = reset_demo_workflows(session)
 
     assert first == second
-    assert first.policy_analysis_runs == 0
-    assert first.policy_comparisons == 0
-    assert first.impact_assessments == 0
-    assert first.approval_runs == 0
-    assert first.execution_commands == 0
-    assert first.execution_results == 0
+    assert first.policy_analysis_runs == 2
+    assert first.policy_comparisons == 1
+    assert first.impact_assessments == 2
+    assert first.approval_runs == 1
+    assert first.execution_commands == 1
+    assert first.execution_results == 2
     assert first.learning_assignments == 0
     with SessionLocal() as session:
         assert session.get(Organization, "org-acme-global-manufacturing") is not None

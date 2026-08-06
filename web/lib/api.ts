@@ -1,5 +1,6 @@
 import type {
   ApiError,
+  AuditTimeline,
   CatalogBrowse,
   CatalogObjectDetail,
   CatalogObjectType,
@@ -76,6 +77,18 @@ export async function getPolicyAnalysisJourney(runId: string): Promise<PolicyAna
     throw new Error(`${error.code}|${error.message}`);
   }
   return response.json() as Promise<PolicyAnalysisJourney>;
+}
+
+export async function getAuditTimeline(runId: string): Promise<AuditTimeline> {
+  const response = await fetch(
+    `${apiBaseUrl()}/api/v1/policy-analysis-runs/${encodeURIComponent(runId)}/audit-timeline`,
+    { cache: "no-store" },
+  );
+  if (!response.ok) {
+    const error = await parseApiError(response);
+    throw new Error(`${error.code}|${error.message}`);
+  }
+  return response.json() as Promise<AuditTimeline>;
 }
 
 export async function getPolicyComparison(comparisonId: string): Promise<PolicyComparison> {

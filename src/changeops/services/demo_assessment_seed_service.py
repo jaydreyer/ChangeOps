@@ -22,9 +22,7 @@ DEMO_ASSESSMENT_ID = uuid.UUID("8f4f647d-7f2d-4da8-8e02-77d5301f2002")
 DEMO_EXTRACTION_ATTEMPT_ID = uuid.UUID("8f4f647d-7f2d-4da8-8e02-77d5301f2003")
 DEMO_PROPOSED_POLICY_ANALYSIS_RUN_ID = uuid.UUID("8f4f647d-7f2d-4da8-8e02-77d5301f2011")
 DEMO_PROPOSED_ASSESSMENT_ID = uuid.UUID("8f4f647d-7f2d-4da8-8e02-77d5301f2012")
-DEMO_PROPOSED_EXTRACTION_ATTEMPT_ID = uuid.UUID(
-    "8f4f647d-7f2d-4da8-8e02-77d5301f2013"
-)
+DEMO_PROPOSED_EXTRACTION_ATTEMPT_ID = uuid.UUID("8f4f647d-7f2d-4da8-8e02-77d5301f2013")
 
 
 def seed_demo_assessment(session: Session) -> uuid.UUID:
@@ -183,9 +181,7 @@ def _provenance(policy: PolicyChange) -> list[dict[str, object]]:
     proposed = policy.id == PROPOSED_POLICY_CHANGE_ID
     effective = "Effective October 1, 2026" if proposed else "Effective September 1, 2026"
     workers = "employees" if proposed else "employees and contractors"
-    excluded = (
-        "United States, Canada, and Mexico" if proposed else "United States and Canada"
-    )
+    excluded = "United States, Canada, and Mexico" if proposed else "United States and Canada"
     exemption = (
         "Travel booked before October 1, 2026 is exempt"
         if proposed

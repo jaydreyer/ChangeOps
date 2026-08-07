@@ -45,9 +45,9 @@ def test_completed_journey_returns_stable_ordered_read_projection(client) -> Non
     )
     assert all(entry["artifact"]["artifact_id"] for entry in body["entries"])
     extraction_entries = [
-        entry for entry in body["entries"] if entry["artifact"]["artifact_type"] == (
-            "policy_extraction_attempt"
-        )
+        entry
+        for entry in body["entries"]
+        if entry["artifact"]["artifact_type"] == ("policy_extraction_attempt")
     ]
     assert {entry["actor_category"] for entry in extraction_entries} == {
         "ai_assisted",

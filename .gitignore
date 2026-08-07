@@ -37,3 +37,16 @@ web/tsconfig.tsbuildinfo
 # Local runtime data
 *.log
 *.pid
+
+# Terraform local state, provider cache, and uncommitted variable values
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfvars
+!*.tfvars.example
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json

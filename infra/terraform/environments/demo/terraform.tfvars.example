@@ -1,0 +1,22 @@
+hosted_zone_name    = "example.com"
+application_hostname = "changeops.example.com"
+
+# Use an existing public Route 53 zone instead of creating one:
+# existing_hosted_zone_id = "Z0123456789EXAMPLE"
+
+github_repository = "jaydreyer/ChangeOps"
+github_environment = "production"
+alert_email        = "operator@example.com"
+
+# The safe normal state: no ALB, no application alias, and ECS desired count zero.
+demo_enabled = false
+
+# Set true only after every application prerequisite in ADR-0022 is implemented and tested.
+infrastructure_prerequisites_confirmed = false
+
+# Use a full immutable Git commit SHA after images have been pushed by a later deployment workflow.
+container_image_tag = "bootstrap"
+
+# Optional integrations remain disabled unless their dedicated secrets and all non-secret values exist.
+enable_jira       = false
+enable_confluence = false

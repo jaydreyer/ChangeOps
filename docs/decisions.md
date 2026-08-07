@@ -893,7 +893,7 @@ aggregate can support it.
 
 ## Status
 
-Proposed
+Accepted
 
 ## Date
 

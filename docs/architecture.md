@@ -18,11 +18,25 @@ ALB target, PostgreSQL remains private RDS, and a separate one-off task definiti
 execution boundary.
 
 Terraform defaults to the declared off state: ECS desired count zero with no ALB or application
-alias. Enabling a demo creates Cognito-authenticated TLS ingress and exactly one task. Applying
-the infrastructure remains prohibited until ADR-0022's authentication, trusted-header,
-database-configuration, logging, health, and sizing prerequisites are implemented and tested.
-Deployment, migrations, database-role bootstrap, seed, and operational lifecycle workflows remain
-separate follow-up work.
+alias. Enabling a demo creates Cognito-authenticated TLS ingress and exactly one task. The
+application gate is implemented by signed ALB/Cognito claim verification in Next.js, strict
+replacement of browser identity headers, TLS-required database URL assembly from injected secret
+fields, structured request-correlated JSON logs, separate health/readiness routes, and locked
+non-root production containers.
+
+The protected production workflow publishes commit-SHA images, registers new ECS task-definition
+revisions, runs Alembic with migration authority and initializes fictional demo data with
+restricted runtime authority as separate controlled tasks, then updates the service. Its prepare
+mode operates at desired count zero, so the first release exists before the demo window starts.
+A separate protected evidence workflow rejects the seeded run and validates persisted identities,
+approval, immutable preparation, explicit execution, and provenance from a human-performed
+deployed journey created after the currently running release task started. Actor subjects remain
+in the business audit trail and are not copied into operational logs. Next.js applies HSTS and
+reviewed browser security headers to every route. Terraform
+ignores only the service's release revision so a later
+infrastructure apply cannot silently roll back application code; it continues to own service
+existence, desired count, networking, identity, secrets, and every other infrastructure control.
+See [`docs/aws-deployment.md`](aws-deployment.md) for deployment and recovery.
 
 ## High-level architecture
 

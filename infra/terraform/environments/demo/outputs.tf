@@ -93,6 +93,11 @@ output "migration_task_definition_arn" {
   value       = aws_ecs_task_definition.migration.arn
 }
 
+output "bootstrap_task_definition_arn" {
+  description = "Separate one-off fictional-data bootstrap task using only runtime DB authority."
+  value       = aws_ecs_task_definition.bootstrap.arn
+}
+
 output "database_identifier" {
   description = "Private RDS instance identifier."
   value       = aws_db_instance.main.identifier

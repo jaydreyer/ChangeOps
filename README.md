@@ -28,6 +28,7 @@ See:
 - `docs/milestone-7-enterprise-knowledge-catalog.md`
 - `docs/demo-scenario.md`
 - `docs/decisions.md`
+- [`docs/aws-deployment.md`](docs/aws-deployment.md)
 - [Contributing and engineering standards](CONTRIBUTING.md)
 
 ## Project direction

@@ -22,6 +22,7 @@ locals {
   ecs_service_arn     = "arn:${data.aws_partition.current.partition}:ecs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:service/${local.ecs_cluster_name}/${local.ecs_service_name}"
   application_family  = "${local.name_prefix}-application"
   migration_family    = "${local.name_prefix}-migration"
+  bootstrap_family    = "${local.name_prefix}-bootstrap"
   database_identifier = "${local.name_prefix}-postgres"
 
   secret_arns = {

@@ -139,6 +139,14 @@ run "adr_0022_off_state" {
     ])
     error_message = "The migration task must receive only the migration database secret."
   }
+
+  assert {
+    condition = length(local.bootstrap_secrets) == 2 && alltrue([
+      for secret in local.bootstrap_secrets :
+      strcontains(secret.valueFrom, aws_secretsmanager_secret.runtime_db.arn)
+    ])
+    error_message = "The fictional bootstrap must use only restricted runtime DB authority."
+  }
 }
 
 run "declared_demo_window" {
@@ -174,6 +182,23 @@ run "declared_demo_window" {
       item.value if item.name == "ALB_EXPECTED_SIGNER_ARN"
     ]) == aws_lb.app[0].arn
     error_message = "Next.js must verify the signed OIDC signer against the load balancer ARN."
+  }
+
+  assert {
+    condition = one([
+      for item in local.web_environment :
+      item.value if item.name == "CHANGEOPS_IDENTITY_MODE"
+    ]) == "alb"
+    error_message = "The deployed proxy must fail closed on verified ALB and Cognito identity."
+  }
+
+  assert {
+    condition = sort(flatten([
+      for listener_condition in aws_lb_listener_rule.public_health[0].condition : flatten([
+        for pattern in listener_condition.path_pattern : pattern.values
+      ])
+    ])) == sort(["/healthz", "/readyz"])
+    error_message = "Only the non-product health and readiness routes may bypass Cognito."
   }
 }
 

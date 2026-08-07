@@ -1,5 +1,3 @@
-import logging
-
 from fastapi import FastAPI
 
 from changeops.api.action_approval import router as action_approval_router
@@ -14,22 +12,14 @@ from changeops.api.policy_analysis_journey import router as policy_analysis_jour
 from changeops.api.policy_comparisons import router as policy_comparisons_router
 from changeops.api.policy_extractions import router as policy_extractions_router
 from changeops.api.policy_interpretation import router as policy_interpretation_router
+from changeops.observability import configure_structured_logging, install_request_logging
 
-
-def _configure_application_logging() -> None:
-    application_logger = logging.getLogger("changeops")
-    application_logger.setLevel(logging.INFO)
-    uvicorn_handlers = logging.getLogger("uvicorn").handlers
-    if uvicorn_handlers:
-        application_logger.handlers = uvicorn_handlers
-        application_logger.propagate = False
-
-
-_configure_application_logging()
+configure_structured_logging()
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="ChangeOps", version="0.1.0")
+    install_request_logging(app)
     app.include_router(health_router)
     app.include_router(assessments_router)
     app.include_router(catalog_router)

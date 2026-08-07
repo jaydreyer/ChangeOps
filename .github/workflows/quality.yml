@@ -97,15 +97,18 @@ jobs:
       - name: Build Compose services
         run: docker compose build
 
+      - name: Build production backend image
+        run: docker build --target production --tag changeops-api:production .
+
       - name: Save API image cache
         if: steps.api-image-cache.outputs.cache-hit != 'true'
         run: docker image save changeops-api:latest --output /tmp/changeops-api-image.tar
 
       - name: Lint
-        run: docker compose run --rm api ruff check src migrations tests
+        run: docker compose run --rm api ruff check src migrations scripts tests
 
       - name: Check formatting
-        run: docker compose run --rm api ruff format --check src migrations tests
+        run: docker compose run --rm api ruff format --check src migrations scripts tests
 
       - name: Run test suite
         run: docker compose run --rm api pytest

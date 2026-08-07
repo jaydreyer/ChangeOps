@@ -5,9 +5,9 @@ Terraform is the source of truth for managed AWS resources. It does not deploy a
 releases, run Alembic, create database roles, seed data, or implement the later demo-lifecycle
 workflows.
 
-## Hard deployment gate
+## Application deployment gate
 
-Do not apply either root until ADR-0022's application prerequisites are implemented and tested:
+Issue #45 implements and tests ADR-0022's application prerequisites:
 
 1. Next.js verifies ALB and Cognito claims and fails closed.
 2. The proxy replaces, rather than forwards, browser actor and role headers.
@@ -17,8 +17,12 @@ Do not apply either root until ADR-0022's application prerequisites are implemen
 5. Next.js exposes the configured health endpoint.
 6. Production container sizing and the bounded synchronous path are verified.
 
-Issue #44 establishes reproducible infrastructure definitions only. The safe default is
-`demo_enabled = false`: no ALB or application DNS alias and ECS desired count zero.
+The protected two-phase release workflow, initial database-role bootstrap, live human-journey
+evidence gate, and recovery steps are in
+[`docs/aws-deployment.md`](../../docs/aws-deployment.md). This does not authorize an
+unreviewed Terraform apply: the exact saved plan, account, domain, and cost impact still require
+human approval. The safe default is `demo_enabled = false`: no ALB or application DNS alias and
+ECS desired count zero.
 
 ## Root layout and provisioned controls
 
@@ -33,7 +37,8 @@ The demo root provisions:
 - security groups allowing only ALB-to-Next.js on 3000 and task-to-RDS on 5432, with no public
   FastAPI or RDS ingress;
 - immutable scan-on-push ECR repositories;
-- one two-container Fargate application task, one separate migration task, and one ECS service;
+- one two-container Fargate application task, separate migration and fictional-bootstrap task
+  definitions with distinct DB authority, and one ECS service;
 - encrypted private Single-AZ PostgreSQL 17 RDS, 20 GiB gp3 storage, 50 GiB autoscaling cap,
   seven-day backups, TLS enforcement, log exports, deletion protection, and an AWS-managed
   break-glass master password;
@@ -370,5 +375,6 @@ explicitly authorize browser assistance while already signed in. Do not share th
 password. Secret values and Cognito users are not needed to provision the safe off-state
 infrastructure, and Codex should not receive real secret values in chat.
 
-At present, ADR-0022's hard deployment gate prevents any AWS apply. This repository change
-therefore performs validation and planning logic only and creates no cloud resources.
+Repository changes and CI perform validation only and create no cloud resources. Apply a saved
+plan only through the reviewed operator procedure above, then use the protected application
+deployment workflow and recovery runbook.

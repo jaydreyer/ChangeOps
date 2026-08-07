@@ -1,0 +1,255 @@
+name: Verify production flagship
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_sha:
+        description: Full 40-character commit SHA currently deployed
+        required: true
+        type: string
+      policy_analysis_run_id:
+        description: Run ID created through the authenticated deployed UI
+        required: true
+        type: string
+      confirmation:
+        description: Enter verified-live-human-journey after completing the run
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: changeops-production-release
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: ${{ vars.AWS_REGION }}
+  APPLICATION_URL: ${{ vars.APPLICATION_URL }}
+  ECS_CLUSTER: changeops-demo-cluster
+  ECS_SERVICE: changeops-demo-service
+  BOOTSTRAP_TASK_FAMILY: changeops-demo-bootstrap
+  API_REPOSITORY: changeops-demo-api
+  WEB_REPOSITORY: changeops-demo-web
+
+jobs:
+  verify:
+    name: verify human journey and audit evidence
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+
+    steps:
+      - name: Validate protected verification request
+        env:
+          AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          RELEASE_SHA: ${{ inputs.release_sha }}
+          POLICY_ANALYSIS_RUN_ID: ${{ inputs.policy_analysis_run_id }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+          test -n "${AWS_DEPLOY_ROLE_ARN}"
+          test -n "${AWS_REGION}"
+          test "${CONFIRMATION}" = "verified-live-human-journey"
+          [[ "${RELEASE_SHA}" =~ ^[0-9a-f]{40}$ ]]
+          [[ "${POLICY_ANALYSIS_RUN_ID}" =~ ^[0-9a-fA-F-]{36}$ ]]
+          case "${APPLICATION_URL}" in
+            https://*) ;;
+            *) echo "Verification requires an HTTPS APPLICATION_URL." >&2; exit 1 ;;
+          esac
+
+      - name: Obtain short-lived AWS credentials
+        uses: aws-actions/configure-aws-credentials@v6.1.2
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Verify the requested immutable release is running
+        id: release
+        env:
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        run: |
+          set -euo pipefail
+          aws ecs wait services-stable --cluster "${ECS_CLUSTER}" --services "${ECS_SERVICE}"
+          service="$(
+            aws ecs describe-services \
+              --cluster "${ECS_CLUSTER}" \
+              --services "${ECS_SERVICE}"
+          )"
+          test "$(jq -r '.services[0].desiredCount' <<<"${service}")" = "1"
+          test "$(jq -r '.services[0].runningCount' <<<"${service}")" = "1"
+          test "$(jq -r '.services[0].pendingCount' <<<"${service}")" = "0"
+          jq -e '
+            .services[0].deployments as $deployments
+            | ($deployments | length) == 1
+              and $deployments[0].status == "PRIMARY"
+              and $deployments[0].rolloutState == "COMPLETED"
+              and $deployments[0].runningCount == 1
+              and $deployments[0].pendingCount == 0
+          ' <<<"${service}" >/dev/null
+          task_definition="$(jq -r '.services[0].taskDefinition' <<<"${service}")"
+          definition="$(
+            aws ecs describe-task-definition --task-definition "${task_definition}"
+          )"
+          api_uri="$(
+            aws ecr describe-repositories \
+              --repository-names "${API_REPOSITORY}" \
+              --query 'repositories[0].repositoryUri' \
+              --output text
+          )"
+          web_uri="$(
+            aws ecr describe-repositories \
+              --repository-names "${WEB_REPOSITORY}" \
+              --query 'repositories[0].repositoryUri' \
+              --output text
+          )"
+          jq -e \
+            --arg api "${api_uri}:${RELEASE_SHA}" \
+            --arg web "${web_uri}:${RELEASE_SHA}" \
+            '
+              (.taskDefinition.containerDefinitions |
+                map(select(.name == "api" and .image == $api)) | length) == 1
+              and
+              (.taskDefinition.containerDefinitions |
+                map(select(.name == "web" and .image == $web)) | length) == 1
+            ' <<<"${definition}" >/dev/null
+          task_arn="$(
+            aws ecs list-tasks \
+              --cluster "${ECS_CLUSTER}" \
+              --service-name "${ECS_SERVICE}" \
+              --desired-status RUNNING \
+              --query 'taskArns[0]' \
+              --output text
+          )"
+          test -n "${task_arn}" && test "${task_arn}" != "None"
+          running_task="$(
+            aws ecs describe-tasks \
+              --cluster "${ECS_CLUSTER}" \
+              --tasks "${task_arn}" \
+              --output json
+          )"
+          test "$(jq -r '.tasks[0].taskDefinitionArn' <<<"${running_task}")" = \
+            "${task_definition}"
+          release_not_before="$(jq -r '.tasks[0].startedAt' <<<"${running_task}")"
+          test -n "${release_not_before}" && test "${release_not_before}" != "None"
+          echo "not_before=${release_not_before}" >> "${GITHUB_OUTPUT}"
+
+      - name: Resolve the matching evidence-task revision
+        id: evidence_task
+        env:
+          RELEASE_SHA: ${{ inputs.release_sha }}
+        run: |
+          set -euo pipefail
+          api_uri="$(
+            aws ecr describe-repositories \
+              --repository-names "${API_REPOSITORY}" \
+              --query 'repositories[0].repositoryUri' \
+              --output text
+          )"
+          expected_image="${api_uri}:${RELEASE_SHA}"
+          evidence_task=""
+          while IFS= read -r task_definition; do
+            image="$(
+              aws ecs describe-task-definition \
+                --task-definition "${task_definition}" \
+                --query "taskDefinition.containerDefinitions[?name=='bootstrap'].image | [0]" \
+                --output text
+            )"
+            if test "${image}" = "${expected_image}"; then
+              evidence_task="${task_definition}"
+              break
+            fi
+          done < <(
+            aws ecs list-task-definitions \
+              --family-prefix "${BOOTSTRAP_TASK_FAMILY}" \
+              --sort DESC \
+              --query 'taskDefinitionArns[]' \
+              --output text | tr '\t' '\n'
+          )
+          test -n "${evidence_task}" || {
+            echo "No evidence task matches the requested release SHA." >&2
+            exit 1
+          }
+          echo "task_definition=${evidence_task}" >> "${GITHUB_OUTPUT}"
+
+      - name: Verify persisted human and execution evidence
+        env:
+          EVIDENCE_TASK_DEFINITION: ${{ steps.evidence_task.outputs.task_definition }}
+          POLICY_ANALYSIS_RUN_ID: ${{ inputs.policy_analysis_run_id }}
+          RELEASE_NOT_BEFORE: ${{ steps.release.outputs.not_before }}
+        run: |
+          set -euo pipefail
+          network_configuration="$(
+            aws ecs describe-services \
+              --cluster "${ECS_CLUSTER}" \
+              --services "${ECS_SERVICE}" \
+              --query 'services[0].networkConfiguration' \
+              --output json
+          )"
+          command_json="$(
+            jq -cn \
+              --arg run "${POLICY_ANALYSIS_RUN_ID}" \
+              --arg release_not_before "${RELEASE_NOT_BEFORE}" \
+              '[
+                "python", "-m", "changeops.evaluation.deployed_evidence",
+                "--run-id", $run,
+                "--release-not-before", $release_not_before
+              ]'
+          )"
+          overrides="$(
+            jq -cn --argjson command "${command_json}" \
+              '{containerOverrides:[{name:"bootstrap",command:$command}]}'
+          )"
+          task_arn="$(
+            aws ecs run-task \
+              --cluster "${ECS_CLUSTER}" \
+              --launch-type FARGATE \
+              --task-definition "${EVIDENCE_TASK_DEFINITION}" \
+              --network-configuration "${network_configuration}" \
+              --overrides "${overrides}" \
+              --started-by "github-verify-${GITHUB_RUN_ID}" \
+              --tags key=Application,value=ChangeOps key=Environment,value=demo \
+              --query 'tasks[0].taskArn' \
+              --output text
+          )"
+          test -n "${task_arn}" && test "${task_arn}" != "None"
+          aws ecs wait tasks-stopped --cluster "${ECS_CLUSTER}" --tasks "${task_arn}"
+          description="$(
+            aws ecs describe-tasks --cluster "${ECS_CLUSTER}" --tasks "${task_arn}"
+          )"
+          exit_code="$(
+            jq -r \
+              '.tasks[0].containers[] | select(.name=="bootstrap") | .exitCode // -1' \
+              <<<"${description}"
+          )"
+          if test "${exit_code}" != "0"; then
+            task_id="${task_arn##*/}"
+            aws logs get-log-events \
+              --log-group-name /changeops/demo/bootstrap \
+              --log-stream-name "bootstrap/bootstrap/${task_id}" \
+              --query 'events[].message' \
+              --output text || true
+            echo "Deployed evidence check failed." >&2
+            exit 1
+          fi
+
+      - name: Verify the public deployed boundary
+        run: |
+          set -euo pipefail
+          response_headers="$(mktemp)"
+          ready_payload="$(
+            curl --fail --silent --show-error \
+              --dump-header "${response_headers}" \
+              "${APPLICATION_URL%/}/readyz"
+          )"
+          test "$(jq -r '.status' <<<"${ready_payload}")" = "ok"
+          test "$(jq -r '.api' <<<"${ready_payload}")" = "ok"
+          grep -Eiq '^strict-transport-security: max-age=31536000; includesubdomains' \
+            "${response_headers}"
+          root_status="$(
+            curl --silent --show-error --output /dev/null --write-out '%{http_code}' \
+              "${APPLICATION_URL%/}/"
+          )"
+          test "${root_status}" = "302"

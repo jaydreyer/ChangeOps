@@ -13,6 +13,11 @@ resource "aws_cloudwatch_log_group" "migration" {
   retention_in_days = 30
 }
 
+resource "aws_cloudwatch_log_group" "bootstrap" {
+  name              = "/changeops/${var.environment}/bootstrap"
+  retention_in_days = 30
+}
+
 resource "aws_cloudwatch_log_group" "rds_postgresql" {
   name              = "/aws/rds/instance/${local.database_identifier}/postgresql"
   retention_in_days = 30
@@ -155,6 +160,10 @@ locals {
       value = "http://127.0.0.1:8000"
     },
     {
+      name  = "CHANGEOPS_IDENTITY_MODE"
+      value = "alb"
+    },
+    {
       name  = "AWS_REGION"
       value = var.aws_region
     },
@@ -181,6 +190,16 @@ locals {
       name      = "DB_PASSWORD"
       valueFrom = "${aws_secretsmanager_secret.migration_db.arn}:password::"
     },
+  ]
+
+  bootstrap_environment = [
+    for item in local.api_environment : item
+    if contains(["APP_NAME", "AWS_REGION", "DB_HOST", "DB_PORT", "DB_NAME", "DB_SSLMODE"], item.name)
+  ]
+
+  bootstrap_secrets = [
+    for item in local.api_secrets : item
+    if contains(["DB_USERNAME", "DB_PASSWORD"], item.name)
   ]
 }
 
@@ -326,6 +345,44 @@ resource "aws_ecs_task_definition" "migration" {
   }
 }
 
+resource "aws_ecs_task_definition" "bootstrap" {
+  family                   = local.bootstrap_family
+  network_mode             = "awsvpc"
+  requires_compatibilities = ["FARGATE"]
+  cpu                      = 512
+  memory                   = 1024
+  execution_role_arn       = aws_iam_role.application_execution.arn
+  task_role_arn            = aws_iam_role.application_task.arn
+
+  container_definitions = jsonencode([
+    {
+      name        = "bootstrap"
+      image       = "${aws_ecr_repository.api.repository_url}:${var.container_image_tag}"
+      essential   = true
+      command     = ["python", "-m", "changeops.deployment_bootstrap"]
+      environment = local.bootstrap_environment
+      secrets     = local.bootstrap_secrets
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          awslogs-group         = aws_cloudwatch_log_group.bootstrap.name
+          awslogs-region        = var.aws_region
+          awslogs-stream-prefix = "bootstrap"
+        }
+      }
+    },
+  ])
+
+  runtime_platform {
+    cpu_architecture        = "X86_64"
+    operating_system_family = "LINUX"
+  }
+
+  tags = {
+    Name = local.bootstrap_family
+  }
+}
+
 resource "aws_ecs_service" "app" {
   name            = local.ecs_service_name
   cluster         = aws_ecs_cluster.main.id
@@ -363,5 +420,11 @@ resource "aws_ecs_service" "app" {
 
   tags = {
     Name = local.ecs_service_name
+  }
+
+  lifecycle {
+    # Terraform owns the service and its safe desired-count state. The protected release
+    # workflow owns immutable application task-definition revisions.
+    ignore_changes = [task_definition]
   }
 }

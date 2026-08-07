@@ -90,6 +90,27 @@ resource "aws_lb_listener" "https" {
   }
 }
 
+resource "aws_lb_listener_rule" "public_health" {
+  count        = var.demo_enabled ? 1 : 0
+  listener_arn = aws_lb_listener.https[0].arn
+  priority     = 10
+
+  action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.web.arn
+  }
+
+  condition {
+    path_pattern {
+      values = ["/healthz", "/readyz"]
+    }
+  }
+
+  tags = {
+    Name = "${local.name_prefix}-public-health"
+  }
+}
+
 resource "aws_route53_record" "app_ipv4" {
   count = var.demo_enabled ? 1 : 0
 

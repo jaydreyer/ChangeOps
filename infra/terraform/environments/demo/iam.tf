@@ -66,6 +66,7 @@ data "aws_iam_policy_document" "application_execution" {
     resources = [
       "${aws_cloudwatch_log_group.api.arn}:*",
       "${aws_cloudwatch_log_group.web.arn}:*",
+      "${aws_cloudwatch_log_group.bootstrap.arn}:*",
     ]
   }
 
@@ -209,6 +210,19 @@ data "aws_iam_policy_document" "github_deploy" {
   }
 
   statement {
+    sid    = "ReadNamedImageMetadata"
+    effect = "Allow"
+    actions = [
+      "ecr:DescribeImages",
+      "ecr:DescribeRepositories",
+    ]
+    resources = [
+      aws_ecr_repository.api.arn,
+      aws_ecr_repository.web.arn,
+    ]
+  }
+
+  statement {
     sid    = "RegisterReviewedTaskDefinitions"
     effect = "Allow"
     actions = [
@@ -225,10 +239,13 @@ data "aws_iam_policy_document" "github_deploy" {
   }
 
   statement {
-    sid       = "RunNamedTaskDefinitions"
-    effect    = "Allow"
-    actions   = ["ecs:RunTask"]
-    resources = ["arn:${data.aws_partition.current.partition}:ecs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:task-definition/${local.migration_family}:*"]
+    sid     = "RunNamedTaskDefinitions"
+    effect  = "Allow"
+    actions = ["ecs:RunTask"]
+    resources = [
+      "arn:${data.aws_partition.current.partition}:ecs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:task-definition/${local.migration_family}:*",
+      "arn:${data.aws_partition.current.partition}:ecs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:task-definition/${local.bootstrap_family}:*",
+    ]
 
     condition {
       test     = "ArnEquals"
@@ -264,6 +281,7 @@ data "aws_iam_policy_document" "github_deploy" {
       "ecs:DescribeServices",
       "ecs:DescribeTaskDefinition",
       "ecs:DescribeTasks",
+      "ecs:ListTaskDefinitions",
       "ecs:ListTasks",
     ]
     resources = ["*"]
@@ -280,6 +298,7 @@ data "aws_iam_policy_document" "github_deploy" {
       "${aws_cloudwatch_log_group.api.arn}:*",
       "${aws_cloudwatch_log_group.web.arn}:*",
       "${aws_cloudwatch_log_group.migration.arn}:*",
+      "${aws_cloudwatch_log_group.bootstrap.arn}:*",
     ]
   }
 

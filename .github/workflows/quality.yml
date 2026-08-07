@@ -36,8 +36,9 @@ jobs:
 
       - name: Initialize and validate bootstrap root
         run: |
-          terraform -chdir=infra/terraform/bootstrap init -backend=false
+          terraform -chdir=infra/terraform/bootstrap init
           terraform -chdir=infra/terraform/bootstrap validate
+          terraform -chdir=infra/terraform/bootstrap test
 
       - name: Initialize and validate demo environment
         run: |

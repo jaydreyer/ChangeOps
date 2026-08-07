@@ -1,3 +1,4 @@
+# Copy this file to the ignored backend_override.tf only after the bucket exists.
 terraform {
   backend "s3" {
     key          = "bootstrap/terraform.tfstate"

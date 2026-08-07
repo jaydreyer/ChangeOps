@@ -56,8 +56,9 @@ From the repository root:
 
 ```bash
 terraform fmt -check -recursive infra/terraform
-terraform -chdir=infra/terraform/bootstrap init -backend=false
+terraform -chdir=infra/terraform/bootstrap init
 terraform -chdir=infra/terraform/bootstrap validate
+terraform -chdir=infra/terraform/bootstrap test
 terraform -chdir=infra/terraform/environments/demo init -backend=false
 terraform -chdir=infra/terraform/environments/demo validate
 terraform -chdir=infra/terraform/environments/demo test
@@ -100,35 +101,57 @@ provide or commit long-lived access keys.
 
 ### 2. Bootstrap secure Terraform state
 
-The first bootstrap apply temporarily uses local state because the bucket does not yet exist.
+The first bootstrap apply uses Terraform's implicit local backend because the bucket does not yet
+exist. The committed S3 backend is deliberately an inactive `.example` file during this phase;
+`terraform init -backend=false` is not a substitute for a usable local backend.
 
-1. Initialize without a backend, inspect, apply, and print the bucket name:
+1. Initialize the implicit local backend and create a saved plan:
 
    ```bash
-   terraform -chdir=infra/terraform/bootstrap init -backend=false
+   terraform -chdir=infra/terraform/bootstrap init
    terraform -chdir=infra/terraform/bootstrap plan -out=bootstrap.tfplan
+   terraform -chdir=infra/terraform/bootstrap show bootstrap.tfplan
+   ```
+
+2. Confirm the plan creates only the account-scoped state bucket, versioning, AES-256
+   server-side encryption, all four public-access blocks, and the TLS-only bucket policy. After
+   explicit human approval of that exact saved plan, apply it and print the bucket name:
+
+   ```bash
    terraform -chdir=infra/terraform/bootstrap apply bootstrap.tfplan
    terraform -chdir=infra/terraform/bootstrap output -raw state_bucket_name
    ```
 
-2. Migrate bootstrap state to that bucket:
+3. Keep the local `terraform.tfstate` until migration is verified. Activate the reviewed partial
+   S3 backend configuration in the ignored override file, then migrate the state to the bucket:
 
    ```bash
+   cp infra/terraform/bootstrap/backend.s3.tf.example \
+     infra/terraform/bootstrap/backend_override.tf
    terraform -chdir=infra/terraform/bootstrap init -migrate-state \
      -backend-config="bucket=PASTE_BUCKET_NAME" \
      -backend-config="region=us-east-1"
    ```
 
-3. Answer `yes` only when Terraform asks to copy the existing local state.
-4. Verify remote state:
+4. Answer `yes` only when Terraform asks to copy the existing local state into that exact bucket.
+   Do not use `-reconfigure`, which changes backend configuration without migrating state.
+5. Verify remote state:
 
    ```bash
    terraform -chdir=infra/terraform/bootstrap state list
    ```
 
-5. If a local state copy remains, move it to encrypted storage and securely remove the working
-   copy. The bucket is versioned, encrypted, public-access-blocked, TLS-only, lock-enabled, and
-   protected from Terraform destruction.
+6. Continue only when the state list includes the state bucket and every protection resource. If
+   a local state copy remains, move it to encrypted storage and securely remove the working copy.
+   Keep the ignored `backend_override.tf` for commands from this checkout. The bucket is
+   versioned, encrypted, public-access-blocked, TLS-only, lock-enabled, and protected from
+   Terraform destruction.
+
+For a later clean checkout, recreate `backend_override.tf` from the committed example and run
+`terraform init -reconfigure` with the exact bucket and Region backend arguments. Use
+`-migrate-state` only when a local state file actually needs to be copied. Run `terraform state
+list` and confirm the expected protected bucket resources before any plan or apply from that
+checkout.
 
 ### 3. Prepare the environment configuration
 
